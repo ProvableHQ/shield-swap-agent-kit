@@ -7,7 +7,7 @@ Choose the funding source: a testnet faucet, assets already on Aleo, or a suppor
 ## CLI — check first, then fund if needed
 
 ```sh
-npx --no-install shield-swap balances --network testnet --all --json
+npx --package @provablehq/shield-swap-cli shield-swap balances --network testnet --all --json
 ```
 
 Check `address`, `network`, and each token's `private`, `public`, and `decimals`. Amounts are base-unit strings. A positive `total` does not guarantee private spending capacity, and a sum of small private records may not cover a swap that requires one larger record.
@@ -15,7 +15,7 @@ Check `address`, `network`, and each token's `private`, `public`, and `decimals`
 If testnet funding is requested and no job is already running:
 
 ```sh
-npx --no-install shield-swap setup --network testnet
+npx --package @provablehq/shield-swap-cli shield-swap setup --network testnet
 ```
 
 Setup stores the faucet job id and resumes polling on subsequent runs. Exit code `3` with `AIRDROP_PENDING` means funding or scanner indexing is still pending; do not create a new account. Re-run the balance read to check progress.
@@ -24,7 +24,7 @@ The current setup skips its faucet when it finds *any* holdings, not necessarily
 
 ## Veil — inspect and request testnet tokens
 
-Save as `balances.mts` and run `npx --no-install tsx balances.mts`:
+Save as `balances.mts` and run `npx tsx balances.mts`:
 
 ```ts
 import { client, account, network } from './authenticate.mts'
@@ -48,7 +48,7 @@ if (!result.job.results.length || result.job.results.some(r => r.status !== 'acc
 console.log({ status: result.status })
 ```
 
-Run with `npx --no-install tsx fund.mts`. Through the decorated client, `confirmAirdrop` waits for the faucet and, when a scanner is configured, its transfers' readable private records. A bare API client does not provide that same record check. Run `balances.mts` afterward and verify the required token.
+Run with `npx tsx fund.mts`. Through the decorated client, `confirmAirdrop` waits for the faucet and, when a scanner is configured, its transfers' readable private records. A bare API client does not provide that same record check. Run `balances.mts` afterward and verify the required token.
 
 This helper starts a new request; it is not a restart command. On a timeout, retain the job id reported by the error. Inspect it with `client.api.getAirdropStatus(jobId)` and recheck balances; do not rerun `fund.mts` blindly. An error without a known outcome requires checking the original funding attempt first.
 

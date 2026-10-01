@@ -18,7 +18,7 @@ The examples quote **1.5 USDCx → ETH on testnet, with 50 basis points (0.5%) s
 Inspect available pools when discovery is part of the request:
 
 ```sh
-npx --no-install shield-swap pools --network testnet --token USDCx --json
+npx --package @provablehq/shield-swap-cli shield-swap pools --network testnet --token USDCx --json
 ```
 
 The response includes each pool's `tradeable`, `liquidity`, and any unavailability reason. Being listed by the API is not sufficient; the command checks on-chain trading controls too.
@@ -26,7 +26,7 @@ The response includes each pool's `tradeable`, `liquidity`, and any unavailabili
 Plan without submitting:
 
 ```sh
-npx --no-install shield-swap swap --network testnet --from USDCx --to ETH --amount 1.5 --slippage 50 --json
+npx --package @provablehq/shield-swap-cli shield-swap swap --network testnet --from USDCx --to ETH --amount 1.5 --slippage 50 --json
 ```
 
 Check `submitted: false`, the route, and the minimum output. The current command checks private holdings even in planning mode. If the account is unfunded and only a quote was requested, use the Veil quote recipe with the [same CLI session](../toolchains/cli.md#reuse-a-cli-account-from-a-script). Do not request funds just to obtain a quote.
@@ -34,7 +34,7 @@ Check `submitted: false`, the route, and the minimum output. The current command
 Execute only when the requested terms are authorized:
 
 ```sh
-npx --no-install shield-swap swap --network testnet --from USDCx --to ETH --amount 1.5 --slippage 50 --execute --json
+npx --package @provablehq/shield-swap-cli shield-swap swap --network testnet --from USDCx --to ETH --amount 1.5 --slippage 50 --execute --json
 ```
 
 This invocation obtains a **fresh quote**; it does not consume the previous command's quote. The CLI has no documented flag to bind execution to that earlier quote or an absolute output floor. If authorization applies to exact quoted terms, use the SDK with the retained quote and validate its freshness instead.
@@ -42,20 +42,20 @@ This invocation obtains a **fresh quote**; it does not consume the previous comm
 The command attempts the claim unless `--no-claim` is supplied. A result with `submitted: true` but `claimTransactionId: null` is an unclaimed swap, not a completed trade. Retain `swapId` and inspect:
 
 ```sh
-npx --no-install shield-swap history --network testnet --json
+npx --package @provablehq/shield-swap-cli shield-swap history --network testnet --json
 ```
 
 To complete one identified, authorized pending claim, replace the ID:
 
 ```sh
-npx --no-install shield-swap history --network testnet --claim --swap-id YOUR_SWAP_ID --execute --json
+npx --package @provablehq/shield-swap-cli shield-swap history --network testnet --claim --swap-id YOUR_SWAP_ID --execute --json
 ```
 
 Without `--swap-id`, that command can claim unrelated pending swaps too. Do not rerun `swap --execute` to recover a missing response or an unfinished claim.
 
 ## Veil — quote, then use that quote
 
-Save as `quote.mts` and run `npx --no-install tsx quote.mts`:
+Save as `quote.mts` and run `npx tsx quote.mts`:
 
 ```ts
 import { formatUnits } from '@provablehq/shield-swap-sdk'
@@ -131,7 +131,7 @@ The profile-bound client has a durable journal. Keep `track=True` (the default) 
 
 Reopen the same account/network/store and inspect first. These examples inspect one known swap; they do not resubmit it or claim all pending outputs. `SHIELD_SWAP_ID` is a recipe input supplied from the original operation's result.
 
-For Veil, save as `inspect-swap.mts` and run with `npx --no-install tsx inspect-swap.mts`:
+For Veil, save as `inspect-swap.mts` and run with `npx tsx inspect-swap.mts`:
 
 ```ts
 import { client } from './authenticate.mts'

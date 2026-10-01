@@ -15,13 +15,13 @@ Read only the section for the selected interface. The SDK recipes continue the `
 If setup has not run and its combined authentication/token/funding effects are wanted:
 
 ```sh
-npx --no-install shield-swap setup --network testnet
+npx --package @provablehq/shield-swap-cli shield-swap setup --network testnet
 ```
 
 Otherwise verify the existing session with a balance read:
 
 ```sh
-npx --no-install shield-swap balances --network testnet --all --json
+npx --package @provablehq/shield-swap-cli shield-swap balances --network testnet --all --json
 ```
 
 Operational commands load and authenticate the existing session. A balance read does not mint a token, request funds, or submit a swap. Check the returned `address` and `network`; zero holdings mean funding may be needed, not that authentication failed.
@@ -39,7 +39,7 @@ await client.authenticateShieldSwap()
 export { client, account, network }
 ```
 
-Run `npx --no-install tsx authenticate.mts`. Success establishes the client's DEX session. Do not log its credentials. Later scripts import this module so a new process authenticates its own client; imports within one process reuse the module.
+Run `npx tsx authenticate.mts`. Success establishes the client's DEX session. Do not log its credentials. Later scripts import this module so a new process authenticates its own client; imports within one process reuse the module.
 
 For optional referral attribution, only when the user supplies a code and wants to use it:
 

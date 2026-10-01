@@ -24,7 +24,7 @@ Retain the lockfile and record the resolved versions. The [source map](../../doc
 Use `.mts` for the example scripts so imports and top-level `await` run as ESM:
 
 ```sh
-npx --no-install tsx filename.mts
+npx tsx filename.mts
 ```
 
 ## Client and runbook conventions

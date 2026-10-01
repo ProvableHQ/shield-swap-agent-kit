@@ -6,13 +6,13 @@ Use the existing `@provablehq/shield-swap-cli` for immediate trading. It install
 
 ```sh
 npm install @provablehq/shield-swap-cli
-npx --no-install shield-swap --help
+npx --package @provablehq/shield-swap-cli shield-swap --help
 npm ls @provablehq/shield-swap-cli
 ```
 
 Keep the project's lockfile. The recipes were checked against the source versions in the [source map](../../docs/source-map.md), not every published release. Check the installed command's help when its flags differ.
 
-The runbooks use `npx --no-install shield-swap` so an absent dependency fails instead of downloading a different version. Run commands from the same trading directory: state is relative to the working directory, not the installed skill.
+The runbooks name the scoped package explicitly so `npx` resolves the Shield Swap CLI, including when it needs to download it. For a repeatable bot deployment, install and lock the dependency version in the consuming project. Run commands from the same trading directory: state is relative to the working directory, not the installed skill.
 
 ## What the command does
 
@@ -49,7 +49,7 @@ export const { client, account, network } = await loadSession({
 })
 ```
 
-Other `.mts` files can import `{ client, account, network }` from `./session.mts` and run with `npx --no-install tsx filename.mts`. Loading the session authenticates and uses the CLI's existing identity store. It does not run setup, request an airdrop, or submit a swap.
+Other `.mts` files can import `{ client, account, network }` from `./session.mts` and run with `npx tsx filename.mts`. Loading the session authenticates and uses the CLI's existing identity store. It does not run setup, request an airdrop, or submit a swap.
 
 Use this path after setup has saved the account, including when the obsolete invite-code check blocks the remaining setup stages. It still needs working DEX authentication. Do not construct a second wallet or copy state into a Python profile as an implicit fallback.
 

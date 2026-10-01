@@ -12,13 +12,13 @@ Choose **one**:
 
 ```sh
 # Reuse the account already configured in this directory.
-npx --no-install shield-swap setup --network testnet
+npx --package @provablehq/shield-swap-cli shield-swap setup --network testnet
 
 # Import an existing key from a file supplied outside the conversation.
-npx --no-install shield-swap setup --network testnet --private-key-file /absolute/path/private-key.txt
+npx --package @provablehq/shield-swap-cli shield-swap setup --network testnet --private-key-file /absolute/path/private-key.txt
 
 # Create an account only when the user chose a new account.
-npx --no-install shield-swap setup --network testnet --new
+npx --package @provablehq/shield-swap-cli shield-swap setup --network testnet --new
 ```
 
 The command prints the account address and state directory. Check the address against the requested account. It stores account credentials in `.shield-swap/testnet/state.json` and swap recovery data in `.shield-swap/testnet/blinded.json`. Reuse that directory across sessions; do not print either file.
@@ -60,7 +60,7 @@ export const client = walletClient.extend(shieldSwapActions({
 
 `api: {}` selects the DEX API for the client's network. The file store retains blinded identities and swap handles across restarts. It is not a wallet backup: retain the original key too. This module does not authenticate, request funds, or submit a transaction.
 
-To verify the selected account, save as `check-account.mts` and run `npx --no-install tsx check-account.mts`:
+To verify the selected account, save as `check-account.mts` and run `npx tsx check-account.mts`:
 
 ```ts
 import { account, network } from './session.mts'
