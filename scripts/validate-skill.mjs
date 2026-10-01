@@ -69,17 +69,17 @@ async function validateLinks(files, root) {
 }
 
 /** Validate this project's single-line skill metadata and bundled local files. */
-export async function validateSkillDirectory(directory) {
+export async function validateSkillDirectory(directory, { sourceRepository = false } = {}) {
   if ((await lstat(directory)).isSymbolicLink()) throw new Error(`Symlink skill directory: ${directory}`)
   const root = await realpath(directory)
-  const files = await filesWithin(root, { bundle: true })
+  const files = await filesWithin(root, { bundle: !sourceRepository })
   const content = await readFile(join(root, 'SKILL.md'), 'utf8')
   const metadata = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)
   if (!metadata) throw new Error(`${root}: SKILL.md requires YAML frontmatter`)
   const name = metadata[1].match(/^name: ([a-z0-9]+(?:-[a-z0-9]+)*)\r?$/m)?.[1]
   const description = metadata[1].match(/^description: (.+)\r?$/m)?.[1].trim()
   if (!name || name.length > 64) throw new Error(`${root}: invalid skill name`)
-  if (name !== basename(root)) throw new Error(`${root}: skill name must match directory name`)
+  if (!sourceRepository && name !== basename(root)) throw new Error(`${root}: skill name must match directory name`)
   if (!description || description.length > 1024 || /^[>|]/.test(description)) {
     throw new Error(`${root}: description must be a nonempty single line of at most 1024 characters`)
   }
@@ -87,18 +87,11 @@ export async function validateSkillDirectory(directory) {
   return { name, markdownFiles }
 }
 
-/** Check repository links and each installable skill independently. */
+/** Check the root skill and its context in a source checkout of any directory name. */
 export async function validateRepository(root = repository) {
   root = await realpath(root)
-  const markdownFiles = await validateLinks(await filesWithin(root), root)
-  const skills = []
-  for (const entry of await readdir(join(root, 'skills'), { withFileTypes: true })) {
-    if (entry.isDirectory() || entry.isSymbolicLink()) {
-      skills.push(await validateSkillDirectory(join(root, 'skills', entry.name)))
-    }
-  }
-  if (!skills.length) throw new Error('No installable skills found')
-  return { markdownFiles, skills }
+  const skill = await validateSkillDirectory(root, { sourceRepository: true })
+  return { markdownFiles: skill.markdownFiles, skills: [skill] }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

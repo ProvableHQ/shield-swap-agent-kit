@@ -22,6 +22,8 @@ Identify the requested operation, network, account, and available interface. Reu
 
 Then apply [permissions](../safety/permissions.md) and [private-key handling](../safety/private-key-handling.md). A request to inspect or quote authorizes that operation, not a swap. An explicit authorized trade should continue through its required claim and verification without repeatedly asking the user to approve the same scope.
 
+If setup is needed, follow [configure account](../shield-swap-setup/configure-account.md) and [configure Shield Swap](../shield-swap-setup/configure-shield-swap.md), which ends at [funding](../shield-swap-setup/bridge-funds.md). Discovery and quoting belong to the separate [swap journey](../shield-swap-setup/swap.md); they are not setup gates.
+
 ## Shared rules
 
 Authentication grants access; referrals are optional. If an older tool requires an invite code, identify the version mismatch and use a verified corrected path. Do not invent a code or disable authentication.

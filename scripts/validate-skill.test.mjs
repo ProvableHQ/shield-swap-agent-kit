@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { access, cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { validateSkillDirectory } from './validate-skill.mjs'
+import { validateRepository, validateSkillDirectory } from './validate-skill.mjs'
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const metadata = '---\nname: fixture\ndescription: Use when validating a test fixture.\n---\n\n'
@@ -26,10 +26,24 @@ async function fixture(t, body, header = metadata) {
 test('the real skill works when copied outside the repository', async (t) => {
   const parent = await temporaryDirectory(t)
   const destination = join(parent, 'shield-swap')
-  await cp(join(repository, 'skills/shield-swap'), destination, { recursive: true })
+  const excluded = new Set(['.git', 'node_modules', '.agents', '.claude', '.codex', '.superpowers'])
+  await cp(repository, destination, { recursive: true, filter: (source) => !excluded.has(basename(source)) })
   const result = await validateSkillDirectory(destination)
   assert.equal(result.name, 'shield-swap')
   assert.ok(result.markdownFiles > 1)
+  await access(join(destination, 'AGENTS.md'))
+  await access(join(destination, 'context/shield-swap-setup/bridge-funds.md'))
+  await access(join(destination, 'tools/SKILL.md'))
+})
+
+test('the source repository name need not match the installed skill name', async () => {
+  const result = await validateRepository(repository)
+  assert.equal(result.skills[0].name, 'shield-swap')
+})
+
+test('the root install entrypoint cannot refer to a missing journey guide', async (t) => {
+  const { directory } = await fixture(t, '[Start](AGENTS.md)\n')
+  await assert.rejects(validateSkillDirectory(directory), /AGENTS\.md/)
 })
 
 test('a missing bundled reference fails with its target', async (t) => {
