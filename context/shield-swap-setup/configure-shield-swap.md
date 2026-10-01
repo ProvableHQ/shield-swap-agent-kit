@@ -15,13 +15,13 @@ Read only the section for the selected interface. The SDK recipes continue the `
 If setup has not run and its combined authentication/token/funding effects are wanted:
 
 ```sh
-npx --package @provablehq/shield-swap-cli shield-swap setup --network testnet
+shield-swap setup --network testnet
 ```
 
 Otherwise verify the existing session with a balance read:
 
 ```sh
-npx --package @provablehq/shield-swap-cli shield-swap balances --network testnet --all --json
+shield-swap balances --network testnet --all --json
 ```
 
 Operational commands load and authenticate the existing session. A balance read does not mint a token, request funds, or submit a swap. Check the returned `address` and `network`; zero holdings mean funding may be needed, not that authentication failed.

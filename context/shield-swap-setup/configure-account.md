@@ -12,13 +12,13 @@ Choose **one**:
 
 ```sh
 # Reuse the account already configured in this directory.
-npx --package @provablehq/shield-swap-cli shield-swap setup --network testnet
+shield-swap setup --network testnet
 
 # Import an existing key from a file supplied outside the conversation.
-npx --package @provablehq/shield-swap-cli shield-swap setup --network testnet --private-key-file /absolute/path/private-key.txt
+shield-swap setup --network testnet --private-key-file /absolute/path/private-key.txt
 
 # Create an account only when the user chose a new account.
-npx --package @provablehq/shield-swap-cli shield-swap setup --network testnet --new
+shield-swap setup --network testnet --new
 ```
 
 The command prints the account address and state directory. Check the address against the requested account. It stores account credentials in `.shield-swap/testnet/state.json` and swap recovery data in `.shield-swap/testnet/blinded.json`. Reuse that directory across sessions; do not print either file.

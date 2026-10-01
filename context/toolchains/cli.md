@@ -2,17 +2,23 @@
 
 Use the existing `@provablehq/shield-swap-cli` for immediate trading. It installs the `shield-swap` command; AgentKit does not require a second CLI.
 
-## Install in the trading project
+## Use the installed command
+
+The runbooks assume `shield-swap` is already installed and on `PATH`:
 
 ```sh
-npm install @provablehq/shield-swap-cli
-npx --package @provablehq/shield-swap-cli shield-swap --help
-npm ls @provablehq/shield-swap-cli
+shield-swap --help
 ```
 
-Keep the project's lockfile. The recipes were checked against the source versions in the [source map](../../docs/source-map.md), not every published release. Check the installed command's help when its flags differ.
+If it is missing, install it once:
 
-The runbooks name the scoped package explicitly so `npx` resolves the Shield Swap CLI, including when it needs to download it. For a repeatable bot deployment, install and lock the dependency version in the consuming project. Run commands from the same trading directory: state is relative to the working directory, not the installed skill.
+```sh
+npm install --global @provablehq/shield-swap-cli
+```
+
+For repeatable bot deployments, pin the dependency version and expose its binary through the application's runtime environment. The recipes were checked against the source versions in the [source map](../../docs/source-map.md), not every published release. Check the installed command's help when its flags differ.
+
+Run commands from the same trading directory: state is relative to the working directory, not the installed skill.
 
 ## What the command does
 
@@ -31,10 +37,10 @@ Both pool reads and swap planning use a configured, authenticated session. The c
 
 ## Reuse a CLI account from a script
 
-When a CLI flag cannot express a task, use the session export. The shared SDK recipes also import formatting helpers from the Shield Swap SDK. Add that direct dependency at a version compatible with the installed CLI, plus the script runner:
+When a CLI flag cannot express a task, use the session export. The shared SDK recipes also import formatting helpers from the Shield Swap SDK. Install the CLI locally for module imports (a global executable does not supply project imports), alongside a compatible SDK and the script runner:
 
 ```sh
-npm install @provablehq/shield-swap-sdk
+npm install @provablehq/shield-swap-cli @provablehq/shield-swap-sdk
 npm install --save-dev tsx
 npm ls @provablehq/shield-swap-cli @provablehq/shield-swap-sdk
 ```

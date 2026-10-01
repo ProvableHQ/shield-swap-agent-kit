@@ -7,7 +7,7 @@ Choose the funding source: a testnet faucet, assets already on Aleo, or a suppor
 ## CLI — check first, then fund if needed
 
 ```sh
-npx --package @provablehq/shield-swap-cli shield-swap balances --network testnet --all --json
+shield-swap balances --network testnet --all --json
 ```
 
 Check `address`, `network`, and each token's `private`, `public`, and `decimals`. Amounts are base-unit strings. A positive `total` does not guarantee private spending capacity, and a sum of small private records may not cover a swap that requires one larger record.
@@ -15,7 +15,7 @@ Check `address`, `network`, and each token's `private`, `public`, and `decimals`
 If testnet funding is requested and no job is already running:
 
 ```sh
-npx --package @provablehq/shield-swap-cli shield-swap setup --network testnet
+shield-swap setup --network testnet
 ```
 
 Setup stores the faucet job id and resumes polling on subsequent runs. Exit code `3` with `AIRDROP_PENDING` means funding or scanner indexing is still pending; do not create a new account. Re-run the balance read to check progress.
