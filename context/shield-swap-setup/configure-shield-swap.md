@@ -10,7 +10,7 @@ An authenticated account may still have no spendable private records. Configure 
 
 Read only the section for the selected interface. The SDK recipes continue the `session.mts` or `session.py` created on the account page.
 
-## CLI — default for immediate trading
+## CLI
 
 If setup has not run and its combined authentication/token/funding effects are wanted:
 

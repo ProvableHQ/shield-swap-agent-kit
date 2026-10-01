@@ -1,12 +1,12 @@
 # Shield Swap AgentKit
 
-Give an agent the context and working recipes to build on Shield Swap or operate a trading account. Immediate trading defaults to the existing CLI; builders use Veil or Python. The context explains account setup, authentication, private funding, and the swap/claim lifecycle directly.
+Give an agent the context and working recipes to build on Shield Swap or operate a trading account. Choose Veil, Python, the CLI, or available MCP tools according to the user's environment and task. The context explains account setup, authentication, private funding, and the swap/claim lifecycle directly.
 
 ## Current contents
 
 This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows.
 
-It does not yet include its own executable trading scripts, standalone MCP server, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. Runbooks assume the CLI is installed and use `shield-swap` directly.
+It does not yet include its own executable trading scripts, standalone MCP server, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. CLI recipes assume the CLI is installed and use `shield-swap` directly; selecting an SDK or MCP path does not require installing the CLI.
 
 ## Layout
 

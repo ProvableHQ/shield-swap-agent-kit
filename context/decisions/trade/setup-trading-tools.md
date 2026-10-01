@@ -2,7 +2,7 @@
 
 Install and configure only the selected execution interface. Run in a stable application/trading directory outside the installed kit so updating the context cannot remove account state.
 
-## CLI-first path
+## CLI path
 
 1. Use the installed `shield-swap` command; [install once](../../toolchains/cli.md) only if it is missing. Record the installed version and check `shield-swap setup --help` and `shield-swap swap --help` before using unfamiliar flags.
 2. Follow [configure account](../../shield-swap-setup/configure-account.md) to reuse or deliberately create the account. Keep `.shield-swap/` private and out of version control.

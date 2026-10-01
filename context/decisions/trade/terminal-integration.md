@@ -26,4 +26,4 @@ External order acceptance, external fill, Shield Swap submission, and Shield Swa
 
 There are no working terminal connectors in this kit yet. Product pages explain the verified external surface and the missing integration work. Do not replace missing support with undocumented session-cookie endpoints or claim that a protocol SDK controls the terminal's account.
 
-For immediate standalone trading, return to [CLI setup](setup-trading-tools.md). For multi-venue execution, read [arbitrage](../../strategies/arbitrage.md) and [unattended trading](../../safety/unattended-trading.md).
+For standalone Shield Swap trading, return to [choose your trading stack](what-is-your-trading-stack.md). For multi-venue execution, read [arbitrage](../../strategies/arbitrage.md) and [unattended trading](../../safety/unattended-trading.md).

@@ -2,7 +2,7 @@
 
 This initial AgentKit does not contain a standalone MCP server. Installing the skill does not register or launch one. Existing SDKs expose different MCP interfaces; inspect the chosen version and actual tool catalog before making calls.
 
-Default immediate trading to the [CLI](cli.md) until the AgentKit server is available. An explicitly selected, already connected MCP server can still be used for capabilities it actually exposes. The operation pages will gain MCP recipes when tool names and behavior are implemented and verified.
+Use an available MCP connection for capabilities it actually exposes when it fits the requested workflow. If a required capability is missing, consider a supported SDK or CLI path that the host can run while preserving the account and recovery state; see [tool selection](../../tools/SKILL.md). The operation pages will gain MCP recipes when tool names and behavior are implemented and verified.
 
 ## TypeScript SDK interface
 

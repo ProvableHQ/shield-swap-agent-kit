@@ -1,6 +1,6 @@
 # CLI
 
-Use the existing `@provablehq/shield-swap-cli` for immediate trading. It installs the `shield-swap` command; AgentKit does not require a second CLI.
+Use the existing `@provablehq/shield-swap-cli` for terminal-command workflows. It installs the `shield-swap` command; AgentKit does not require a second CLI.
 
 ## Use the installed command
 

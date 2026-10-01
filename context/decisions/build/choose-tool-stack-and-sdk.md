@@ -7,7 +7,7 @@ Use the application's existing language and runtime. The SDKs remain the source 
 | TypeScript bot or service with its own signer | Veil + Shield Swap SDK | [TypeScript](../../toolchains/typescript.md) |
 | Python bot, service, or notebook | Python Shield Swap SDK | [Python](../../toolchains/python.md) |
 | Browser with wallet-controlled keys | Veil wallet integration + Shield Swap SDK | [TypeScript](../../toolchains/typescript.md) |
-| Operate an account now | Existing JS CLI | [CLI](../../toolchains/cli.md) |
+| Operate an account through terminal commands | Existing JS CLI | [CLI](../../toolchains/cli.md) |
 | Existing agent framework needs registered tools | SDK tool definitions or an available MCP connection | [MCP](../../toolchains/mcp.md) |
 | Rust application | A deliberate process/service boundary until a verified native SDK path exists | [Rust](../../toolchains/rust.md) |
 

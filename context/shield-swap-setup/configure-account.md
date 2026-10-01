@@ -4,7 +4,7 @@ Select the account, network, and persistent state before authenticating or tradi
 
 The examples use **testnet**. Keep the account's state outside the installed kit, exclude it from version control, and use a private working directory. On macOS/Linux, `umask 077` before running scripts makes newly created state owner-only. See [private keys and state](../safety/private-key-handling.md) for custody boundaries.
 
-## CLI — default for immediate trading
+## CLI
 
 Install the [CLI](../toolchains/cli.md) and run from the directory where trading state should live. The current `setup` command also authenticates, can create an API token, and requests testnet funds when it finds no holdings. Use it when that combined setup is wanted. For account configuration without those effects, use the SDK path below.
 

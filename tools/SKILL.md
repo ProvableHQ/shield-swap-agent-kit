@@ -2,10 +2,13 @@
 
 Use this guide inside the complete AgentKit. The repository's root `SKILL.md` is the installable entrypoint; this file explains when to use deterministic tools.
 
+Preserve the user's selected interface. Otherwise, choose based on the host's available tools, existing account setup, runtime, custody, and the capabilities needed to complete and recover the operation. Trading immediately does not by itself select the CLI. Ask a focused question only if a consequential choice remains unclear.
+
 | Task | Interface |
 | --- | --- |
 | Build application code | The chosen [TypeScript](../context/toolchains/typescript.md) or [Python](../context/toolchains/python.md) SDK. |
-| Trade immediately, with no interface specified | Default to the existing [Shield Swap CLI](../context/toolchains/cli.md), using structured output and the documented planning mode where available. |
+| Operate through terminal commands | The existing [Shield Swap CLI](../context/toolchains/cli.md), using structured output and the documented planning mode where available. |
+| Trade through an existing application or script | Its configured Veil or Python client, retaining the same account and recovery state. |
 | Operate through an existing agent tool connection | The configured [MCP interface](../context/toolchains/mcp.md), after checking its actual tool catalog and permissions. |
 | Repeat a workflow or validate deterministic results | A tested script under `tools/js/` or `tools/python/` when that script is implemented. |
 

@@ -1,10 +1,10 @@
 # What is your trading stack?
 
-Keep an explicit stack choice. If the user wants to trade immediately and has not chosen one, default to the JS CLI until the AgentKit MCP server is available.
+Keep an explicit stack choice. If none is specified, choose a surface that fits the host's available tools, existing account setup, custody, and required operations. CLI, SDK, and MCP support differ; immediate trading does not imply one preferred interface.
 
 | Existing environment | Continue with |
 | --- | --- |
-| Agent with terminal access | [Set up trading tools](setup-trading-tools.md), using the CLI. |
+| Terminal-command workflow | [CLI](../../toolchains/cli.md) and the matching [tool setup](setup-trading-tools.md). |
 | Existing Veil or Python trader | Its [TypeScript](../../toolchains/typescript.md) or [Python](../../toolchains/python.md) client and existing recovery state. |
 | Connected MCP server | [MCP](../../toolchains/mcp.md): inspect the actual tools, account, network, and permissions. |
 | Axiom, GMGN, Terminal, or fomo | [Terminal integration](terminal-integration.md). |

@@ -1,6 +1,6 @@
 # Source map
 
-Rechecked on 2026-10-01 for the CLI-first context and remaining operational documentation. These are local checkout observations, not published-version or live-network verification. The sources below inform the kit; their existing runbooks are not copied wholesale.
+Rechecked on 2026-10-01 for the cross-surface context and operational documentation. These are local checkout observations, not published-version or live-network verification. The sources below inform the kit; their existing runbooks are not copied wholesale.
 
 ## Sources
 
