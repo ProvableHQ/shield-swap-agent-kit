@@ -2,6 +2,8 @@
 
 This initial AgentKit does not contain a standalone MCP server. Installing the skill does not register or launch one. Existing SDKs expose different MCP interfaces; inspect the chosen version and actual tool catalog before making calls.
 
+Default immediate trading to the [CLI](cli.md) until the AgentKit server is available. An explicitly selected, already connected MCP server can still be used for capabilities it actually exposes. The operation pages will gain MCP recipes when tool names and behavior are implemented and verified.
+
 ## TypeScript SDK interface
 
 `createShieldSwapMcpServer(...)` from `@provablehq/shield-swap-sdk/mcp` returns tool definitions and `handleToolCall`. It does not start a process or implement stdio/HTTP transport. A host must wire MCP initialization, tool listing, invocation, result formatting, and errors to a transport.

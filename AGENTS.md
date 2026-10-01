@@ -2,7 +2,9 @@
 
 Start with [build or trade now](context/decisions/build-or-trade-now.md). Preserve choices and authorization already supplied by the user. A request to build an integration does not require creating or funding a trading account.
 
-This package currently provides context and routing to existing SDKs and tools. It does not bundle its own executable trading scripts or standalone MCP server. Use the installed toolchain's reference for exact APIs; do not invent an unavailable command or method. Read [tool selection](tools/SKILL.md) when choosing how to execute a task.
+For immediate trading, default to the existing [CLI](context/toolchains/cli.md). For application development, use [Veil](context/toolchains/typescript.md) or [Python](context/toolchains/python.md) according to the user's stack. Preserve an explicitly selected interface, including an existing MCP connection; read [tool selection](tools/SKILL.md) for supported fallbacks.
+
+Each operational page explains the shared behavior, then gives interface-specific recipes. Read the section for the chosen interface, not every implementation. The examples use testnet and run in the consumer's project, outside this installed kit. Change networks only to match the user's request. The kit does not yet bundle its own executable trading scripts or standalone MCP server.
 
 ## Setup and trading are separate journeys
 

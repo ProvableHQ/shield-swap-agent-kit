@@ -1,6 +1,6 @@
 # Shield Swap AgentKit
 
-Give an agent the context to build on Shield Swap or operate an existing trading account. The kit routes the task to the appropriate SDK, CLI, or MCP integration and explains the account, privacy, and recovery requirements.
+Give an agent the context and working recipes to build on Shield Swap or operate a trading account. Immediate trading defaults to the existing CLI; builders use Veil or Python. The context explains account setup, authentication, private funding, and the swap/claim lifecycle directly.
 
 ## Current contents
 
@@ -59,7 +59,7 @@ The skill follows the stated intent. It asks for an account decision only when t
 - [Source map](docs/source-map.md) records the SDK sources inspected, differences between implementations, and known corrections required before reusing their flows.
 - [Contributor instructions](CONTRIBUTING.md) describe how to maintain this repository.
 
-The installed skill contains its own routing and operational constraints. Detailed API reference stays with the relevant SDK and documentation site.
+The installed skill contains task explanations, commands, SDK code examples, verification steps, and recovery guidance. Save example scripts in the consuming project, not inside the installed kit. Full API reference stays with the relevant SDK and documentation site.
 
 ## Validate
 

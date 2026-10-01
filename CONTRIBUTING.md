@@ -20,7 +20,8 @@ No roadmap document is maintained here. Describe current functionality in the RE
 - State exactly what a command changes. A constructor or status workflow may create a profile or register a scanner; inspect the implementation before calling it read-only.
 - Record SDK versions and source revisions when validating a workflow. An inspected checkout is not proof of a published release or a successful live run.
 - Use SDK-native terminology and methods for each language. Do not invent cross-language parity or duplicate tool schemas already exported by the SDK.
-- Keep context concise. Link to the installed SDK's reference or maintained documentation for full signatures.
+- Write task-oriented context: explain the shared behavior, give complete CLI and SDK recipes, then show verification, failure handling, and the next step. A link to an API reference supplements the procedure; it does not replace it.
+- Default immediate trading to the existing CLI until the AgentKit MCP server is available. Keep Veil and Python as native builder paths. Select the interface once and preserve it through the journey; document explicit fallbacks for unsupported operations.
 - Mark unavailable functionality explicitly. Do not add empty workflow files, placeholder servers, or installation commands for unpublished packages.
 - Describe the actual privacy boundary: public-chain confidentiality does not imply that wallets, scanners, provers, or API operators learn nothing.
 - Never commit private keys, account state, journals, credentials, or transaction handles containing claim material. Never add AI attribution to commits or documentation.

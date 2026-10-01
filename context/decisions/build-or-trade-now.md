@@ -16,9 +16,11 @@ Start from the selected SDK's documented client and API. Set up an account only 
 
 Identify the requested operation, network, account, and available interface. Reuse an existing configured account. If the account choice is unknown, resolve it before invoking any helper that can generate keys.
 
-- For terminal access, read [CLI](../toolchains/cli.md).
+- Default to [CLI](../toolchains/cli.md) for agents trading immediately. This remains the default until the AgentKit MCP server is available.
 - For an existing MCP connection, read [MCP](../toolchains/mcp.md) and inspect its actual tools.
 - For a requested language-specific script, read the corresponding SDK page.
+
+Select the interface once and carry it through the task. Use an SDK fallback only for a concrete CLI gap, preserving the same account, network, and recovery state. The CLI guide shows how a Veil script can reuse its session.
 
 Then apply [permissions](../safety/permissions.md) and [private-key handling](../safety/private-key-handling.md). A request to inspect or quote authorizes that operation, not a swap. An explicit authorized trade should continue through its required claim and verification without repeatedly asking the user to approve the same scope.
 
