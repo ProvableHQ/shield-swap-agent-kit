@@ -4,7 +4,9 @@ Give an agent the context and working recipes to build on Shield Swap or operate
 
 ## Current contents
 
-This version contains the agent journey entrypoint, build-or-trade routing, account configuration and funding guidance, a separate swap journey, TypeScript and Python SDK guidance, and CLI/MCP and safety context. It does not yet include its own executable trading scripts, standalone MCP server, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages.
+This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows.
+
+It does not yet include its own executable trading scripts, standalone MCP server, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. Runbooks assume the CLI is installed and use `shield-swap` directly.
 
 ## Layout
 
@@ -14,16 +16,35 @@ SKILL.md                     # Thin entrypoint for skill installers
 context/
   decisions/                 # Choose the task and stack before provisioning
   shield-swap-setup/         # Operational runbooks, selected by task
-  toolchains/                # TypeScript, Python, CLI, and MCP guidance
-  safety/                    # Permissions, custody, and recovery state
+  toolchains/                # TypeScript, Python, CLI, MCP, and Rust boundaries
+  integrations/              # Verified product surfaces and connector requirements
+  safety/                    # Permissions, custody, and unattended execution
+  strategies/                # Strategy design; currently arbitrage
+  troubleshooting/           # Scanner lag, record contention, proving failures
 tools/
   SKILL.md                   # When to use SDKs, CLI, MCP, or scripts
 CONTRIBUTING.md              # Instructions for working on this repository
 ```
 
-Keep context and tools at the top level. JS/Python scripts, CLI/MCP code, integration and strategy guides, and examples will occupy the corresponding directories in the agreed design as their implementations become available. No empty executable stubs are shipped.
+Keep context and tools at the top level. Executable JS/Python scripts, CLI/MCP code, and examples belong in their corresponding directories when implemented. Integration context is not a working connector, and strategy guidance is not a running strategy. No empty executable stubs are shipped.
 
-Setup follows account configuration, then Shield Swap authentication with optional referrals, then a link to funding. Pool discovery and quoting belong to `swap.md`. The `shield-swap-setup/` folder is a collection of runbooks, not a sequence that starts trading automatically.
+Setup follows account configuration, then Shield Swap authentication with optional referrals, then a link to funding. [Discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md) supports standalone inspection; [swap](context/shield-swap-setup/swap.md) retains its complete discovery-to-claim flow. The `shield-swap-setup/` folder is a collection of runbooks, not a sequence that starts trading automatically.
+
+Its operational guides are:
+
+```text
+shield-swap-setup/
+  configure-account.md
+  configure-shield-swap.md
+  bridge-funds.md
+  discover-pools-and-get-quotes.md
+  swap.md
+  swap-history.md
+  recover-swaps.md
+  swap-utxo-management.md
+  diagnose-environment.md
+  error-handling.md
+```
 
 ## Install the context
 

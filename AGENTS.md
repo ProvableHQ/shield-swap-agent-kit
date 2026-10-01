@@ -10,7 +10,7 @@ Each operational page explains the shared behavior, then gives interface-specifi
 
 For an account that needs setup, follow [configure account](context/shield-swap-setup/configure-account.md), then [configure Shield Swap](context/shield-swap-setup/configure-shield-swap.md). Configuration ends by linking to [funding](context/shield-swap-setup/bridge-funds.md).
 
-Discover pools and obtain a quote only as part of a requested [swap](context/shield-swap-setup/swap.md) or inspection task. Funding does not select a trade or start a strategy. The `shield-swap-setup/` folder holds operational runbooks; do not execute every file in directory order.
+For inspection without execution, use [discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md). For an authorized trade, [swap](context/shield-swap-setup/swap.md) keeps the complete discovery-to-claim flow. Neither is a setup gate. Funding does not select a trade or start a strategy. The `shield-swap-setup/` folder holds operational runbooks; do not execute every file in directory order.
 
 ## Select the relevant context
 
@@ -20,10 +20,21 @@ Discover pools and obtain a quote only as part of a requested [swap](context/shi
 | Python application, notebook, server, or bot | [Python](context/toolchains/python.md) |
 | Operate an account through terminal commands | [CLI](context/toolchains/cli.md) |
 | Use or embed MCP tools | [MCP](context/toolchains/mcp.md) |
+| Select a build architecture, SDK, and signer | [Builder decisions](context/decisions/build/what-are-you-building.md) |
+| Select a trading stack or strategy | [Trader decisions](context/decisions/trade/what-is-your-trading-stack.md) |
+| Inspect available pools or obtain a quote without trading | [Discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md) |
+| Complete a submitted swap | [Execute and claim](context/shield-swap-setup/recover-swaps.md#resume-one-claim) |
+| Submission or claim outcome is unknown | [Recover the original operation](context/shield-swap-setup/recover-swaps.md) |
+| Inspect this account's swaps or accounting | [Swap history](context/shield-swap-setup/swap-history.md) |
+| Read pool-wide market activity | [Pool trade feed](context/shield-swap-setup/discover-pools-and-get-quotes.md#read-market-trades) |
+| Prepare records for repeated trading | [UTXO management](context/shield-swap-setup/swap-utxo-management.md) |
+| Diagnose a broken environment or operation | [Diagnostics](context/shield-swap-setup/diagnose-environment.md) / [error handling](context/shield-swap-setup/error-handling.md) |
+| Integrate a terminal or chat bot | [Terminal integration](context/decisions/trade/terminal-integration.md) / [bot integration](context/decisions/trade/bot-integration.md) |
 | Configure access or submit an operation | [Permissions](context/safety/permissions.md) |
 | Select an account, signer, or state location | [Private keys and state](context/safety/private-key-handling.md) |
+| Run recurring strategies | [Unattended trading](context/safety/unattended-trading.md) |
 
-Load only the pages relevant to the task. For Rust or a terminal connector not covered here, state that this kit has no verified path and retain the user's choice; do not silently substitute a different stack.
+Load only the pages relevant to the task. The [Rust guide](context/toolchains/rust.md) and product integration pages distinguish available interfaces from unimplemented connectors. Retain the user's stack; do not silently substitute another one or claim that context alone installs an integration.
 
 ## Operational facts
 

@@ -6,7 +6,7 @@ Authenticate the account selected in [configure account](configure-account.md) a
 
 Shield Swap authentication signs a challenge to prove account ownership. It grants DEX access; **invite codes are not required and referrals are optional**. It is separate from proving and scanning: the default Provable edge gateway needs no consumer registration or JWT provisioning.
 
-An authenticated account may still have no spendable private records. Configure access here, then check funding. Discovery and quoting belong to the [swap flow](swap.md).
+An authenticated account may still have no spendable private records. Configure access here, then check funding when needed. Standalone [discovery and quoting](discover-pools-and-get-quotes.md) does not require funding; the [swap flow](swap.md) also includes discovery and quoting for a complete trade.
 
 Read only the section for the selected interface. The SDK recipes continue the `session.mts` or `session.py` created on the account page.
 

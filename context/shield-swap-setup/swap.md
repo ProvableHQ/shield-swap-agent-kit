@@ -172,12 +172,14 @@ print({"swap_id": swap_id, "transaction_id": original.transaction_id,
 
 An empty pending list does not resolve an unknown broadcast. In particular, Python journal entries without a recovered swap ID are omitted from `pending_claims()`. Preserve those entries and recover the original transaction's result; never interpret their absence as permission to trade again.
 
-These recipes cover known-ID inspection and pending-claim continuation, not full recovery of a lost response with no swap ID. Stop with the original transaction identifier and protected state location when that information is insufficient; do not invent a replacement handle.
+These recipes cover known-ID inspection and pending-claim continuation. For a lost response or missing swap ID, follow [unknown-operation recovery](recover-swaps.md): Veil can reconstruct some request handles using surviving identity material and transaction history; Python needs explicit handling for ID-less journal entries. Neither is a guarantee of recovery from a lost store.
 
-CLI `history --reconcile` and Veil history reconciliation can repair parts of local history, but cannot recreate every missing unclaimed handle. Retain the original store. Full handles, journal contents, and private records must not appear in logs or shared output.
+Use [execute and claim](recover-swaps.md#resume-one-claim) to resume one authorized operation. Full handles, journal contents, and private records must not appear in logs or shared output.
 
 ## Verify completion
 
 The SDK examples print both `amountOut`/`amount_out` and the input refund (`amountRemaining`/`amount_remaining`) in their respective tokens' base units. A zero output or refund-only result is not a successful fill, even if transactions were accepted. Report it as such without placing a replacement trade automatically.
 
 Keep the swap and claim transaction IDs. After a confirmed claim, rerun the [balance recipe](bridge-funds.md) for the selected interface and verify the destination token's private holdings. With CLI, also inspect `history --network testnet --json` for the claim and refund summary; `bought` alone does not show refunds. A missing balance update can be scanner lag. Do not claim exact trade attribution from a balance delta when other operations are changing the account concurrently.
+
+Use [swap history](swap-history.md) for receipts and pending outputs, [record management](swap-utxo-management.md) for repeat trading, and [error handling](error-handling.md) when a stage fails.

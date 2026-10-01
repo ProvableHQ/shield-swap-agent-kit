@@ -4,6 +4,8 @@ Use the user's request to select the path. Ask a focused question only if the in
 
 ## Build an integration
 
+Start with [what are you building?](build/what-are-you-building.md), then [choose the tool stack and SDK](build/choose-tool-stack-and-sdk.md) and [custody mode](build/choose-custody-mode.md). Skip decisions already answered by the user's request.
+
 Identify the runtime and where signing keys belong. A browser application uses the connected wallet; a server or unattended bot needs an explicitly configured signer. A read-only prototype may need neither a signer nor a funded account.
 
 - For browser applications or TypeScript services, read [TypeScript](../toolchains/typescript.md).
@@ -13,6 +15,8 @@ Identify the runtime and where signing keys belong. A browser application uses t
 Start from the selected SDK's documented client and API. Set up an account only when a requested integration test or operation actually requires it. Do not run a first-swap example as an installation check: it may create an account, request funding, and submit a trade.
 
 ## Operate an account
+
+Start with [the trading stack](trade/what-is-your-trading-stack.md), [strategy requirements](trade/what-is-your-strategy.md), and [tool setup](trade/setup-trading-tools.md). For a fully specified trade on an existing account, go straight to the requested operation.
 
 Identify the requested operation, network, account, and available interface. Reuse an existing configured account. If the account choice is unknown, resolve it before invoking any helper that can generate keys.
 
@@ -24,7 +28,7 @@ Select the interface once and carry it through the task. Use an SDK fallback onl
 
 Then apply [permissions](../safety/permissions.md) and [private-key handling](../safety/private-key-handling.md). A request to inspect or quote authorizes that operation, not a swap. An explicit authorized trade should continue through its required claim and verification without repeatedly asking the user to approve the same scope.
 
-If setup is needed, follow [configure account](../shield-swap-setup/configure-account.md) and [configure Shield Swap](../shield-swap-setup/configure-shield-swap.md), which ends at [funding](../shield-swap-setup/bridge-funds.md). Discovery and quoting belong to the separate [swap journey](../shield-swap-setup/swap.md); they are not setup gates.
+If setup is needed, follow [configure account](../shield-swap-setup/configure-account.md) and [configure Shield Swap](../shield-swap-setup/configure-shield-swap.md), which ends at [funding](../shield-swap-setup/bridge-funds.md). For inspection only, use [discover pools and get quotes](../shield-swap-setup/discover-pools-and-get-quotes.md). For execution, use the complete [swap journey](../shield-swap-setup/swap.md). Neither is a setup gate, and a quote does not require funding.
 
 ## Shared rules
 

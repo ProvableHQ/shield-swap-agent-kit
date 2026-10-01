@@ -1,6 +1,6 @@
 # Source map
 
-Rechecked on 2026-10-01 for the CLI-first context iteration. These are local checkout observations, not published-version or live-network verification. The sources below inform the kit; their existing runbooks are not copied wholesale.
+Rechecked on 2026-10-01 for the CLI-first context and remaining operational documentation. These are local checkout observations, not published-version or live-network verification. The sources below inform the kit; their existing runbooks are not copied wholesale.
 
 ## Sources
 
@@ -39,11 +39,28 @@ Use the installed dependency's reference when writing executable code. The Pytho
 | MCP coverage differs from SDK coverage. | Python's inspected tool catalog lacks standalone quote/single-swap/individual-claim tools; TS needs further operational recovery tooling. Describe supported tools from the actual catalog. |
 | Quote and manual-transaction amount conventions differ. | Quote examples use human decimal strings; manual transaction amounts and returned handles use base units. Preserve the quote object and its minimum output. |
 | CLI `swap` checks private holdings before its plan-only branch. | An unfunded quote-only task uses the SDK, not an unsolicited faucet request. Use the CLI session export to preserve account and state. |
+| CLI `pools --token` filters after fetching a bounded pool list; Python `get_pools()` exposes no pagination arguments. | An empty filtered response does not prove that no matching pool exists. Use explicit API pagination where supported and report the inspected scope. |
 | CLI `swap --execute` obtains a new quote. | Do not describe plan/execute as consuming one retained quote. Exact quote approval needs the SDK path; execution under preauthorized bounds must remain within those bounds. |
 | Veil quotes carry a 60-second preparation expiry; Python's inspected quote has no expiry field. | Describe each SDK's actual freshness behavior. Python's transaction deadline is not a quote-freshness guarantee. |
 | Python `status()` can degrade to public-only holdings if private scanning fails. | Use `get_balances()` for funding verification so scanner errors are visible. |
 | Python `pending_claims()` omits journal entries without a swap ID. | An empty pending list does not establish that an unknown broadcast failed. Recover the original transaction before retrying. |
+| Veil reconciliation comments understate request recovery. | The implementation matches accepted single- and multi-hop requests to known identities and can reconstruct handles using surviving blinding material. Search bounds, missing transaction bodies, and previously searched/handled records limit coverage; `complete` is not a universal recovery guarantee. |
+| Veil `syncBlindedIdentities()` infers claimed status from missing output. | Do not treat this local status alone as proof of an accepted claim; correlate the actual transaction. |
+| Veil `transactionStatus()` catches read errors and can return `not_found`. | Use direct confirmed-transaction reads for recovery and preserve transport uncertainty. |
+| Python API swap history/detail endpoints are retired. | Use the journal plus on-chain execution receipts. Pool trade feeds describe market activity, not the account's private ledger. |
+| Neither inspected SDK exports a general split/join/autojoin helper. | Explain single-record readiness and coordination. Any record reshaping requires the actual token program's supported ABI and a separately authorized transaction. |
+| Counter locking is not account-wide record reservation. | Veil's store lock is process-local; Python batch exclusions are batch-local. Coordinate input records across writers or serialize them. |
+| Veil has no public record-provider progress API; Python's Shield facade has no public scanner-status accessor. | Do not invent scanner heights or use private members in portable recipes. Distinguish DEX indexer freshness from record visibility. |
+| Wallet-based Veil claims can return before chain confirmation. | Verify confirmation separately; neither local nor wallet claim return implies records are already scanner-visible. |
+
+## External integration evidence
+
+The integration pages cite official product documentation checked on 2026-10-01: Axiom product/limit-order guides, GMGN's official agent package and separate legacy routing API, Pump's protocol documentation, BONKbot/Telemetry guides, Banana Gun product/scraper guides, and fomo's site.
+
+GMGN has a documented agent interface; that does not supply an Aleo connector. For the other named products, the reviewed material did not verify a general product-account execution API. Protocol SDKs, human trading interfaces, and Telegram-client credentials are not substitutes for that evidence. Each guide separates sourced product facts from proposed connector requirements.
 
 ## Evidence boundary
 
 Repository tests validate context structure and isolated packaging. The operational recipes are checked against the source interfaces above; source inspection does not certify published dependency versions, live onboarding, a completed swap, or transport compatibility. Report syntax/type checks separately from live workflow tests.
+
+For this documentation pass, the examples were extracted and checked without executing trading code: 42 TypeScript modules typechecked against local SDK declarations (native SDK and CLI-session variants), 19 Python blocks parsed, and 26 shell blocks passed syntax checks. All 37 context pages were reachable from `AGENTS.md`, and the operational directory matched the revised ten-file layout. The existing `swap.md` prose and examples were preserved, with only renamed link targets updated. These checks do not validate private scanner behavior, live transaction outcomes, or external connector access.
