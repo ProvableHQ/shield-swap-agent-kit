@@ -6,11 +6,15 @@ Use the account and persistent store from [configure account](configure-account.
 
 The examples quote **1.5 USDCx → ETH on testnet, with 50 basis points (0.5%) slippage**. Replace these with the user's actual pair, amount, network, and bounds. The example values are not a recommended strategy or permission to trade.
 
+Use the current [Veil release](https://github.com/ProvableHQ/veil/releases) and the [Shield docs](https://shield.fi/docs). The method names below follow those sources.
+
 ## Shared execution rules
 
 - Use token symbols or IDs resolved by the SDK; never invent decimals or pool keys. A quote finds a route without requiring a full pool scan first.
 - Human amounts are decimal strings. Veil quote results contain base-unit `bigint` values; Python quote amounts are token-unit strings. Returned transaction handles use base units.
 - Preserve the native quote and its minimum output through execution. A quote is an estimate, not a reservation of liquidity. Refresh stale quotes within the user's bounds; do not increase slippage to force execution.
+- `GET /route` takes `amount_in` in human token units and returns `protocol_revision` with the route. A Veil quote exposes that revision as `protocolRevision`. Discard the quote when the revision is older than the current protocol configuration, then request another quote inside the authorized bounds.
+- `GET /unclaimed` is an indexer list of pending swaps. It does not submit the claim. Claiming is the second transaction, through `claimSwapOutput` or `claim_swap_output`.
 - Keep the client and recovery store for the whole operation. Identity persistence prevents lost claim material; it does not make the same input record safe for concurrent spending.
 
 ## CLI — inspect, plan, execute
@@ -70,6 +74,7 @@ console.log({
   minimumOut: formatUnits(quote.minOut, quote.to.decimals),
   outputToken: quote.to.symbol,
   route: quote.hops.map(hop => hop.poolKey),
+  protocolRevision: quote.protocolRevision,
   expiresAt: new Date(quote.expiresAt).toISOString(),
 })
 ```
@@ -93,6 +98,8 @@ console.log({
 Do not append this block to a quote-only script. Running a combined script submits a trade every time. Check the quote against the authorization immediately before execution; if approval named an exact earlier quote, retain that object rather than rerunning the quote call.
 
 The configured file store records the identity and handle. Do not print the whole handle: it contains claim material. A wait failure leaves the original operation to inspect, not a reason to submit another swap.
+
+An application that needs Veil's explicit route check and program imports can follow `planSwap` in the [SDK swap guide](https://shield.fi/docs/sdk/swaps). Copy the quote recipe above for a normal integration.
 
 ## Python — quote, prepare, submit, claim
 
