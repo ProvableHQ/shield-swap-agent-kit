@@ -9,7 +9,7 @@
   },
   "scripts": {
     "validate": "node scripts/validate-skill.mjs",
-    "test": "node scripts/validate-skill.mjs && node --test scripts/validate-skill.test.mjs"
+    "test": "node scripts/validate-skill.mjs && node --test scripts/validate-skill.test.mjs scripts/existing-system-scenarios.test.mjs scripts/one-account-bot-scenarios.test.mjs"
   },
   "repository": {
     "type": "git",

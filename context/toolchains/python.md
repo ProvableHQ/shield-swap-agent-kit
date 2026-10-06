@@ -1,6 +1,6 @@
 # Python
 
-Use `shield-swap-sdk`, imported as `aleo_shield_swap`, for Python bots, notebooks, and services. The package depends on `aleo-sdk` and requires Python 3.10 or newer. The inspected persistent journal uses POSIX file locking; use macOS, Linux, or WSL for these profile-based recipes.
+Use `shield-swap-sdk`, imported as `aleo_shield_swap`, for Python bots, notebooks, and services. A new one-account bot follows [Build a one-account bot](../decisions/trade/bot-integration.md#build-a-one-account-bot) before these install steps. The package depends on `aleo-sdk` and requires Python 3.10 or newer. The inspected persistent journal uses POSIX file locking; use macOS, Linux, or WSL for these profile-based recipes.
 
 ## Install in the application
 

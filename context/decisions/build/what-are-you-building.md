@@ -12,6 +12,18 @@ Choose the application's job before provisioning an account. Reuse requirements 
 
 A one-off request to trade belongs in [the trading path](../trade/what-is-your-trading-stack.md), not a new application scaffold.
 
+## Extend an existing system
+
+Use this route when the project already has a runtime, signer, and network. Keep that client. Skip account creation, funding, and strategy selection unless the user asked for them.
+
+### Quote only
+
+Read [discover pools and get quotes](../../shield-swap-setup/discover-pools-and-get-quotes.md). Call quote on the existing client and return that quote. Stop there. Do not create an account, request funding, or submit a swap.
+
+### Authorized swap
+
+Read [swap](../../shield-swap-setup/swap.md). Call quote, submit, and claim on that same client. When the submission or claim outcome is unknown, read [recover swaps](../../shield-swap-setup/recover-swaps.md) and resume the original operation. Do not create an account, request funding, choose a strategy, or submit another swap to recover the first.
+
 ## Establish the minimum brief
 
 Identify the runtime, who controls the signer, required operations, and whether live execution is needed now. Also establish whether the application serves one account or many: account isolation changes how credentials and recovery stores are selected.

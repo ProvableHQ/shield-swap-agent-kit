@@ -21,6 +21,7 @@ For inspection without execution, use [discover pools and get quotes](context/sh
 | Operate an account through terminal commands | [CLI](context/toolchains/cli.md) |
 | Use or embed MCP tools | [MCP](context/toolchains/mcp.md) |
 | Select a build architecture, SDK, and signer | [Builder decisions](context/decisions/build/what-are-you-building.md) |
+| Extend an application that already has a stack, signer, and network | [Existing system](context/decisions/build/what-are-you-building.md#extend-an-existing-system) |
 | Select a trading stack or strategy | [Trader decisions](context/decisions/trade/what-is-your-trading-stack.md) |
 | Inspect available pools or obtain a quote without trading | [Discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md) |
 | Complete a submitted swap | [Execute and claim](context/shield-swap-setup/recover-swaps.md#resume-one-claim) |
@@ -30,6 +31,7 @@ For inspection without execution, use [discover pools and get quotes](context/sh
 | Prepare records for repeated trading | [UTXO management](context/shield-swap-setup/swap-utxo-management.md) |
 | Diagnose a broken environment or operation | [Diagnostics](context/shield-swap-setup/diagnose-environment.md) / [error handling](context/shield-swap-setup/error-handling.md) |
 | Integrate a terminal or chat bot | [Terminal integration](context/decisions/trade/terminal-integration.md) / [bot integration](context/decisions/trade/bot-integration.md) |
+| Build a one-account bot from scratch | [One-account bot](context/decisions/trade/bot-integration.md#build-a-one-account-bot) |
 | Configure access or submit an operation | [Permissions](context/safety/permissions.md) |
 | Select an account, signer, or state location | [Private keys and state](context/safety/private-key-handling.md) |
 | Run recurring strategies | [Unattended trading](context/safety/unattended-trading.md) |
