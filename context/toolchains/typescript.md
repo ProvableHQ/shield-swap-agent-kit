@@ -33,7 +33,7 @@ npx tsx filename.mts
 
 [Configure Shield Swap](../shield-swap-setup/configure-shield-swap.md) adds an `authenticate.mts` module. Funding and trading scripts import that module so a new process establishes its own DEX session.
 
-The default Provable edge gateway handles proving and record scanning without consumer registration. DEX authentication is a separate signed challenge. Preserve the same client and store while a process is running; rebuilding them for every call adds setup work and risks using different state.
+The published Provable API docs describe proving at `https://api.provable.com/prove/{network}` and record scanning at `https://api.provable.com/scanner/{network}`. An `x-api-key` header selects a Standard or Enterprise key; a request without it uses the Free tier. Consumer registration and JWT exchange are retired for that service. The account recipe keeps the inspected SDK 0.12.0 defaults, `https://edge.provable.com/api/prove` and `https://edge.provable.com/api/scanner`, with no key. DEX authentication is a separate signed challenge. Preserve the same client and store while a process is running; rebuilding them for every call adds setup work and risks using different state.
 
 The local-key recipes do not apply to a browser wallet. A browser uses the connected wallet's account and signing path, not a private-key environment variable or Node file store. Use the [wallet integration reference](https://github.com/ProvableHQ/veil/tree/main/packages/wallet-adapter) for that client; the [SDK reference](https://github.com/ProvableHQ/veil/tree/main/packages/shield-swap) documents compatible DEX actions.
 

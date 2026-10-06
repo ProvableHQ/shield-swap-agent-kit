@@ -4,7 +4,11 @@ Authenticate the account selected in [configure account](configure-account.md) a
 
 ## What configuration means
 
-Shield Swap authentication signs a challenge to prove account ownership. It grants DEX access; **invite codes are not required and referrals are optional**. It is separate from proving and scanning: the default Provable edge gateway needs no consumer registration or JWT provisioning.
+Shield Swap authentication signs a challenge to prove account ownership. It grants DEX access; **invite codes are not required and referrals are optional**. DEX access is separate from Provable proving and record scanning.
+
+Proving and scanning use their own optional API keys. The published Provable API docs describe delegated proving at `https://api.provable.com/prove/{network}` and record scanning at `https://api.provable.com/scanner/{network}`, where `{network}` is `mainnet` or `testnet`. A Standard or Enterprise key is sent as `x-api-key`. A request without that header uses the Free tier: 90 requests per minute per IP for each service. Consumer registration and JWT exchange are retired for this service.
+
+The Veil recipes keep the inspected SDK 0.12.0 defaults, `https://edge.provable.com/api/prove` and `https://edge.provable.com/api/scanner`, which require no key. A provisioned key for that gateway is sent as `X-API-Key`. Supply a host or key override only when the user has configured one. These recipes keep the SDK host rather than retargeting the client to `api.provable.com`.
 
 An authenticated account may still have no spendable private records. Configure access here, then check funding when needed. Standalone [discovery and quoting](discover-pools-and-get-quotes.md) does not require funding; the [swap flow](swap.md) also includes discovery and quoting for a complete trade.
 
