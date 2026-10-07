@@ -9,7 +9,7 @@ Keep an explicit stack choice. If none is specified, choose a surface that fits 
 | Connected MCP server | [MCP](../../toolchains/mcp.md): inspect the actual tools, account, network, and permissions. |
 | Axiom, GMGN, Terminal, or fomo | [Terminal integration](terminal-integration.md). |
 | BONKbot, Banana Gun, or another chat bot | [Bot integration](bot-integration.md). |
-| New one-account bot | [One-account bot](bot-integration.md#build-a-one-account-bot), then [TypeScript](../../toolchains/typescript.md) or [Python](../../toolchains/python.md). |
+| New one-account bot | [One-account bot](bot-integration.md#build-a-one-account-bot), then its native [TypeScript](../../toolchains/typescript.md), [Python](../../toolchains/python.md), or [MCP](../../toolchains/mcp.md) option. |
 | Arbitrage bot setup | [Ten-minute setup](arbitrage-setup.md), after the [one-account bot](bot-integration.md#build-a-one-account-bot). |
 
 An external terminal login or API key does not automatically configure an Aleo account. Determine whether the user wants to operate Shield Swap alongside that product, build a connector, or trade only on the external venue.

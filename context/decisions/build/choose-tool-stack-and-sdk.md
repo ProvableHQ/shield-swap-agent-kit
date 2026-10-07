@@ -9,6 +9,7 @@ Use the application's existing language and runtime. The SDKs remain the source 
 | Browser with wallet-controlled keys | Veil wallet integration + Shield Swap SDK | [TypeScript](../../toolchains/typescript.md) |
 | Operate an account through terminal commands | Existing JS CLI | [CLI](../../toolchains/cli.md) |
 | Existing agent framework needs registered tools | SDK tool definitions or an available MCP connection | [MCP](../../toolchains/mcp.md) |
+| One-account agent using a local Aleo signer | Standalone MCP for saved quotes, encrypted state, and operation recovery | [One-account MCP option](../trade/bot-integration.md#mcp-option) |
 | Rust application | A deliberate process/service boundary until a verified native SDK path exists | [Rust](../../toolchains/rust.md) |
 
 Do not require MCP to use either SDK. Conversely, an MCP-only consumer should not be instructed to run arbitrary Python or shell code unless its host actually provides that ability.

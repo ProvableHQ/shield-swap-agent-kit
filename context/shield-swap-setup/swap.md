@@ -18,6 +18,12 @@ Use the current [Veil release](https://github.com/ProvableHQ/veil/releases) and 
 - Attach the durable store before `swap`, `claimSwapOutput`, or `claim_swap_output`. Veil uses the configured blinded-identity file. Python uses the profile journal with `track=True`. Keep that store when a transaction id is already known. Identity persistence prevents lost claim material; it does not make the same input record safe for concurrent spending.
 - A timeout or lost response after submit is an unknown result for that same operation. Reopen the same account, network, and store. If the swap id survived, use the inspect recipe below. If it did not, follow [unknown-operation recovery](recover-swaps.md) before any new swap or claim.
 
+## AgentKit MCP — quote, execute, claim
+
+Follow the [MCP single-swap recipe](../toolchains/mcp.md#execute-and-claim-one-swap) on the existing profile. `quote` saves the executable terms; `execute` consumes its `quoteId` with a stable idempotency key and returns an operation ID. Poll `get_operation_status`, then call `claim_unclaimed_swaps` with only that operation's `swapId` and a separate claim key when claimable. Verify the claim and returned amounts before the next trade.
+
+A quote-only request stops after `quote`. A timeout or restart follows [MCP recovery](../toolchains/mcp.md#recover-a-one-account-bot) using the same state and operation; never submit a new swap to recover the first.
+
 ## CLI — inspect, plan, execute
 
 Inspect available pools when discovery is part of the request:
