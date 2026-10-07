@@ -64,11 +64,36 @@ export class VeilBackend implements TradingBackend {
       case "get_wallet_status": return { profileId: profile.id, network: profile.network, address: profile.address, signerReady: true, policy: profile.policy };
       case "get_balances": {
         const tokens = input.tokens as string[] | undefined;
-        const resolved = tokens ? await Promise.all(tokens.map(token => client.tokenData(token))) : undefined;
-        const balances = await client.getBalances({ tokens: resolved?.map(token => token.id) });
-        return { network: profile.network, address: profile.address, balances: Object.entries(balances).map(([tokenId, value]) => ({
-          tokenId, symbol: value.symbol, decimals: value.decimals, public: value.public.toString(), private: value.private.toString(), total: value.total.toString(),
-        })) };
+        const selected = tokens ? await Promise.all(tokens.map(token => client.tokenData(token))) : await client.listTokens();
+        const resolved = [...new Map(selected.map(token => [token.id, token])).values()];
+        const balances = await client.getBalances({ tokens: resolved.map(token => token.id) });
+        // The swap aggregate reads public AMM programs and private underlying
+        // records. Bridged public tokens and native fee credits live separately.
+        const programs = [...new Set(resolved.filter(token => token.underlyingProgram && token.underlyingProgram !== token.ammTokenProgram)
+          .map(token => token.underlyingProgram!))];
+        const [{ getPublicBalances }, { readMapping }] = await Promise.all([
+          import("@provablehq/shield-swap-sdk"), import("@provablehq/veil-core"),
+        ]);
+        const underlying = await getPublicBalances(session.publicClient, { user: profile.address,
+          programs: programs.filter(program => program !== "credits.aleo") });
+        if (programs.includes("credits.aleo")) {
+          // An absent native account mapping is a zero balance. SDK 0.12's
+          // getBalance does not handle null; keep transport failures visible.
+          const value = await readMapping(session.publicClient, { programId: "credits.aleo", mapping: "account", key: profile.address });
+          if (value !== null && !/^\d+u64$/.test(value.trim())) throw new TradingError("invalid_balance", "The native balance response was invalid.");
+          underlying["credits.aleo"] = value === null ? 0n : BigInt(value.trim().slice(0, -3));
+        }
+        const rows = resolved.map(token => {
+          const value = balances[token.id];
+          const swapPublic = value?.public ?? 0n, privateBalance = value?.private ?? 0n;
+          const extra = token.underlyingProgram && token.underlyingProgram !== token.ammTokenProgram ? underlying[token.underlyingProgram] ?? 0n : 0n;
+          const publicBalance = swapPublic + extra;
+          return { tokenId: token.id, symbol: token.symbol, decimals: token.decimals,
+            public: publicBalance.toString(), private: privateBalance.toString(), total: (publicBalance + privateBalance).toString(),
+            publicByProgram: { ...(token.ammTokenProgram ? { [token.ammTokenProgram]: swapPublic.toString() } : {}),
+              ...(token.underlyingProgram && token.underlyingProgram !== token.ammTokenProgram ? { [token.underlyingProgram]: extra.toString() } : {}) } };
+        });
+        return { network: profile.network, address: profile.address, balances: tokens ? rows : rows.filter(row => row.total !== "0") };
       }
       case "list_tokens": {
         const tokens = await client.listTokens();
