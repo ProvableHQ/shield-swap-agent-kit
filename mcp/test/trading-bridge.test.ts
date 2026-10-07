@@ -260,3 +260,33 @@ test("bridge status advances recovered Hyperlane receipts through the SDK destin
     assert.equal(destinationReads, 2);
   } finally { f.close(); }
 });
+
+test("outbound xReserve status identifies missing SDK destination verification without resubmitting", async () => {
+  const f = fixture();
+  try {
+    const sdk = createBridgeClient({ environment: "mainnet" });
+    const { plan } = await sdk.quote({ source: { chain: "aleo", asset: "usdcx" },
+      destination: { chain: "ethereum", asset: "usdc" }, amount: "2.000001",
+      sender: profile.address, recipient: profile.evm!.address });
+    const receipt: BridgeReceipt = { id: "at1burn", protocol: "xreserve", status: "DELIVERY_PENDING",
+      sourceTxId: "at1burn", protocolState: { routeId: plan.route.id } };
+    const client = { ...sdk, recover: async () => ({ next: "wait" as const, plan, receipt }),
+      resume: async () => { throw new Error("Must not resubmit an accepted burn"); },
+    } as BridgeClient;
+    const backend = new BridgeBackend(f.store, async () => client);
+    const offer: SavedQuote = { id: "q", kind: "bridge", profile, scope: "", createdAt: 0,
+      expiresAt: 0, summary: {}, plan: {} };
+    const operation: Operation = { id: "o", kind: "bridge", profileId: profile.id, scope: "", quoteId: "q",
+      requestKey: "r", status: "pending", createdAt: 0, updatedAt: 0, result: {}, checkpoint: {
+        version: 1, plan, started: true, checkpoint: createBridgeCheckpoint(plan, receipt),
+      } };
+    for (const result of [await backend.reconcile(offer, operation),
+      await backend.resume(offer, operation, { operationId: "o", checkpoint: () => {} })]) {
+      assert.equal(result.status, "pending");
+      assert.equal(result.result.bridgeStatus, "DELIVERY_PENDING");
+      assert.equal(result.result.nextAction, "verify_destination_externally");
+      assert.equal(result.result.deliveryVerification, "unsupported_by_sdk");
+      assert.match(String(result.result.message), /Do not repeat/);
+    }
+  } finally { f.close(); }
+});

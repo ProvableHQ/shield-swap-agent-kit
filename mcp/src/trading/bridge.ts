@@ -92,8 +92,16 @@ export class BridgeBackend {
   private progress(value: BridgeProgress, state: BridgeState): Progress {
     state.receipt = value.receipt;
     state.checkpoint = mergeCheckpoint(state.checkpoint, createBridgeCheckpoint(value.plan, value.receipt));
+    const result = publicReceipt(value.receipt, value.next);
+    if (value.receipt.status === "DELIVERY_PENDING" && value.plan.protocol === "xreserve" &&
+      ["aleo", "aleo-testnet"].includes(value.plan.sourceAsset.chainId)) {
+      // SDK 0.12 confirms these burns but cannot verify the EVM release.
+      result.nextAction = "verify_destination_externally";
+      result.deliveryVerification = "unsupported_by_sdk";
+      result.message = "The source burn is confirmed. SDK 0.12 cannot verify destination delivery for this route. Check the destination receipt independently. Do not repeat the transfer.";
+    }
     return { status: value.next === "done" ? "complete" : value.next === "failed" ? "failed" : "pending",
-      result: publicReceipt(value.receipt, value.next), checkpoint: state };
+      result, checkpoint: state };
   }
 
   async execute(offer: SavedQuote, context: ExecutionContext): Promise<Progress> {

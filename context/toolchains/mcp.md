@@ -10,7 +10,7 @@ The draft server pins published Veil packages to 0.12.0 and runs over stdio on N
 
 Its swap workflow is `quote` → `execute` → operation polling → `claim_unclaimed_swaps`. Executions consume durable quotes using idempotency keys. `swap_history` reads the encrypted identity store and reports recovery coverage. SDKs still own transaction construction, signing, and protocol logic; this server adds transport, operation IDs, encrypted storage, and local policy enforcement.
 
-Offline tests and an independently installed tarball verify terminal key import, encrypted persistence, stdio discovery, restart, and recovery failure cases. Bridge regressions cover SDK recovery, destination verification, and lost RPC responses. Separate mainnet checks have completed a local Aleo swap and claim and an Ethereum-to-Aleo ETH bridge. Follow the [server README](../../mcp/README.md) for the current limitations.
+Offline tests and an independently installed tarball verify terminal key import, encrypted persistence, stdio discovery, restart, and recovery failure cases. Bridge regressions cover SDK recovery, destination verification, and lost RPC responses. Separate mainnet checks completed a local Aleo swap and claim, an Ethereum-to-Aleo ETH bridge, and a USDC round trip. The return USDC payment was inspected independently; SDK status still requires external destination verification. Follow the [server README](../../mcp/README.md) for the current limitations.
 
 ## TypeScript SDK interface
 

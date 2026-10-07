@@ -128,6 +128,8 @@ The server uses stdio and does not open a listening port. It can start locked or
 | Bridges | `list_bridge_routes`, `quote_bridge`, `execute_bridge`, `bridge_status`, `recover_bridge_transactions` |
 | Durable operations | `get_operation_status`, `list_operations`, `resume_operation` |
 
+`get_balances` includes public AMM tokens, underlying public bridge tokens, and native Aleo fee credits. Its `publicByProgram` breakdown identifies where those balances live; private records remain separate. A total balance does not imply that every operation can spend every balance type.
+
 A quote retains the SDK's executable route, input, minimum output, and expiry. `execute` consumes it once and returns an operation ID. Reusing its idempotency key returns the same operation. Poll that operation after a timeout; never create another swap to recover an uncertain submission. Private swap outputs require a subsequent claim.
 
 State is AES-256-GCM encrypted before SQLite writes it. Quotes, profiles, claim material, and bridge checkpoints belong to this local state; tool responses expose selected public fields. Per-account OS locks coordinate processes and profiles sharing Aleo, EVM, or Solana wallets in the same state directory, including history and quote refreshes, and release on process exit. Uncertain operations block new submissions and unrelated resumes across those profiles. SDK history recovery refreshes unresolved identities and expands incomplete scans on later polls.
@@ -141,7 +143,7 @@ Local encryption protects data at rest. An unlocked server can use configured si
 - Bridge quotes display SDK fees, which the SDK recalculates before execution; token input caps do not cap network gas fees.
 - Bridge recovery requires this server's saved checkpoints. It does not import arbitrary external transactions.
 - `rebalance_swap_inventory` is deferred until the SDK exposes that operation.
-- Aleo-to-Ethereum xReserve recovery confirms the source burn, but SDK 0.12.0 does not verify the Ethereum release. Its status remains `DELIVERY_PENDING`; inspect destination delivery independently.
+- Aleo-to-Ethereum xReserve recovery confirms the source burn, but SDK 0.12.0 does not verify the Ethereum release. Its status remains `DELIVERY_PENDING` with `nextAction: "verify_destination_externally"` and `deliveryVerification: "unsupported_by_sdk"`; inspect destination delivery independently and do not repeat the transfer.
 - History discovery probes a bounded identity window and reports incomplete coverage; it cannot promise discovery across arbitrary missing counter gaps.
 - Existing Shield Swap CLI file stores do not share this package's encryption or locking. Do not operate the same wallet concurrently through an uncoordinated CLI or another state directory.
 - Permission changes are refused while the profile has a queued or running operation.
@@ -154,9 +156,10 @@ On 2026-10-07, the built stdio server used existing local wallets and Veil 0.12.
 | --- | --- |
 | 0.000002 USDCx → ETH swap | Submitted, claimed, and reconciled after restart. History reports the claim; private balances changed by exactly the input and 382,133,042 output base units. |
 | 1 wei ETH, Ethereum → Aleo | SDK destination verification reports complete; the public Aleo ETH balance increased by 1 wei. |
-| USDC → USDCx → USDC | Inbound source deposit confirmed; destination attestation and return validation are in progress. |
+| 2.100001 USDC, Ethereum → Aleo USDCx | Source approval and deposit confirmed; SDK attestation and destination verification report complete. |
+| 2.000001 USDCx, Aleo → Ethereum USDC | Source burn confirmed. Independent Ethereum receipt inspection found 0.996501 USDC delivered to the intended wallet; its xReserve withdrawal hook matches the Aleo sender and USDCx token. The SDK status remains `DELIVERY_PENDING` because it lacks this destination verifier. |
 
-Swap and claim used delegated fee sponsorship. The ETH bridge additionally paid the SDK-quoted bridge fee and Ethereum gas; provider fees on other routes can reduce the delivered amount. This evidence covers these routes and local accounts; it does not establish hosted-wallet or Solana production behavior. Wallet credentials and recovery state remain outside the repository.
+The USDC inputs were the smallest pair accepted by the SDK that could cover its quoted inbound and return fees. The return payment exceeded the SDK's conservative quoted output; this test does not establish a fee guarantee. Swap, claim, and the Aleo return burn used delegated fee sponsorship. The ETH bridge additionally paid the SDK-quoted bridge fee and Ethereum gas; provider fees on other routes can reduce the delivered amount. This evidence covers these routes and local accounts; it does not establish hosted-wallet or Solana production behavior. Wallet credentials and recovery state remain outside the repository.
 
 ## Development and verification
 
