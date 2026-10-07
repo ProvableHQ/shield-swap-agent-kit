@@ -53,6 +53,14 @@ Use the installed dependency's reference when writing executable code. The Pytho
 | Veil has no public record-provider progress API; Python's Shield facade has no public scanner-status accessor. | Do not invent scanner heights or use private members in portable recipes. Distinguish DEX indexer freshness from record visibility. |
 | Wallet-based Veil claims can return before chain confirmation. | Verify confirmation separately; neither local nor wallet claim return implies records are already scanner-visible. |
 
+## Standalone MCP implementation evidence
+
+On 2026-10-06, the draft in `mcp/` was checked against published `@provablehq/veil-core`, `@provablehq/veil-aleo-sdk`, `@provablehq/shield-swap-sdk`, `@provablehq/aleo-bridge-sdk`, and `@provablehq/sdk` version **0.12.0**, pinned in its lockfile. This is separate from the older checkout observations above.
+
+Twenty-four offline MCP tests, TypeScript checking, and the build pass. A tarball installed in a fresh project outside SDK workspaces passes SDK key import, encrypted persistence, all twenty tool schemas over stdio, and two process restarts. A separate crash test verifies that the operating system releases the wallet lock. No funded transaction is part of that evidence; bridge integration remains in progress.
+
+Recovery regressions exercise the installed Shield Swap SDK's negative history cache and pagination. Unresolved identities must be searched again after an empty scan, and incomplete scans need expanding coverage. A proving-adapter checkpoint distinguishes failures before submission from ambiguous results; a swap deposit is never replayed by recovery.
+
 ## External integration evidence
 
 The integration pages cite official product documentation checked on 2026-10-01: Axiom product/limit-order guides, GMGN's official agent package and separate legacy routing API, Pump's protocol documentation, BONKbot/Telemetry guides, Banana Gun product/scraper guides, and fomo's site.

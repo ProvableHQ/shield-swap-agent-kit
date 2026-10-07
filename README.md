@@ -6,7 +6,7 @@ Give an agent the context and working recipes to build on Shield Swap or operate
 
 This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows.
 
-It does not yet include its own executable trading scripts, standalone MCP server, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. CLI recipes assume the CLI is installed and use `shield-swap` directly; selecting an SDK or MCP path does not require installing the CLI.
+The [draft standalone MCP server](mcp/README.md) now provides terminal wallet setup, encrypted state, stdio transport, and swap operations. Bridge integration and live validation are still in progress. The kit does not include its own trading CLI, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. CLI recipes assume the CLI is installed and use `shield-swap` directly; selecting an SDK or MCP path does not require installing the CLI.
 
 ## Layout
 
@@ -21,12 +21,13 @@ context/
   safety/                    # Permissions, custody, and unattended execution
   strategies/                # Strategy design; currently arbitrage
   troubleshooting/           # Scanner lag, record contention, proving failures
+mcp/                         # Draft standalone TypeScript MCP server
 tools/
   SKILL.md                   # When to use SDKs, CLI, MCP, or scripts
 CONTRIBUTING.md              # Instructions for working on this repository
 ```
 
-Keep context and tools at the top level. Executable JS/Python scripts, CLI/MCP code, and examples belong in their corresponding directories when implemented. Integration context is not a working connector, and strategy guidance is not a running strategy. No empty executable stubs are shipped.
+Keep context and tools at the top level. Executable JS/Python scripts, CLI/MCP code, and examples belong in their corresponding directories when implemented. Integration context is not a working connector, and strategy guidance is not a running strategy. The draft MCP README identifies incomplete bridge actions; do not use them as evidence of working bridge support.
 
 Setup follows account configuration, then Shield Swap authentication with optional referrals, then a link to funding. [Discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md) supports standalone inspection; [swap](context/shield-swap-setup/swap.md) retains its complete discovery-to-claim flow. The `shield-swap-setup/` folder is a collection of runbooks, not a sequence that starts trading automatically.
 

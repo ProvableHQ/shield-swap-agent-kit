@@ -1,8 +1,16 @@
 # MCP
 
-This initial AgentKit does not contain a standalone MCP server. Installing the skill does not register or launch one. Existing SDKs expose different MCP interfaces; inspect the chosen version and actual tool catalog before making calls.
+AgentKit includes a [draft standalone TypeScript server](../../mcp/README.md) in `mcp/`. Installing the skill does not install its dependencies, register it, or launch it. Existing SDK servers expose different interfaces; inspect the selected implementation and actual tool catalog before making calls.
 
-Use an available MCP connection for capabilities it actually exposes when it fits the requested workflow. If a required capability is missing, consider a supported SDK or CLI path that the host can run while preserving the account and recovery state; see [tool selection](../../tools/SKILL.md). The operation pages will gain MCP recipes when tool names and behavior are implemented and verified.
+Use an available MCP connection for capabilities it actually exposes when it fits the requested workflow. If a required capability is missing, consider a supported SDK or CLI path that the host can run while preserving the account and recovery state; see [tool selection](../../tools/SKILL.md). The standalone server README contains its current setup instructions and tool catalog. Its bridge wiring and live validation are unfinished, so the SDK recipes remain the verified source-interface guidance for those operations.
+
+## AgentKit standalone server
+
+The draft server pins published Veil packages to 0.12.0 and runs over stdio on Node.js 22.13 or newer. `setup` provides onboarding instructions; signing keys and execution permissions are configured only in the trusted terminal. Starting an unconfigured server does not create an account.
+
+Its swap workflow is `quote` → `execute` → operation polling → `claim_unclaimed_swaps`. Executions consume durable quotes using idempotency keys. `swap_history` reads the encrypted identity store and reports recovery coverage. SDKs still own transaction construction, signing, and protocol logic; this server adds transport, operation IDs, encrypted storage, and local policy enforcement.
+
+Offline tests and an independently installed tarball verify terminal key import, encrypted persistence, stdio discovery, restart, and recovery failure cases. They do not establish live trading or bridge support. Follow the [server README](../../mcp/README.md) for the current limitations.
 
 ## TypeScript SDK interface
 

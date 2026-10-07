@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { once } from "node:events";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -67,4 +68,29 @@ test("async transaction callbacks are rejected before they can schedule escaped 
     assert.throws(() => store.transaction(async () => { called = true; await Promise.resolve(); store.set("escaped", true); }), /synchronous/i);
     assert.equal(called, false);
   } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("wallet locks exclude another process and are released after a crash", { timeout: 10000 }, async () => {
+  const { spawn } = await import("node:child_process");
+  const root = mkdtempSync(join(tmpdir(), "shield-process-lock-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  const script = `
+    import { TradingStore } from "./src/trading/store.ts";
+    const store = new TradingStore(process.env.TEST_STATE, "test-password-long-enough");
+    await store.withLock("wallet", async () => {
+      process.stdout.write("locked\\n");
+      await new Promise(() => { setInterval(() => {}, 1000); });
+    });
+  `;
+  const child = spawn(process.execPath, ["--import", "tsx", "--input-type=module", "-e", script], { env: { ...process.env, TEST_STATE: root }, stdio: ["ignore", "pipe", "pipe"] });
+  const exited = once(child, "exit");
+  try {
+    const [chunk] = await Promise.race([once(child.stdout, "data"), exited.then(() => { throw new Error("lock child exited before readiness"); })]);
+    assert.match(chunk.toString(), /locked/);
+    await assert.rejects(store.withLock("wallet", async () => {}), /busy/i);
+    child.kill("SIGKILL");
+    await exited;
+    await store.withLock("wallet", async () => { store.set("after-crash", true); });
+    assert.equal(store.get("after-crash"), true);
+  } finally { child.kill("SIGKILL"); await exited; store.close(); rmSync(root, { recursive: true, force: true }); }
 });

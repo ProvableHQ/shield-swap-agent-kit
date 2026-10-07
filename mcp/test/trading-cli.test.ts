@@ -21,3 +21,71 @@ test("raw private keys are rejected as command arguments and never echoed", asyn
     assert.match(result.stderr, /arguments/i);
   }
 });
+
+test("terminal setup encrypts an imported key and stdio survives process restart", { timeout: 30000 }, async () => {
+  const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { loadNetwork } = await import("@provablehq/veil-aleo-sdk");
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
+  const { TradingStore } = await import("../src/trading/store");
+  const sdk = await loadNetwork("testnet");
+  const account = sdk.generateAccount();
+  const root = mkdtempSync(join(tmpdir(), "shield-cli-"));
+  const cli = resolve("src/cli.ts");
+  const password = "test-password-long-enough";
+  const env = { ...process.env, SHIELD_SWAP_MCP_PASSWORD: password, MCP_TEST_ALEO_KEY: account.privateKey };
+  try {
+    const result = await run(process.execPath, ["--import", "tsx", cli, "setup", "--network", "testnet", "--state-dir", root, "--key-env", "MCP_TEST_ALEO_KEY", "--store-key"], { env, timeout: 20000 });
+    assert.equal(JSON.parse(result.stdout).address, account.address);
+    assert.ok(!result.stdout.includes(account.privateKey) && !result.stderr.includes(account.privateKey));
+    assert.equal(readFileSync(join(root, "state.sqlite")).includes(account.privateKey), false);
+    const configured = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root, "--allow-claims", "--swap-limit", "1field=1000", "--max-slippage-bps", "75"], { env });
+    assert.deepEqual(JSON.parse(configured.stdout).policy, { swaps: false, claims: true, bridges: false, maxSlippageBps: 75, swapLimits: { "1field": "1000" }, bridgeLimits: {} });
+    const store = new TradingStore(root, password);
+    assert.equal(store.get("secret:aleo:default"), account.privateKey);
+    store.close();
+    for (let restart = 0; restart < 2; restart++) {
+      // The imported key is deliberately absent from the server environment.
+      const transport = new StdioClientTransport({ command: process.execPath, args: ["--import", "tsx", cli, "serve", "--state-dir", root], env: { SHIELD_SWAP_MCP_PASSWORD: password }, stderr: "pipe" });
+      const client = new Client({ name: "test", version: "1" });
+      let diagnostics = "";
+      transport.stderr?.on("data", chunk => { diagnostics += chunk.toString(); });
+      try {
+        await client.connect(transport);
+        assert.equal((await client.listTools()).tools.length, 20);
+        const setup = await client.callTool({ name: "setup", arguments: {} });
+        assert.equal((setup.structuredContent as { ready: boolean }).ready, true);
+        const wallets = await client.callTool({ name: "list_wallets", arguments: {} });
+        assert.match(JSON.stringify(wallets), new RegExp(account.address));
+        assert.ok(!JSON.stringify(wallets).includes(account.privateKey));
+      } finally { await client.close(); }
+      assert.ok(!diagnostics.includes(account.privateKey));
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("concurrent setup cannot replace a profile or discard its newly generated key", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { setup } = await import("../src/terminal");
+  const { TradingStore } = await import("../src/trading/store");
+  const root = mkdtempSync(join(tmpdir(), "shield-setup-race-"));
+  const previous = process.env.SHIELD_SWAP_MCP_PASSWORD;
+  process.env.SHIELD_SWAP_MCP_PASSWORD = "test-password-long-enough";
+  try {
+    const options = { network: "testnet", generate: true, "state-dir": root };
+    const results = await Promise.allSettled([setup(options), setup(options)]);
+    const succeeded = results.filter(result => result.status === "fulfilled");
+    assert.equal(succeeded.length, 1);
+    const store = new TradingStore(root, "test-password-long-enough");
+    try { assert.equal(store.get<{ address: string }>("profile:default")?.address, succeeded[0].value.address); }
+    finally { store.close(); }
+  } finally {
+    if (previous === undefined) delete process.env.SHIELD_SWAP_MCP_PASSWORD;
+    else process.env.SHIELD_SWAP_MCP_PASSWORD = previous;
+    rmSync(root, { recursive: true, force: true });
+  }
+});

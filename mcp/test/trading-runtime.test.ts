@@ -23,7 +23,7 @@ function fixture(submit: () => Promise<Record<string, unknown>>) {
     resume: async () => { throw new Error("unexpected resume"); },
   };
   const runtime = new TradingRuntime(store, backend);
-  return { store, runtime, close: async () => { await runtime.drain(); store.close(); rmSync(root, { recursive: true, force: true }); } };
+  return { store, runtime, backend, close: async () => { await runtime.drain(); store.close(); rmSync(root, { recursive: true, force: true }); } };
 }
 
 test("quote execution is durable and duplicate requests do not submit twice", async () => {
@@ -104,4 +104,31 @@ test("concurrent recovery cannot mark another resume failed or submit twice", as
     assert.equal(resumes, 1);
     assert.equal(runtime.operation("o").status, "complete");
   } finally { release(); await first?.catch(() => {}); await runtime.drain(); store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a delayed worker cannot submit an operation already reconciled as failed", async () => {
+  let submissions = 0, release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const f = fixture(async () => { submissions++; return { transactionId: "at1test" }; });
+  f.backend.reconcile = async () => ({ status: "failed", result: { error: { code: "not_submitted" } } });
+  const otherStore = new TradingStore(f.store.directory, "test-password-long-enough");
+  const otherRuntime = new TradingRuntime(otherStore, f.backend);
+  const originalLock = f.store.withLock.bind(f.store);
+  let delayFirst = true;
+  f.store.withLock = async (scope, fn) => {
+    if (delayFirst) { delayFirst = false; await gate; }
+    return originalLock(scope, fn);
+  };
+  try {
+    const quote = await f.runtime.quote("swap", "alice", {});
+    const first = await f.runtime.execute(String(quote.quoteId), "delayed-original");
+    assert.equal((await otherRuntime.status(String(first.operationId))).status, "failed");
+    const replacement = await otherRuntime.quote("swap", "alice", {});
+    await otherRuntime.execute(String(replacement.quoteId), "replacement");
+    await otherRuntime.drain();
+    release();
+    await f.runtime.drain();
+    assert.equal(submissions, 1);
+    assert.equal(f.runtime.operation(String(first.operationId)).status, "failed");
+  } finally { release(); await otherRuntime.drain(); await f.runtime.drain(); otherStore.close(); await f.close(); }
 });

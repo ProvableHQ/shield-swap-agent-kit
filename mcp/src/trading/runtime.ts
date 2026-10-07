@@ -101,6 +101,9 @@ export class TradingRuntime {
       try {
         await this.store.withLock(quote.scope, async () => {
           let op = this.store.get<Operation>("operation:" + id)!;
+          // A different process may reconcile a queued operation before this
+          // worker acquires the lock. Never resurrect an operation it resolved.
+          if (!resuming && op.status !== "queued") return;
           if (resuming) {
             if (op.status !== "complete" && op.status !== "failed") {
               op = this.save(op, await this.backend.reconcile(quote, op));
