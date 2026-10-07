@@ -78,7 +78,7 @@ export class VeilBackend implements TradingBackend {
         const response = await client.api.getPools({ limit, offset });
         return { pools: response.data, pagination: response.pagination };
       }
-      case "swap_history": return this.store.withLock(walletScope(profile), async () => {
+      case "swap_history": {
         let recovery: Summary = { requested: false, complete: false };
         if (input.reconcile) recovery = await this.discover(session, profile);
         const records = await session.identities.load();
@@ -93,7 +93,7 @@ export class VeilBackend implements TradingBackend {
             claimTransactionId: record.claim?.transactionId, claimable: Boolean(owed?.claimable) };
         });
         return { swaps, total: records.length, offset, limit, recovery, unresolvableCount: pending.unresolvable.length };
-      });
+      }
       default: throw new TradingError("unsupported_action", "This action is not available for this wallet.");
     }
   }

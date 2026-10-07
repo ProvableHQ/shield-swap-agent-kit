@@ -6,7 +6,7 @@ import { TradingRuntime } from "./runtime";
 import { TradingError, type Kind, type Summary } from "./types";
 
 const id = z.string().min(1).max(128);
-const profile = { profileId: id };
+const profile = { profileId: id.optional().describe("Defaults to the configured default profile.") };
 const page = { limit: z.number().int().min(1).max(100).default(25), offset: z.number().int().min(0).max(10000).default(0) };
 const executeArgs = { quoteId: id, idempotencyKey: id };
 const operation = { operationId: id };
@@ -79,7 +79,7 @@ export function createTradingServer(runtime?: TradingRuntime): Server {
 }
 
 async function call(runtime: TradingRuntime, name: ToolName, args: Summary): Promise<Summary> {
-  const profileId = String(args.profileId ?? "");
+  const profileId = String(args.profileId ?? runtime.store.get<Summary>("settings")?.defaultProfile ?? "default");
   switch (name) {
     case "get_config": return { profiles: runtime.profiles(), defaults: runtime.store.get("settings") ?? {} };
     case "update_config": {

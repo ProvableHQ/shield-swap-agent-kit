@@ -36,7 +36,7 @@ node dist/cli.js configure --profile default --allow-claims
 node dist/cli.js configure --profile default --allow-swaps --swap-limit TOKEN_ID=RAW_AMOUNT --max-slippage-bps 100
 ```
 
-Replace `TOKEN_ID` and `RAW_AMOUNT` with a discovered token ID and the desired integer cap. Limits apply **per operation**, not per day or across a strategy. An absent or zero cap prevents execution for that token. Use `--deny-swaps`, `--deny-claims`, or `--deny-bridges` to revoke permissions. The MCP configuration tool cannot grant permissions, change signers, or set spending limits.
+Replace `TOKEN_ID` and `RAW_AMOUNT` with a discovered token ID and the desired integer cap. Limits apply **per operation**, not per day or across a strategy. An absent or zero cap prevents execution for that token. Use `--deny-swaps`, `--deny-claims`, or `--deny-bridges` to revoke permissions. The MCP configuration tool cannot grant permissions, change signers, or set spending limits. Tools use the configured default profile when `profileId` is omitted; an explicit profile overrides it.
 
 ## Configure local bridge wallets
 
@@ -83,7 +83,7 @@ The server uses stdio and does not open a listening port. It can start locked or
 
 A quote retains the SDK's executable route, input, minimum output, and expiry. `execute` consumes it once and returns an operation ID. Reusing its idempotency key returns the same operation. Poll that operation after a timeout; never create another swap to recover an uncertain submission. Private swap outputs require a subsequent claim.
 
-State is AES-256-GCM encrypted before SQLite writes it. Quotes, profiles, claim material, and bridge checkpoints belong to this local state; tool responses expose selected public fields. Per-wallet OS locks coordinate processes using the same state directory and release on process exit. SDK history recovery refreshes unresolved identities and expands incomplete scans on later polls.
+State is AES-256-GCM encrypted before SQLite writes it. Quotes, profiles, claim material, and bridge checkpoints belong to this local state; tool responses expose selected public fields. Per-account OS locks coordinate processes and profiles sharing Aleo, EVM, or Solana wallets in the same state directory, including history and quote refreshes, and release on process exit. Uncertain operations block new submissions and unrelated resumes across those profiles. SDK history recovery refreshes unresolved identities and expands incomplete scans on later polls.
 
 Local encryption protects data at rest. An unlocked server can use configured signing credentials. The Veil integration uses a remote scanner and delegated prover, whose service boundaries still apply. `--fee-master` enables fee sponsorship only when the prover has granted that capability.
 
@@ -93,7 +93,6 @@ Local encryption protects data at rest. An unlocked server can use configured si
 - Aleo bridge inputs currently use public balances. Private-record burns are not exposed. Inbound xReserve transfers support public, record, and private mint modes.
 - Bridge quotes display SDK fees, which the SDK recalculates before execution; token input caps do not cap network gas fees.
 - Bridge recovery requires this server's saved checkpoints. It does not import arbitrary external transactions.
-- Coordination across profiles sharing an EVM or Solana wallet is still being completed.
 - `rebalance_swap_inventory` is deferred until the SDK exposes that operation.
 - No live transactions have been submitted by this implementation. It is not yet ready for funded use.
 - History discovery probes a bounded identity window and reports incomplete coverage; it cannot promise discovery across arbitrary missing counter gaps.

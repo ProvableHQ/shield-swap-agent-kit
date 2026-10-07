@@ -47,7 +47,7 @@ try {
       const wallets = await client.callTool({ name: "list_wallets", arguments: {} });
       assert.equal(wallets.structuredContent.wallets[0].address, address);
       assert.ok(!JSON.stringify(wallets).includes(key));
-      const routes = await client.callTool({ name: "list_bridge_routes", arguments: { profileId: "default" } });
+      const routes = await client.callTool({ name: "list_bridge_routes", arguments: {} });
       assert.equal(routes.isError, false);
       assert.ok(routes.structuredContent.routes.length > 0);
       assert.ok(routes.structuredContent.routes.every(route => route.network === "testnet"));

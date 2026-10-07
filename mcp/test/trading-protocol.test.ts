@@ -40,3 +40,39 @@ test("MCP does not accept private keys or permission grants in tool arguments", 
     }
   } finally { await client.close(); await server.close(); }
 });
+
+test("configured default profile is used when omitted and explicit profiles still win", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { TradingStore } = await import("../src/trading/store");
+  const { TradingRuntime } = await import("../src/trading/runtime");
+  const root = mkdtempSync(join(tmpdir(), "shield-default-"));
+  const store = new TradingStore(root, "test-passphrase-long-enough", true);
+  const policy = { swaps: false, claims: false, bridges: false, maxSlippageBps: 100, swapLimits: {}, bridgeLimits: {} };
+  for (const id of ["alice", "bob"]) store.set("profile:" + id, { id, network: "testnet", address: "aleo1" + id,
+    key: { type: "env", name: "TEST_KEY" }, policy });
+  store.set("settings", { defaultProfile: "alice", slippageBps: 50 });
+  const backend: import("../src/trading/types").TradingBackend = {
+    read: async (_action, profile) => ({ address: profile.address }),
+    quote: async () => { throw new Error("unexpected quote"); },
+    execute: async () => { throw new Error("unexpected execution"); },
+    reconcile: async () => { throw new Error("unexpected recovery"); },
+    resume: async () => { throw new Error("unexpected resume"); },
+  };
+  const runtime = new TradingRuntime(store, backend);
+  const server = createTradingServer(runtime);
+  const client = new Client({ name: "test", version: "1" });
+  const [a,b] = InMemoryTransport.createLinkedPair();
+  try {
+    await Promise.all([server.connect(a), client.connect(b)]);
+    const first = await client.callTool({ name: "get_balances", arguments: {} });
+    assert.equal(first.isError, false);
+    assert.equal((first.structuredContent as { address: string }).address, "aleo1alice");
+    await client.callTool({ name: "update_config", arguments: { defaultProfile: "bob" } });
+    const changed = await client.callTool({ name: "get_balances", arguments: {} });
+    assert.equal((changed.structuredContent as { address: string }).address, "aleo1bob");
+    const explicit = await client.callTool({ name: "get_balances", arguments: { profileId: "alice" } });
+    assert.equal((explicit.structuredContent as { address: string }).address, "aleo1alice");
+  } finally { await client.close(); await server.close(); store.close(); rmSync(root, { recursive: true, force: true }); }
+});

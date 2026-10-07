@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { TradingStore } from "./store";
+import { sharesAccount, withWalletLocks } from "./coordination";
 import { TradingError, type Kind, type Operation, type Profile, type SavedQuote, type Summary, type TradingBackend, type Progress } from "./types";
 
 const activeStatuses = new Set(["queued", "running", "uncertain"]);
@@ -25,7 +26,7 @@ export class TradingRuntime {
 
   async quote(kind: Kind, profileId: string, input: Summary): Promise<Summary> {
     const profile = this.profile(profileId);
-    const priced = await this.backend.quote(kind, profile, input);
+    const priced = await withWalletLocks(this.store, [profile], () => this.backend.quote(kind, profile, input));
     const now = Date.now();
     const quote: SavedQuote = { id: randomUUID(), kind, profile, scope: this.scope(profile),
       createdAt: now, ...priced, expiresAt: Math.min(now + 60_000, priced.expiresAt ?? Infinity) };
@@ -34,6 +35,13 @@ export class TradingRuntime {
     }
     this.store.set("quote:" + quote.id, quote);
     return { quoteId: quote.id, kind, profileId, network: profile.network, address: profile.address, expiresAt: quote.expiresAt, ...quote.summary };
+  }
+
+  private assertWalletAvailable(profile: Profile, exceptId?: string): void {
+    if (this.store.list<Operation>("operation:").some(op => op.id !== exceptId && activeStatuses.has(op.status) &&
+      sharesAccount(this.store.get<SavedQuote>("quote:" + op.quoteId)!.profile, profile))) {
+      throw new TradingError("operation_pending", "Resolve the wallet\'s existing active or uncertain operation before submitting another.");
+    }
   }
 
   private authorize(quote: SavedQuote): void {
@@ -73,9 +81,7 @@ export class TradingRuntime {
       if (current.operationId) throw new TradingError("quote_consumed", "Quote has already been consumed; inspect its original operation.");
       if (current.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired; request a fresh quote.");
       this.authorize(current);
-      if (this.store.list<Operation>("operation:").some(op => op.scope === quote.scope && activeStatuses.has(op.status))) {
-        throw new TradingError("operation_pending", "Resolve the wallet's existing active or uncertain operation before submitting another.");
-      }
+      this.assertWalletAvailable(quote.profile);
       const now = Date.now();
       const op: Operation = { id: randomUUID(), kind: quote.kind, profileId: quote.profile.id, scope: quote.scope,
         quoteId, requestKey: requestId, status: "queued", createdAt: now, updatedAt: now, result: {} };
@@ -99,7 +105,7 @@ export class TradingRuntime {
     const worker = (async () => {
       let entered = false;
       try {
-        await this.store.withLock(quote.scope, async () => {
+        await withWalletLocks(this.store, [quote.profile], async () => {
           let op = this.store.get<Operation>("operation:" + id)!;
           // A different process may reconcile a queued operation before this
           // worker acquires the lock. Never resurrect an operation it resolved.
@@ -116,6 +122,7 @@ export class TradingRuntime {
               return;
             }
           }
+          this.assertWalletAvailable(quote.profile, op.id);
           this.authorize(quote);
           if (!resuming && quote.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired before execution began.");
           entered = true;
@@ -162,7 +169,8 @@ export class TradingRuntime {
     if (!op) throw new TradingError("operation_missing", "Operation was not found.");
     if (op.status === "complete" || op.status === "failed") return this.publicOperation(op);
     try {
-      return await this.store.withLock(op.scope, async () => {
+      const saved = this.store.get<SavedQuote>("quote:" + op.quoteId)!;
+      return await withWalletLocks(this.store, [saved.profile], async () => {
         const current = this.store.get<Operation>("operation:" + id)!;
         const quote = this.store.get<SavedQuote>("quote:" + current.quoteId)!;
         return this.publicOperation(this.save(current, await this.backend.reconcile(quote, current)));
@@ -179,7 +187,8 @@ export class TradingRuntime {
     return new Promise<Summary>((resolve, reject) => this.launch(id, quote, true, { resolve, reject }));
   }
   async read(action: string, profileId: string, input: Summary): Promise<Summary> {
-    return this.backend.read(action, this.profile(profileId), input);
+    const profile = this.profile(profileId);
+    return withWalletLocks(this.store, [profile], () => this.backend.read(action, profile, input));
   }
   async drain(): Promise<void> { while (this.workers.size) await Promise.allSettled([...this.workers]); }
 }

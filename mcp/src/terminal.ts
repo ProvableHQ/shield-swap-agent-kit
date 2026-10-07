@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { emitKeypressEvents, type Key } from "node:readline";
 import { parseArgs } from "node:util";
 import { TradingStore } from "./trading/store";
-import { walletScope } from "./trading/session";
+import { withWalletLocks } from "./trading/coordination";
 import { TradingError, type Profile, type Policy, type HostedWallet } from "./trading/types";
 
 export const help = `Shield Swap MCP
@@ -214,13 +214,14 @@ export async function configure(options: Options): Promise<Record<string, unknow
       if (!/^\d+$/.test(options["max-slippage-bps"]) || !Number.isInteger(value) || value < 0 || value > 1000) throw new TradingError("invalid_slippage", "Slippage must be a whole number from 0 to 1000 basis points.");
       policy.maxSlippageBps = value;
     }
-    await store.withLock(walletScope(profile), async () => store.transaction(() => {
+    const updated = { ...profile, ...(evm ? { evm } : {}), ...(solana ? { solana } : {}), policy };
+    await withWalletLocks(store, [profile, updated], async () => store.transaction(() => {
       if (store.list<{ profileId: string; status: string }>("operation:").some(op => op.profileId === id && ["queued", "running"].includes(op.status))) {
         throw new TradingError("operation_pending", "Wait for the profile's active operation before changing its permissions.");
       }
       const current = store.get<Profile>("profile:" + id)!;
       if (JSON.stringify(current) !== JSON.stringify(profile)) throw new TradingError("profile_changed", "This profile changed during configuration; rerun configure.");
-      store.set("profile:" + id, { ...profile, ...(evm ? { evm } : {}), ...(solana ? { solana } : {}), policy });
+      store.set("profile:" + id, updated);
     }));
     return { profileId: id, policy, ...(evm ? { ethereumAddress: evm.address } : {}), ...(solana ? { solanaAddress: solana.address } : {}) };
   } finally { store.close(); }

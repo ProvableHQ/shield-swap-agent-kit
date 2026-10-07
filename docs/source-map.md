@@ -57,7 +57,7 @@ Use the installed dependency's reference when writing executable code. The Pytho
 
 On 2026-10-07, the draft in `mcp/` was checked against published `@provablehq/veil-core`, `@provablehq/veil-aleo-sdk`, `@provablehq/shield-swap-sdk`, `@provablehq/aleo-bridge-sdk`, and `@provablehq/sdk` version **0.12.0**, pinned in its lockfile. This is separate from the older checkout observations above.
 
-Thirty-four offline MCP tests, TypeScript checking, and the build pass. A tarball installed in a fresh project outside SDK workspaces passes SDK key import, encrypted persistence, all twenty tool schemas over stdio, and two process restarts. A separate crash test verifies that the operating system releases the wallet lock. No funded transaction is part of that evidence; local bridge wiring is implemented, with hosted wallets and mainnet validation still in progress.
+Forty-one offline MCP tests, TypeScript checking, and the build pass. A tarball installed in a fresh project outside SDK workspaces passes SDK key import, encrypted persistence, all twenty tool schemas over stdio, and two process restarts. A separate crash test verifies that the operating system releases the wallet lock. No funded transaction is part of that evidence; local bridge wiring is implemented, with hosted wallets and mainnet validation still in progress.
 
 Recovery regressions exercise the installed Shield Swap SDK's negative history cache and pagination. Unresolved identities must be searched again after an empty scan, and incomplete scans need expanding coverage. A proving-adapter checkpoint distinguishes failures before submission from ambiguous results; a swap deposit is never replayed by recovery.
 

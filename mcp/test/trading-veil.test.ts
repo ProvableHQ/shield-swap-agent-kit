@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TradingStore } from "../src/trading/store";
+import { TradingRuntime } from "../src/trading/runtime";
 import { VeilBackend } from "../src/trading/veil";
 import { swapContext, type AleoSession } from "../src/trading/session";
 import type { Profile, SavedQuote } from "../src/trading/types";
@@ -44,7 +45,9 @@ test("history projects public economics without returning SDK handles or blindin
   }) }, identities: { load: async () => [{ counter: 0, blindingFactor: "PRIVATE-CLAIM-SECRET", status: "swapped", swapId: "4field", handle: { transactionId: "at1test", amountIn: "100" } }], save: async () => {} } } as unknown as AleoSession;
   const backend = new VeilBackend(store, async () => session);
   try {
-    const result = await backend.read("swap_history", profile, { limit: 25, offset: 0 });
+    store.set("profile:" + profile.id, profile);
+    const runtime = new TradingRuntime(store, backend);
+    const result = await runtime.read("swap_history", profile.id, { limit: 25, offset: 0 });
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE-CLAIM-SECRET|blindingFactor|handle/);
     assert.equal((result.swaps as { swapId: string }[])[0].swapId, "4field");
   } finally { store.close(); rmSync(root, { recursive: true, force: true }); }

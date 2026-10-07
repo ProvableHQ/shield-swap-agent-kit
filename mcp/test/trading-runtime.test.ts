@@ -114,13 +114,14 @@ test("a delayed worker cannot submit an operation already reconciled as failed",
   const otherStore = new TradingStore(f.store.directory, "test-password-long-enough");
   const otherRuntime = new TradingRuntime(otherStore, f.backend);
   const originalLock = f.store.withLock.bind(f.store);
-  let delayFirst = true;
+  let delayFirst = false;
   f.store.withLock = async (scope, fn) => {
     if (delayFirst) { delayFirst = false; await gate; }
     return originalLock(scope, fn);
   };
   try {
     const quote = await f.runtime.quote("swap", "alice", {});
+    delayFirst = true;
     const first = await f.runtime.execute(String(quote.quoteId), "delayed-original");
     assert.equal((await otherRuntime.status(String(first.operationId))).status, "failed");
     const replacement = await otherRuntime.quote("swap", "alice", {});
@@ -131,4 +132,88 @@ test("a delayed worker cannot submit an operation already reconciled as failed",
     assert.equal(submissions, 1);
     assert.equal(f.runtime.operation(String(first.operationId)).status, "failed");
   } finally { release(); await otherRuntime.drain(); await f.runtime.drain(); otherStore.close(); await f.close(); }
+});
+
+for (const chain of ["evm", "solana", "aleo"] as const) {
+  test("an uncertain operation blocks a second profile sharing its " + chain + " wallet", async () => {
+    const f = fixture(async () => { throw new Error("lost broadcast"); });
+    const wallet = { provider: "local" as const, address: chain === "evm" ? "0xAbCDEF" : "sharedSolana", rpcUrl: "https://rpc.invalid" };
+    const first = { ...profile, ...(chain === "aleo" ? {} : { [chain]: wallet }) };
+    const second = { ...first, id: "bob", address: chain === "aleo" ? first.address : "aleo1other",
+      program: "other_swap.aleo", ...(chain === "evm" ? { evm: { ...wallet, address: wallet.address.toLowerCase() } } : {}) };
+    f.store.set("profile:alice", first);
+    f.store.set("profile:bob", second);
+    try {
+      const q1 = await f.runtime.quote("claim", "alice", {});
+      await f.runtime.execute(String(q1.quoteId), "first");
+      await f.runtime.drain();
+      const q2 = await f.runtime.quote("claim", "bob", {});
+      await assert.rejects(f.runtime.execute(String(q2.quoteId), "second"), /existing active or uncertain/);
+    } finally { await f.close(); }
+  });
+}
+
+test("two pending bridge resumes sharing an EVM wallet cannot submit concurrently", async () => {
+  const f = fixture(async () => ({}));
+  let release!: () => void, started!: () => void, resumes = 0;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const entered = new Promise<void>(resolve => { started = resolve; });
+  const policy = { ...profile.policy, bridges: true, bridgeLimits: { tokenA: "1000000" } };
+  const wallet = { provider: "local" as const, address: "0x1111", rpcUrl: "https://rpc.invalid" };
+  const first = { ...profile, policy, evm: wallet };
+  const second = { ...first, id: "bob", address: "aleo1other" };
+  f.store.set("profile:alice", first);
+  f.store.set("profile:bob", second);
+  f.backend.reconcile = async () => ({ status: "pending", result: { nextAction: "resume" } });
+  f.backend.resume = async () => { resumes++; started(); await gate; return { status: "complete", result: {} }; };
+  try {
+    for (const p of [first, second]) {
+      const q = await f.runtime.quote("bridge", p.id, {});
+      f.store.set("operation:" + p.id, { id: p.id, quoteId: q.quoteId, profileId: p.id,
+        scope: f.runtime.scope(p), kind: "bridge", requestKey: p.id, status: "pending",
+        result: { nextAction: "resume" }, createdAt: 0, updatedAt: 0 });
+    }
+    await f.runtime.resume("alice");
+    await entered;
+    await f.runtime.resume("bob");
+    assert.equal(resumes, 1);
+    release();
+    await f.runtime.drain();
+    assert.equal(f.runtime.operation("bob").status, "pending");
+    await f.runtime.resume("bob");
+    await f.runtime.drain();
+    assert.equal(resumes, 2);
+  } finally { release(); await f.close(); }
+});
+
+test("resume cannot spend through another operation's uncertainty on the same wallet", async () => {
+  const f = fixture(async () => { throw new Error("lost response"); });
+  let resumed = 0;
+  f.backend.resume = async () => { resumed++; return { status: "complete", result: {} }; };
+  f.backend.reconcile = async () => ({ status: "pending", result: { nextAction: "claim" } });
+  try {
+    const first = await f.runtime.quote("claim", "alice", {});
+    await f.runtime.execute(String(first.quoteId), "uncertain-original");
+    await f.runtime.drain();
+    const next = await f.runtime.quote("claim", "alice", {});
+    f.store.set("operation:old-pending", { id: "old-pending", quoteId: next.quoteId, profileId: "alice",
+      scope: f.runtime.scope(profile), kind: "claim", requestKey: "old", status: "pending",
+      result: { nextAction: "claim" }, createdAt: 0, updatedAt: 0 });
+    await assert.rejects(f.runtime.resume("old-pending"), /existing active or uncertain/);
+    assert.equal(resumed, 0);
+  } finally { await f.close(); }
+});
+
+test("history and quote refresh cannot mutate wallet state during submission", async () => {
+  let release!: () => void, started!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const entered = new Promise<void>(resolve => { started = resolve; });
+  const f = fixture(async () => { started(); await gate; return {}; });
+  try {
+    const quote = await f.runtime.quote("swap", "alice", {});
+    await f.runtime.execute(String(quote.quoteId), "running");
+    await entered;
+    await assert.rejects(f.runtime.read("swap_history", "alice", {}), /busy/);
+    await assert.rejects(f.runtime.quote("claim", "alice", {}), /busy/);
+  } finally { release(); await f.close(); }
 });
