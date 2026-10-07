@@ -1,4 +1,5 @@
 import type { BlindedIdentityRecord, SwapQuote } from "@provablehq/shield-swap-sdk";
+import { BridgeBackend } from "./bridge";
 import { TradingStore } from "./store";
 import { createSessionFactory, swapContext, walletScope, type AleoSession, type SessionFactory, type SwapSubmission } from "./session";
 import { TradingError, type ExecutionContext, type Kind, type Operation, type Profile, type Progress, type SavedQuote, type Summary, type TradingBackend } from "./types";
@@ -8,10 +9,11 @@ type ClaimPlan = { swapIds: string[] };
 type SwapCheckpoint = { submissionBoundary?: number; phase?: string; counter?: number; swapId?: string; transactionId?: string };
 export class VeilBackend implements TradingBackend {
   private session: SessionFactory;
-  constructor(private store: TradingStore, session?: SessionFactory) { this.session = session ?? createSessionFactory(store); }
+  private bridge: BridgeBackend;
+  constructor(private store: TradingStore, session?: SessionFactory) { this.session = session ?? createSessionFactory(store); this.bridge = new BridgeBackend(store); }
 
   async quote(kind: Kind, profile: Profile, input: Summary) {
-    if (kind === "bridge") throw new TradingError("bridge_unavailable", "Bridge integration is not configured.");
+    if (kind === "bridge") return this.bridge.quote(profile, input);
     const { client } = await this.session(profile);
     if (kind === "claim") {
       const pending = await client.getUnclaimedSwaps();
@@ -33,7 +35,7 @@ export class VeilBackend implements TradingBackend {
   }
 
   async execute(quote: SavedQuote, context: ExecutionContext): Promise<Progress> {
-    if (quote.kind === "bridge") throw new TradingError("bridge_unavailable", "Bridge integration is not configured.");
+    if (quote.kind === "bridge") return this.bridge.execute(quote, context);
     if (quote.kind === "claim") return this.claim(quote, context);
     const session = await this.session(quote.profile);
     const initial = new Set((await session.identities.load()).map(record => record.counter));
@@ -54,6 +56,7 @@ export class VeilBackend implements TradingBackend {
   }
 
   async read(action: string, profile: Profile, input: Summary): Promise<Summary> {
+    if (action === "list_bridge_routes") return this.bridge.routes(profile, input);
     const session = await this.session(profile);
     const { client } = session;
     const offset = Number(input.offset ?? 0), limit = Number(input.limit ?? 25);
@@ -136,7 +139,7 @@ export class VeilBackend implements TradingBackend {
   }
 
   async reconcile(quote: SavedQuote, operation: Operation): Promise<Progress> {
-    if (quote.kind === "bridge") throw new TradingError("bridge_unavailable", "Bridge integration is not configured.");
+    if (quote.kind === "bridge") return this.bridge.reconcile(quote, operation);
     const session = await this.session(quote.profile);
     if (quote.kind === "claim") return this.reconcileClaims(quote, operation, session);
     const checkpoint = operation.checkpoint as SwapCheckpoint | undefined;
@@ -194,6 +197,7 @@ export class VeilBackend implements TradingBackend {
   }
 
   async resume(quote: SavedQuote, operation: Operation, context: ExecutionContext): Promise<Progress> {
+    if (quote.kind === "bridge") return this.bridge.resume(quote, operation, context);
     if (quote.kind !== "claim") throw new TradingError("unsafe_retry", "A swap request cannot be resubmitted by recovery.");
     return this.claim(quote, context, (operation.checkpoint as { claims?: ClaimItem[] } | undefined)?.claims);
   }

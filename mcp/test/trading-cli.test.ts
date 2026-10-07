@@ -43,7 +43,13 @@ test("terminal setup encrypts an imported key and stdio survives process restart
     assert.equal(readFileSync(join(root, "state.sqlite")).includes(account.privateKey), false);
     const configured = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root, "--allow-claims", "--swap-limit", "1field=1000", "--max-slippage-bps", "75"], { env });
     assert.deepEqual(JSON.parse(configured.stdout).policy, { swaps: false, claims: true, bridges: false, maxSlippageBps: 75, swapLimits: { "1field": "1000" }, bridgeLimits: {} });
+    const evmKey = "0x" + "01".repeat(32);
+    const bridgeConfig = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root,
+      "--evm-key-env", "MCP_EVM_TEST_KEY", "--evm-rpc-url", "https://rpc.invalid"], { env: { ...env, MCP_EVM_TEST_KEY: evmKey } });
+    assert.equal(JSON.parse(bridgeConfig.stdout).policy.bridges, false);
+    assert.ok(!bridgeConfig.stdout.includes(evmKey) && !bridgeConfig.stderr.includes(evmKey));
     const store = new TradingStore(root, password);
+    assert.deepEqual(store.get<{ evm: { key: unknown } }>("profile:default")?.evm.key, { type: "env", name: "MCP_EVM_TEST_KEY" });
     assert.equal(store.get("secret:aleo:default"), account.privateKey);
     store.close();
     for (let restart = 0; restart < 2; restart++) {

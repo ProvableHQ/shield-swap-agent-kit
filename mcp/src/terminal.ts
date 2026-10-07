@@ -5,7 +5,7 @@ import { emitKeypressEvents, type Key } from "node:readline";
 import { parseArgs } from "node:util";
 import { TradingStore } from "./trading/store";
 import { walletScope } from "./trading/session";
-import { TradingError, type Profile, type Policy } from "./trading/types";
+import { TradingError, type Profile, type Policy, type HostedWallet } from "./trading/types";
 
 export const help = `Shield Swap MCP
   shield-swap-mcp setup --network mainnet --key-env ALEO_PRIVATE_KEY
@@ -36,6 +36,9 @@ configure changes trusted terminal permissions:
   --swap-limit TOKEN=RAW   Per-operation base-unit input cap (repeatable)
   --bridge-limit ASSET=RAW Per-operation base-unit input cap (repeatable)
   --max-slippage-bps N     Maximum swap slippage (0–1000)
+  --evm-key-env NAME --evm-rpc-url URL
+  --solana-key-env NAME --solana-rpc-url URL
+                          Configure existing bridge wallets from environment keys
 
 New profiles have execution disabled. Setup/configure require a hidden
 passphrase prompt or SHIELD_SWAP_MCP_PASSWORD from your secret manager.
@@ -56,11 +59,13 @@ export function argumentsFor(argv: string[]) {
       "allow-bridges": { type: "boolean" }, "deny-bridges": { type: "boolean" },
       "swap-limit": { type: "string", multiple: true }, "bridge-limit": { type: "string", multiple: true },
       "max-slippage-bps": { type: "string" },
+      "evm-key-env": { type: "string" }, "evm-rpc-url": { type: "string" },
+      "solana-key-env": { type: "string" }, "solana-rpc-url": { type: "string" },
     } });
     const command = parsed.positionals[0] ?? "serve";
     if (parsed.positionals.length > 1 || !["setup", "configure", "serve"].includes(command)) throw new Error();
     const allowed = command === "setup" ? new Set(["help", "state-dir", "profile", "network", "key-env", "store-key", "generate", "network-url", "api-url", "fee-master"])
-      : command === "configure" ? new Set(["help", "state-dir", "profile", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "swap-limit", "bridge-limit", "max-slippage-bps"])
+      : command === "configure" ? new Set(["help", "state-dir", "profile", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "swap-limit", "bridge-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url"])
       : new Set(["help", "state-dir"]);
     if (Object.keys(parsed.values).some(key => !allowed.has(key))) throw new Error();
     return { command, values: parsed.values };
@@ -159,12 +164,37 @@ export async function setup(options: Options): Promise<Record<string, unknown>> 
   } finally { store.close(); }
 }
 
+async function localBridgeWallet(chain: "evm" | "solana", options: Options): Promise<HostedWallet | undefined> {
+  const keyEnv = options[chain === "evm" ? "evm-key-env" : "solana-key-env"];
+  const rpcUrl = endpoint(options[chain === "evm" ? "evm-rpc-url" : "solana-rpc-url"]);
+  if (!keyEnv && !rpcUrl) return undefined;
+  if (!keyEnv || !rpcUrl || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(keyEnv)) throw new TradingError("invalid_wallet", "Supply both the bridge key environment variable name and its RPC URL.");
+  const key = process.env[keyEnv];
+  if (!key) throw new TradingError("key_missing", "The bridge wallet key environment variable is not set.");
+  let address: string;
+  try {
+    if (chain === "evm") {
+      const { privateKeyToAccount } = await import("viem/accounts");
+      address = privateKeyToAccount((key.startsWith("0x") ? key : "0x" + key) as import("viem").Hex).address;
+    } else {
+      const parsed: unknown = JSON.parse(key);
+      if (!Array.isArray(parsed) || parsed.length !== 64 || parsed.some(value => !Number.isInteger(value) || value < 0 || value > 255)) throw new Error();
+      const { createSolanaClient, solanaHttp, solanaKeyPair } = await import("@provablehq/aleo-bridge-sdk");
+      const client = createSolanaClient({ transport: solanaHttp(rpcUrl), account: solanaKeyPair(Uint8Array.from(parsed)) });
+      address = await client.walletClient!.getAddress();
+    }
+  } catch { throw new TradingError("invalid_key", "The bridge wallet key is invalid. Solana expects a JSON array of 64 bytes."); }
+  return { provider: "local", address, rpcUrl, key: { type: "env", name: keyEnv } };
+}
+
 export async function configure(options: Options): Promise<Record<string, unknown>> {
   const id = profileId(options), directory = stateDirectory(options);
   const store = new TradingStore(directory, await password(directory));
   try {
     const profile = store.get<Profile>("profile:" + id);
     if (!profile) throw new TradingError("profile_missing", "Profile does not exist; run setup first.");
+    const [evm, solana] = await Promise.all([localBridgeWallet("evm", options), localBridgeWallet("solana", options)]);
+    if (solana && profile.network !== "mainnet") throw new TradingError("unsupported_network", "The SDK registry has no Solana testnet bridge route.");
     const policy = structuredClone(profile.policy);
     for (const permission of ["swaps", "claims", "bridges"] as const) {
       const allow = options[("allow-" + permission) as "allow-swaps"];
@@ -188,8 +218,10 @@ export async function configure(options: Options): Promise<Record<string, unknow
       if (store.list<{ profileId: string; status: string }>("operation:").some(op => op.profileId === id && ["queued", "running"].includes(op.status))) {
         throw new TradingError("operation_pending", "Wait for the profile's active operation before changing its permissions.");
       }
-      store.set("profile:" + id, { ...profile, policy });
+      const current = store.get<Profile>("profile:" + id)!;
+      if (JSON.stringify(current) !== JSON.stringify(profile)) throw new TradingError("profile_changed", "This profile changed during configuration; rerun configure.");
+      store.set("profile:" + id, { ...profile, ...(evm ? { evm } : {}), ...(solana ? { solana } : {}), policy });
     }));
-    return { profileId: id, policy };
+    return { profileId: id, policy, ...(evm ? { ethereumAddress: evm.address } : {}), ...(solana ? { solanaAddress: solana.address } : {}) };
   } finally { store.close(); }
 }

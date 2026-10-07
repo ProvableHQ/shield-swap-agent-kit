@@ -47,9 +47,13 @@ try {
       const wallets = await client.callTool({ name: "list_wallets", arguments: {} });
       assert.equal(wallets.structuredContent.wallets[0].address, address);
       assert.ok(!JSON.stringify(wallets).includes(key));
+      const routes = await client.callTool({ name: "list_bridge_routes", arguments: { profileId: "default" } });
+      assert.equal(routes.isError, false);
+      assert.ok(routes.structuredContent.routes.length > 0);
+      assert.ok(routes.structuredContent.routes.every(route => route.network === "testnet"));
     } finally { await client.close(); }
     assert.ok(!stderr.includes(key));
   }
-  process.stdout.write("Installed package: SDK key import, encrypted persistence, 20 stdio tools, and two restarts passed. No network calls or transactions requested.\n");
+  process.stdout.write("Installed package: SDK key import, encrypted persistence, 20 stdio tools, testnet bridge discovery, and two restarts passed. No network calls or transactions requested.\n");
 } finally { await rm(root, { recursive: true, force: true }); }
 }

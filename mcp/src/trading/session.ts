@@ -41,7 +41,7 @@ export function resolveSecret(ref: SecretRef | undefined, store: TradingStore, e
   if (!value) throw new TradingError("wallet_locked", "A configured wallet credential is unavailable. Configure it outside the conversation.");
   return value;
 }
-export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv = process.env): SessionFactory {
+export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv = process.env, authenticate = true): SessionFactory {
   const sessions = new Map<string, Promise<AleoSession>>();
   return async profile => {
     const cacheKey = JSON.stringify({ ...profile, policy: undefined });
@@ -78,7 +78,7 @@ export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv
           },
         };
         const client = pair.walletClient.extend(shieldSwapActions({ program: profile.program, api: { baseUrl: profile.apiUrl }, blindedIdentities: identities }));
-        await client.authenticateShieldSwap();
+        if (authenticate) await client.authenticateShieldSwap();
         return { client, publicClient: pair.publicClient, account: pair.account, identities, submissionTracked: true };
       })();
       sessions.set(cacheKey, pending);
