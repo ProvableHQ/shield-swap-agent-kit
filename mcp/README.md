@@ -1,6 +1,6 @@
 # Shield Swap MCP
 
-Draft TypeScript MCP server for terminal users, backed by the published Veil 0.12.0 packages. Wallet configuration happens in a trusted terminal; MCP exposes structured trading tools. Implementation and mainnet validation are in progress.
+Draft TypeScript MCP server for terminal users, backed by the published Veil 0.12.0 packages. Wallet configuration happens in a trusted terminal; MCP exposes structured trading tools. The server is a draft; validation coverage and remaining limits are recorded below.
 
 ## Run from this repository
 
@@ -136,15 +136,27 @@ Local encryption protects data at rest. An unlocked server can use configured si
 
 ## Current limitations
 
-- Local and Privy/Dynamic EVM/Solana adapters are wired and checked offline. Production provider authentication, wallet policies, and funded execution have not yet been validated.
+- Privy/Dynamic EVM/Solana adapters are checked offline. Production provider authentication, wallet policies, and funded hosted-wallet execution have not yet been validated.
 - Aleo bridge inputs currently use public balances. Private-record burns are not exposed. Inbound xReserve transfers support public, record, and private mint modes.
 - Bridge quotes display SDK fees, which the SDK recalculates before execution; token input caps do not cap network gas fees.
 - Bridge recovery requires this server's saved checkpoints. It does not import arbitrary external transactions.
 - `rebalance_swap_inventory` is deferred until the SDK exposes that operation.
-- No live transactions have been submitted by this implementation. It is not yet ready for funded use.
+- Aleo-to-Ethereum xReserve recovery confirms the source burn, but SDK 0.12.0 does not verify the Ethereum release. Its status remains `DELIVERY_PENDING`; inspect destination delivery independently.
 - History discovery probes a bounded identity window and reports incomplete coverage; it cannot promise discovery across arbitrary missing counter gaps.
 - Existing Shield Swap CLI file stores do not share this package's encryption or locking. Do not operate the same wallet concurrently through an uncoordinated CLI or another state directory.
 - Permission changes are refused while the profile has a queued or running operation.
+
+## Mainnet validation
+
+On 2026-10-07, the built stdio server used existing local wallets and Veil 0.12.0 for these bounded checks:
+
+| Flow | Evidence |
+| --- | --- |
+| 0.000002 USDCx → ETH swap | Submitted, claimed, and reconciled after restart. History reports the claim; private balances changed by exactly the input and 382,133,042 output base units. |
+| 1 wei ETH, Ethereum → Aleo | SDK destination verification reports complete; the public Aleo ETH balance increased by 1 wei. |
+| USDC → USDCx → USDC | Inbound source deposit confirmed; destination attestation and return validation are in progress. |
+
+Swap and claim used delegated fee sponsorship. The ETH bridge additionally paid the SDK-quoted bridge fee and Ethereum gas; provider fees on other routes can reduce the delivered amount. This evidence covers these routes and local accounts; it does not establish hosted-wallet or Solana production behavior. Wallet credentials and recovery state remain outside the repository.
 
 ## Development and verification
 

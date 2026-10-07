@@ -4,7 +4,7 @@ Start with [build or trade now](context/decisions/build-or-trade-now.md). Preser
 
 Choose [Veil](context/toolchains/typescript.md), [Python](context/toolchains/python.md), the [CLI](context/toolchains/cli.md), or available [MCP tools](context/toolchains/mcp.md) according to the user's stack, custody model, and required operations. Preserve an explicitly selected interface. When none is specified, use the existing setup and verified capabilities to choose a suitable surface; read [tool selection](tools/SKILL.md) for the options and supported fallbacks.
 
-Each operational page explains the shared behavior, then gives interface-specific recipes. Read the section for the chosen interface, not every implementation. The examples use testnet and run in the consumer's project, outside this installed kit. Change networks only to match the user's request. The kit includes a [draft standalone MCP server](mcp/README.md) with terminal setup and swap integration; bridge integration and live validation are still in progress. It does not bundle its own trading CLI.
+Each operational page explains the shared behavior, then gives interface-specific recipes. Read the section for the chosen interface, not every implementation. The examples use testnet and run in the consumer's project, outside this installed kit. Change networks only to match the user's request. The kit includes a [draft standalone MCP server](mcp/README.md) with terminal setup, swap and bridge integration, and documented validation limits. It does not bundle its own trading CLI.
 
 ## Setup and trading are separate journeys
 

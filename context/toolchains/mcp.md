@@ -2,7 +2,7 @@
 
 AgentKit includes a [draft standalone TypeScript server](../../mcp/README.md) in `mcp/`. Installing the skill does not install its dependencies, register it, or launch it. Existing SDK servers expose different interfaces; inspect the selected implementation and actual tool catalog before making calls.
 
-Use an available MCP connection for capabilities it actually exposes when it fits the requested workflow. If a required capability is missing, consider a supported SDK or CLI path that the host can run while preserving the account and recovery state; see [tool selection](../../tools/SKILL.md). The standalone server README contains its current setup instructions and tool catalog. Its live validation is unfinished, so the SDK recipes remain the verified source-interface guidance for those operations.
+Use an available MCP connection for capabilities it actually exposes when it fits the requested workflow. If a required capability is missing, consider a supported SDK or CLI path that the host can run while preserving the account and recovery state; see [tool selection](../../tools/SKILL.md). The standalone server README contains its current setup instructions and tool catalog. Its validation section records which wallet and route combinations have been exercised; do not infer coverage for other combinations.
 
 ## AgentKit standalone server
 
@@ -10,7 +10,7 @@ The draft server pins published Veil packages to 0.12.0 and runs over stdio on N
 
 Its swap workflow is `quote` → `execute` → operation polling → `claim_unclaimed_swaps`. Executions consume durable quotes using idempotency keys. `swap_history` reads the encrypted identity store and reports recovery coverage. SDKs still own transaction construction, signing, and protocol logic; this server adds transport, operation IDs, encrypted storage, and local policy enforcement.
 
-Offline tests and an independently installed tarball verify terminal key import, encrypted persistence, stdio discovery, restart, and recovery failure cases. Bridge regressions also cover SDK recovery and lost RPC responses, but these checks do not establish successful live trading or bridging. Follow the [server README](../../mcp/README.md) for the current limitations.
+Offline tests and an independently installed tarball verify terminal key import, encrypted persistence, stdio discovery, restart, and recovery failure cases. Bridge regressions cover SDK recovery, destination verification, and lost RPC responses. Separate mainnet checks have completed a local Aleo swap and claim and an Ethereum-to-Aleo ETH bridge. Follow the [server README](../../mcp/README.md) for the current limitations.
 
 ## TypeScript SDK interface
 
