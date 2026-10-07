@@ -199,3 +199,31 @@ for (const role of ["approval", "source"] as const) {
     } finally { f.close(); }
   });
 }
+
+test("native pre-submission failure is durable while an interrupted bridge stays uncertain", async () => {
+  const f = fixture();
+  try {
+    // The real SDK rejects this public burn before signing: no wallet is configured.
+    const sdk = createBridgeClient({ environment: "mainnet" });
+    const backend = new BridgeBackend(f.store, async () => sdk);
+    const quoted = await backend.quote(profile, { sourceChain: "aleo", sourceAsset: "usdcx",
+      destinationChain: "ethereum", destinationAsset: "usdc", amount: "2.000001" });
+    const offer: SavedQuote = { id: "q", kind: "bridge", profile, scope: "", createdAt: 0,
+      expiresAt: Date.now() + 60000, summary: quoted.summary, plan: quoted.plan };
+    const op: Operation = { id: "o", kind: "bridge", profileId: profile.id, scope: "", quoteId: "q",
+      requestKey: "r", status: "uncertain", createdAt: 0, updatedAt: 0, result: {} };
+    const result = await backend.execute(offer, { operationId: "o", checkpoint: value => {
+      f.store.set("checkpoint", value);
+    } });
+    assert.equal(result.status, "failed");
+    assert.equal((result.result.error as { code: string }).code, "not_submitted");
+    assert.equal((await backend.reconcile(offer, { ...op, checkpoint: f.store.get("checkpoint") })).status, "failed");
+    assert.equal((await backend.reconcile(offer, { ...op, checkpoint: {
+      version: 1, plan: quoted.plan.quote.plan, started: true,
+    } })).status, "uncertain");
+    assert.equal((await backend.reconcile(offer, { ...op, checkpoint: {
+      version: 1, plan: quoted.plan.quote.plan, started: true, unknownSubmission: true,
+    } })).status, "uncertain");
+    assert.deepEqual(quoted.summary.fees, [{ kind: "protocol", chainId: "aleo", assetId: "aleo/usdcx", amount: "2", estimated: false }]);
+  } finally { f.close(); }
+});

@@ -8,5 +8,6 @@ export type BridgeState = {
   checkpoint?: BridgeCheckpoint;
   receipt?: BridgeReceipt;
   unknownSubmission?: boolean;
+  notSubmitted?: boolean;
 };
 export const bridgeContext = new AsyncLocalStorage<{ state: BridgeState; persist(): void; submission?: { chain: string; role: "source" | "approval" | "destination"; captured: boolean } }>();

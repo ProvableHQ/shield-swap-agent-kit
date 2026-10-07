@@ -73,9 +73,10 @@ export class BridgeBackend {
     if (quote.plan.route.environment !== profile.network) throw new TradingError("network_mismatch", "Quoted bridge route does not match the wallet network.");
     const plan: BridgeOffer = { quote, sourceBalance: "public", ...(privateMintSecretNonce ? { privateMintSecretNonce } : {}) };
     const amounts: Summary = {};
-    for (const field of ["nativeFeeAtomic", "nativeValueAtomic", "maxFeeAtomic", "gasPaymentMicrocredits", "approvalRequired", "balanceAtomic"] as const) {
+    for (const field of ["nativeFeeAtomic", "nativeValueAtomic", "maxFeeAtomic", "gasPaymentMicrocredits", "balanceAtomic"] as const) {
       if (field in quote) amounts[field] = String((quote as unknown as Summary)[field]);
     }
+    if ("approvalRequired" in quote) amounts.approvalRequired = quote.approvalRequired;
     return { plan, summary: {
       quoteKind: quote.kind, routeId: quote.plan.route.id, protocol: quote.plan.protocol,
       sourceChain, destinationChain, tokenIn: quote.plan.sourceAsset.id, tokenOut: quote.plan.destinationAsset.id,
@@ -84,7 +85,7 @@ export class BridgeBackend {
       amountIn: parseDecimalAmount(quote.plan.amountIn, quote.plan.sourceAsset.decimals).toString(),
       expectedAmountOut: "amountOut" in quote ? quote.amountOut : quote.plan.amountOut,
       sender: quote.plan.sender, recipient: quote.plan.recipient, sourceBalance: "public",
-      destinationBalance: quote.plan.mintMode, fees: quote.plan.fees, feesMayChange: true, ...amounts,
+      destinationBalance: quote.plan.mintMode, fees: "fees" in quote ? quote.fees : quote.plan.fees, feesMayChange: true, ...amounts,
     } };
   }
 
@@ -103,9 +104,22 @@ export class BridgeBackend {
     const persist = () => context.checkpoint(state);
     persist();
     return bridgeContext.run({ state, persist }, async () => {
-      const result = await client.execute({ plan: saved.quote.plan, mode: saved.quote.kind === "aleo-xreserve" ? "public-as-signer" : undefined,
+      let result;
+      try {
+        result = await client.execute({ plan: saved.quote.plan, mode: saved.quote.kind === "aleo-xreserve" ? "public-as-signer" : undefined,
         privateMintSecretNonce: saved.privateMintSecretNonce, confirmationTimeoutMs: 30_000,
         onCheckpoint: checkpoint => { state.checkpoint = mergeCheckpoint(state.checkpoint, checkpoint); persist(); } });
+      } catch (error) {
+        // Owned EVM/Solana transports persist before sending; the native Aleo
+        // adapter awaits its prepared checkpoint before broadcasting. Only an
+        // observed failure before either boundary proves nothing was submitted.
+        // A process interruption never writes this marker and stays uncertain.
+        if (state.checkpoint || state.unknownSubmission) throw error;
+        state.notSubmitted = true;
+        persist();
+        return { status: "failed", result: { error: { code: "not_submitted",
+          message: "Bridge preparation failed before submission. Check balances and request a fresh quote." } }, checkpoint: state };
+      }
       state.checkpoint = mergeCheckpoint(state.checkpoint, createBridgeCheckpoint(saved.quote.plan, result.receipt));
       persist();
       return this.progress({ next: result.receipt.status === "COMPLETED" ? "done" : "wait", plan: saved.quote.plan, receipt: result.receipt }, state);
@@ -114,7 +128,7 @@ export class BridgeBackend {
 
   async reconcile(offer: SavedQuote, operation: Operation): Promise<Progress> {
     const state = operation.checkpoint as BridgeState | undefined;
-    if (!state?.started) return { status: "failed", result: { error: { code: "not_submitted", message: "Bridge execution did not start." } } };
+    if (!state?.started || (state.notSubmitted && !state.checkpoint && !state.unknownSubmission)) return { status: "failed", result: { error: { code: "not_submitted", message: "Bridge execution did not start." } } };
     if (!state.checkpoint || state.unknownSubmission) return { status: "uncertain",
       result: { nextAction: "reconcile", error: { code: "submission_uncertain", message: "No conclusive bridge submission checkpoint is available. Do not submit this transfer again." } } };
     const client = await this.session(offer.profile);
