@@ -1,11 +1,11 @@
 import type { BlindedIdentityRecord, SwapQuote } from "@provablehq/shield-swap-sdk";
 import { TradingStore } from "./store";
-import { createSessionFactory, swapContext, walletScope, type AleoSession, type SessionFactory } from "./session";
+import { createSessionFactory, swapContext, walletScope, type AleoSession, type SessionFactory, type SwapSubmission } from "./session";
 import { TradingError, type ExecutionContext, type Kind, type Operation, type Profile, type Progress, type SavedQuote, type Summary, type TradingBackend } from "./types";
 
 type ClaimItem = { swapId: string; status: "pending" | "submitting" | "claimed" | "uncertain"; transactionId?: string; amountOut?: string; amountRemaining?: string };
 type ClaimPlan = { swapIds: string[] };
-type SwapCheckpoint = { phase?: string; counter?: number; swapId?: string; transactionId?: string };
+type SwapCheckpoint = { submissionBoundary?: number; phase?: string; counter?: number; swapId?: string; transactionId?: string };
 export class VeilBackend implements TradingBackend {
   private session: SessionFactory;
   constructor(private store: TradingStore, session?: SessionFactory) { this.session = session ?? createSessionFactory(store); }
@@ -37,8 +37,18 @@ export class VeilBackend implements TradingBackend {
     if (quote.kind === "claim") return this.claim(quote, context);
     const session = await this.session(quote.profile);
     const initial = new Set((await session.identities.load()).map(record => record.counter));
-    context.checkpoint({ phase: "preparing" });
-    const handle = await swapContext.run({ execution: context, initial }, () => session.client.swap({ quote: quote.plan as SwapQuote }));
+    const state: SwapSubmission = { execution: context, initial, submissionStarted: false,
+      checkpoint: { phase: "preparing", ...(session.submissionTracked ? { submissionBoundary: 1 } : {}) } };
+    context.checkpoint(state.checkpoint);
+    let handle;
+    try {
+      handle = await swapContext.run(state, () => session.client.swap({ quote: quote.plan as SwapQuote }));
+    } catch (error) {
+      if (!session.submissionTracked || state.submissionStarted) throw error;
+      return { status: "failed", result: { error: { code: "not_submitted",
+        message: "Swap preparation failed before proving or submission. Check balances and request a fresh quote." } },
+        checkpoint: state.checkpoint };
+    }
     context.checkpoint({ phase: "submitted", swapId: handle.swapId, transactionId: handle.transactionId });
     return { status: "submitted", result: { transactionId: handle.transactionId, swapId: handle.swapId, nextAction: "claim_when_ready" } };
   }
@@ -104,9 +114,25 @@ export class VeilBackend implements TradingBackend {
       } else gaps++;
     }
     await session.identities.save(records);
-    const result = await session.client.reconcileSwapHistory({ maxPages: 10 });
+    const result = await this.reconcileHistory(session, profile);
     return { requested: true, complete: false, historyScanComplete: result.complete, identitiesProbed: scanned,
       identityWindow: 16, identityCeiling: 256, pagesScanned: result.pagesScanned };
+  }
+
+  private async reconcileHistory(session: AleoSession, profile: Profile) {
+    // SDK 0.12 caches a negative result at the current history tip. Pending
+    // transactions can land after that scan, so only concrete claims are final.
+    const records = await session.identities.load();
+    if (records.some(record => !record.claim && record.claimSearched)) {
+      await session.identities.save(records.map(record => record.claim ? record : { ...record, claimSearched: false }));
+    }
+    const key = "history-recovery:" + walletScope(profile);
+    const pageLimit = this.store.get<number>(key) ?? 10;
+    const result = await session.client.reconcileSwapHistory({ maxPages: pageLimit });
+    // The public SDK restarts from the newest page; increase the window after
+    // an incomplete scan so older claims remain reachable across polls/restarts.
+    this.store.set(key, result.complete ? 10 : Math.min(Number.MAX_SAFE_INTEGER, pageLimit * 2));
+    return { complete: result.complete, pagesScanned: result.pagesScanned, pageLimit };
   }
 
   async reconcile(quote: SavedQuote, operation: Operation): Promise<Progress> {
@@ -114,18 +140,18 @@ export class VeilBackend implements TradingBackend {
     const session = await this.session(quote.profile);
     if (quote.kind === "claim") return this.reconcileClaims(quote, operation, session);
     const checkpoint = operation.checkpoint as SwapCheckpoint | undefined;
-    if (!checkpoint || checkpoint.phase === "preparing") return { status: "failed", result: { error: { code: "not_submitted", message: "No swap identity was reserved; execution did not reach submission." } } };
-    await session.client.reconcileSwapHistory({ maxPages: 10 });
+    if (!checkpoint || checkpoint.phase === "preparing" || (checkpoint.submissionBoundary === 1 && checkpoint.phase === "reserved")) return { status: "failed", result: { error: { code: "not_submitted", message: "Execution did not reach the proving or submission boundary." } } };
+    const historyRecovery = await this.reconcileHistory(session, quote.profile);
     const records = await session.identities.load();
     const record = records.find(item => checkpoint.swapId ? item.swapId === checkpoint.swapId : item.counter === checkpoint.counter);
-    if (record?.claim) return { status: "complete", result: { swapId: record.swapId, transactionId: record.handle?.transactionId,
+    if (record?.claim) return { status: "complete", result: { historyRecovery, swapId: record.swapId, transactionId: record.handle?.transactionId,
       claimTransactionId: record.claim.transactionId, amountOut: record.claim.amountOut, amountRemaining: record.claim.amountRemaining } };
     const pending = await session.client.getUnclaimedSwaps();
     const found = pending.swaps.find(swap => swap.swapId === (record?.swapId ?? checkpoint.swapId));
-    if (found) return { status: "submitted", result: { swapId: found.swapId, transactionId: record?.handle?.transactionId ?? checkpoint.transactionId,
+    if (found) return { status: "submitted", result: { historyRecovery, swapId: found.swapId, transactionId: record?.handle?.transactionId ?? checkpoint.transactionId,
       claimable: found.claimable, amountOut: found.output.amount_out.toString(), nextAction: "claim_when_ready" } };
     return { status: record?.handle || checkpoint.transactionId ? "pending" : "uncertain",
-      result: { swapId: record?.swapId ?? checkpoint.swapId, transactionId: record?.handle?.transactionId ?? checkpoint.transactionId, nextAction: "wait" } };
+      result: { historyRecovery, swapId: record?.swapId ?? checkpoint.swapId, transactionId: record?.handle?.transactionId ?? checkpoint.transactionId, nextAction: "wait" } };
   }
 
   private async claim(quote: SavedQuote, context: ExecutionContext, prior: ClaimItem[] = []): Promise<Progress> {
@@ -152,7 +178,7 @@ export class VeilBackend implements TradingBackend {
   }
 
   private async reconcileClaims(quote: SavedQuote, operation: Operation, session: AleoSession): Promise<Progress> {
-    await session.client.reconcileSwapHistory({ maxPages: 10 });
+    const historyRecovery = await this.reconcileHistory(session, quote.profile);
     const records = await session.identities.load();
     const previous = (operation.checkpoint as { claims?: ClaimItem[] } | undefined)?.claims ?? [];
     const items = (quote.plan as ClaimPlan).swapIds.map(swapId => {
@@ -164,7 +190,7 @@ export class VeilBackend implements TradingBackend {
     const uncertain = items.some(item => item.status === "submitting" || item.status === "uncertain");
     const complete = items.every(item => item.status === "claimed");
     return { status: complete ? "complete" : uncertain ? "uncertain" : "pending",
-      result: { claims: items, nextAction: complete ? "done" : uncertain ? "reconcile" : "claim" }, checkpoint: { claims: items } };
+      result: { historyRecovery, claims: items, nextAction: complete ? "done" : uncertain ? "reconcile" : "claim" }, checkpoint: { claims: items } };
   }
 
   async resume(quote: SavedQuote, operation: Operation, context: ExecutionContext): Promise<Progress> {

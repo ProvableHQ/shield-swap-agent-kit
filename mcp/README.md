@@ -14,7 +14,7 @@ Draft implementation of a TypeScript MCP server backed by Veil. This subfolder i
 
 - Terminal setup, CLI entrypoint, build, and installed-package validation are not implemented yet. CLI tests currently fail for the missing entrypoint.
 - The bridge tool contracts are present, but bridge execution and hosted-wallet wiring are incomplete.
-- Recovery review has identified SDK negative-cache behavior that needs correction before live use.
+- Recovery refreshes unresolved SDK history, expands incomplete scans, and tracks the proving boundary. Live recovery validation is still pending.
 - Existing Shield Swap CLI file stores do not participate in this package's encryption or locking. Do not operate the same wallet concurrently through an uncoordinated CLI or another state directory.
 - `rebalance_swap_inventory` is deferred until the SDK exposes the operation.
 - No live transactions have been submitted by this implementation.

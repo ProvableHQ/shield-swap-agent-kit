@@ -95,16 +95,29 @@ export class TradingRuntime {
     return value;
   }
 
-  private launch(id: string, quote: SavedQuote, resuming: boolean): void {
+  private launch(id: string, quote: SavedQuote, resuming: boolean, ready?: { resolve(value: Summary): void; reject(error: unknown): void }): void {
     const worker = (async () => {
       let entered = false;
       try {
         await this.store.withLock(quote.scope, async () => {
           let op = this.store.get<Operation>("operation:" + id)!;
+          if (resuming) {
+            if (op.status !== "complete" && op.status !== "failed") {
+              op = this.save(op, await this.backend.reconcile(quote, op));
+            }
+            // Reconcile and start the next step under the same wallet lock.
+            // Another caller must never queue work based on a stale status.
+            if (op.status === "complete" || op.status === "failed" || op.kind === "swap" ||
+                !["resume", "complete", "claim"].includes(String(op.result.nextAction))) {
+              ready?.resolve(this.publicOperation(op));
+              return;
+            }
+          }
           this.authorize(quote);
           if (!resuming && quote.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired before execution began.");
           entered = true;
           op = this.save(op, { status: "running", result: op.result });
+          ready?.resolve(this.publicOperation(op));
           const context = { operationId: id, checkpoint: (checkpoint: unknown) => {
             op = { ...op, checkpoint, updatedAt: Date.now() };
             this.store.set("operation:" + id, op);
@@ -114,6 +127,11 @@ export class TradingRuntime {
         });
       } catch (error) {
         const op = this.store.get<Operation>("operation:" + id)!;
+        if (resuming && !entered) {
+          if (error instanceof Error && /busy/.test(error.message)) ready?.resolve(this.publicOperation(op));
+          else ready?.reject(error);
+          return;
+        }
         this.save(op, { status: entered ? "uncertain" : "failed",
           result: { error: { code: entered ? "submission_uncertain" : error instanceof TradingError ? error.code : "wallet_busy",
             message: entered ? "The submission result is uncertain. Reconcile this operation before any retry." : "Execution did not start. Check the wallet permissions, quote expiry, and active operations." } } });
@@ -152,17 +170,10 @@ export class TradingRuntime {
     }
   }
   async resume(id: string): Promise<Summary> {
-    await this.status(id);
-    const op = this.store.get<Operation>("operation:" + id)!;
-    if (op.status === "complete" || op.status === "failed" || op.status === "running" || op.status === "queued") return this.publicOperation(op);
-    // A swap request is never replayed. Claims and bridges can resume only from
-    // SDK reconciliation that identifies an explicit next step.
-    if (op.kind === "swap" || !["resume", "complete", "claim"].includes(String(op.result.nextAction))) return this.publicOperation(op);
+    const op = this.store.get<Operation>("operation:" + id);
+    if (!op) throw new TradingError("operation_missing", "Operation was not found.");
     const quote = this.store.get<SavedQuote>("quote:" + op.quoteId)!;
-    this.authorize(quote);
-    const updated = this.save(op, { status: "queued", result: op.result });
-    this.launch(id, quote, true);
-    return this.publicOperation(updated);
+    return new Promise<Summary>((resolve, reject) => this.launch(id, quote, true, { resolve, reject }));
   }
   async read(action: string, profileId: string, input: Summary): Promise<Summary> {
     return this.backend.read(action, this.profile(profileId), input);

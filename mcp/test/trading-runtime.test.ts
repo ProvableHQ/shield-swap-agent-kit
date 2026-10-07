@@ -71,3 +71,37 @@ test("an ambiguous broadcast stays uncertain and resume never repeats the swap",
     assert.doesNotMatch(JSON.stringify(recovered), /PRIVATE-KEY-LEAK/);
   } finally { await f.close(); }
 });
+
+test("concurrent recovery cannot mark another resume failed or submit twice", async () => {
+  const root = mkdtempSync(join(tmpdir(), "shield-resume-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  store.set("profile:alice", profile);
+  let release!: () => void, entered!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  let resumes = 0;
+  const backend: TradingBackend = {
+    quote: async () => ({ plan: {}, summary: {} }),
+    execute: async () => { throw new Error("unexpected deposit"); },
+    read: async () => ({}),
+    reconcile: async () => { entered(); await gate; return { status: "pending", result: { nextAction: "claim" } }; },
+    resume: async () => { resumes++; return { status: "complete", result: {} }; },
+  };
+  const runtime = new TradingRuntime(store, backend);
+  const scope = runtime.scope(profile);
+  store.set("quote:q", { id: "q", profile, scope, kind: "claim", createdAt: 0, expiresAt: 1, plan: {}, summary: {} });
+  store.set("operation:o", { id: "o", quoteId: "q", profileId: "alice", scope, kind: "claim", requestKey: "r",
+    status: "pending", result: { nextAction: "claim" }, createdAt: 0, updatedAt: 0 });
+  let first: Promise<unknown> | undefined;
+  try {
+    first = runtime.resume("o");
+    await started;
+    await runtime.resume("o");
+    assert.equal(runtime.operation("o").status, "pending");
+    release();
+    await first;
+    await runtime.drain();
+    assert.equal(resumes, 1);
+    assert.equal(runtime.operation("o").status, "complete");
+  } finally { release(); await first?.catch(() => {}); await runtime.drain(); store.close(); rmSync(root, { recursive: true, force: true }); }
+});

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TradingStore } from "../src/trading/store";
 import { VeilBackend } from "../src/trading/veil";
-import type { AleoSession } from "../src/trading/session";
+import { swapContext, type AleoSession } from "../src/trading/session";
 import type { Profile, SavedQuote } from "../src/trading/types";
 
 const profile: Profile = { id: "alice", network: "testnet", address: "aleo1test", key: { type: "env", name: "TEST_KEY" },
@@ -47,5 +47,26 @@ test("history projects public economics without returning SDK handles or blindin
     const result = await backend.read("swap_history", profile, { limit: 25, offset: 0 });
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE-CLAIM-SECRET|blindingFactor|handle/);
     assert.equal((result.swaps as { swapId: string }[])[0].swapId, "4field");
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a reserved identity followed by quote expiry before proving is a definitive failure", async () => {
+  const root = mkdtempSync(join(tmpdir(), "shield-veil-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  const session = { submissionTracked: true, client: {
+    swap: async () => {
+      const state = swapContext.getStore()!;
+      state.checkpoint = { phase: "reserved", submissionBoundary: 1, counter: 2 };
+      state.execution.checkpoint(state.checkpoint);
+      throw new Error("Quote expired; request a new quote PRIVATE-DETAIL");
+    },
+  }, identities: { load: async () => [{ counter: 1, status: "reserved" }], save: async () => {} } } as unknown as AleoSession;
+  try {
+    const backend = new VeilBackend(store, async () => session);
+    const quote: SavedQuote = { id: "q", kind: "swap", profile, scope: "", createdAt: 0, expiresAt: 1, plan: offer, summary: {} };
+    const result = await backend.execute(quote, { operationId: "o", checkpoint: () => {} });
+    assert.equal(result.status, "failed");
+    assert.equal((result.result.error as { code: string }).code, "not_submitted");
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE-DETAIL/);
   } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
 });
