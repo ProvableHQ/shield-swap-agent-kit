@@ -126,20 +126,34 @@ export class BridgeBackend {
     });
   }
 
+  private async recover(client: BridgeClient, state: BridgeState): Promise<BridgeProgress> {
+    const progress = await client.recover({ checkpoint: state.checkpoint! });
+    // Native recovery reconstructs some routes only through source confirmation.
+    // Refresh the recovered delivery receipt so destination acceptance can finish
+    // the operation instead of restarting at DELIVERY_PENDING on every poll.
+    if (progress.next !== "wait" || progress.receipt.status !== "DELIVERY_PENDING") return progress;
+    const receipt = await client.getStatus({ plan: progress.plan, receipt: progress.receipt });
+    if (receipt.status === "COMPLETED") return { next: "done", plan: progress.plan, receipt };
+    if (receipt.status === "FAILED" || receipt.status === "EXPIRED") return {
+      next: "failed", plan: progress.plan, receipt, error: "Bridge delivery failed.",
+    };
+    return { ...progress, receipt };
+  }
+
   async reconcile(offer: SavedQuote, operation: Operation): Promise<Progress> {
     const state = operation.checkpoint as BridgeState | undefined;
     if (!state?.started || (state.notSubmitted && !state.checkpoint && !state.unknownSubmission)) return { status: "failed", result: { error: { code: "not_submitted", message: "Bridge execution did not start." } } };
     if (!state.checkpoint || state.unknownSubmission) return { status: "uncertain",
       result: { nextAction: "reconcile", error: { code: "submission_uncertain", message: "No conclusive bridge submission checkpoint is available. Do not submit this transfer again." } } };
     const client = await this.session(offer.profile);
-    return this.progress(await client.recover({ checkpoint: state.checkpoint }), state);
+    return this.progress(await this.recover(client, state), state);
   }
 
   async resume(offer: SavedQuote, operation: Operation, context: ExecutionContext): Promise<Progress> {
     const state = operation.checkpoint as BridgeState | undefined;
     if (!state?.checkpoint || state.unknownSubmission) return this.reconcile(offer, operation);
     const client = await this.session(offer.profile);
-    const progress = await client.recover({ checkpoint: state.checkpoint });
+    const progress = await this.recover(client, state);
     if (progress.next !== "resume" && progress.next !== "complete") return this.progress(progress, state);
     const persist = () => context.checkpoint(state);
     const onCheckpoint = (checkpoint: BridgeCheckpoint) => { state.checkpoint = mergeCheckpoint(state.checkpoint, checkpoint); persist(); };

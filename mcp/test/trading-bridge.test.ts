@@ -227,3 +227,36 @@ test("native pre-submission failure is durable while an interrupted bridge stays
     assert.deepEqual(quoted.summary.fees, [{ kind: "protocol", chainId: "aleo", assetId: "aleo/usdcx", amount: "2", estimated: false }]);
   } finally { f.close(); }
 });
+
+test("bridge status advances recovered Hyperlane receipts through the SDK destination check", async () => {
+  const f = fixture();
+  try {
+    const { loadNetwork } = await import("@provablehq/veil-aleo-sdk");
+    const recipient = (await loadNetwork("mainnet")).generateAccount().address;
+    let delivered = false, destinationReads = 0;
+    const { encodeAbiParameters, parseAbiParameters, zeroAddress } = await import("viem");
+    const sdk = createBridgeClient({ environment: "mainnet", clients: { aleo: {
+      family: "aleo", publicClient: { request: async () => { destinationReads++; return delivered ? "true" : null; } },
+    }, ethereum: { family: "evm", publicClient: { getChainId: async () => 1,
+      call: async () => encodeAbiParameters(parseAbiParameters("(address token, uint256 amount)[]"), [[{ token: zeroAddress, amount: 2n }]]),
+    } } } as unknown as NonNullable<Parameters<typeof createBridgeClient>[0]>["clients"] });
+    const { plan } = await sdk.quote({ source: { chain: "ethereum", asset: "eth" }, destination: { chain: "aleo", asset: "eth" },
+      amount: "0.000000000000000001", sender: profile.evm!.address, recipient });
+    const receipt: BridgeReceipt = { id: "0x" + "11".repeat(32), protocol: "hyperlane", status: "DELIVERY_PENDING",
+      sourceTxId: "0x" + "22".repeat(32), messageId: "0x" + "11".repeat(32), protocolState: { routeId: plan.route.id } };
+    const client = { ...sdk, recover: async () => ({ next: "wait" as const, plan, receipt }) } as BridgeClient;
+    const backend = new BridgeBackend(f.store, async () => client);
+    const offer: SavedQuote = { id: "q", kind: "bridge", profile, scope: "", createdAt: 0,
+      expiresAt: 0, summary: {}, plan: {} };
+    const op: Operation = { id: "o", kind: "bridge", profileId: profile.id, scope: "", quoteId: "q", requestKey: "r",
+      status: "pending", createdAt: 0, updatedAt: 0, result: {}, checkpoint: {
+        version: 1, plan, started: true, checkpoint: createBridgeCheckpoint(plan, receipt),
+      } };
+    assert.equal((await backend.reconcile(offer, op)).status, "pending");
+    delivered = true;
+    const result = await backend.reconcile(offer, op);
+    assert.equal(result.status, "complete");
+    assert.equal(result.result.bridgeStatus, "COMPLETED");
+    assert.equal(destinationReads, 2);
+  } finally { f.close(); }
+});
