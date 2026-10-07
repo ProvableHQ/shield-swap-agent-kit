@@ -1,0 +1,44 @@
+{
+  "name": "@provablehq/shield-swap-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shield Swap MCP server for local and hosted wallets.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "bin": {
+    "shield-swap-mcp": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@provablehq/aleo-bridge-sdk": "0.12.0",
+    "@provablehq/sdk": "0.12.0",
+    "@provablehq/shield-swap-sdk": "0.12.0",
+    "@provablehq/veil-aleo-sdk": "0.12.0",
+    "@provablehq/veil-core": "0.12.0",
+    "@solana/kit": "8.0.0",
+    "viem": "2.57.3",
+    "zod": "4.0.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ProvableHQ/shield-swap-agent-kit.git",
+    "directory": "mcp"
+  }
+}
