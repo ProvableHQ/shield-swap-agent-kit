@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -8,7 +8,8 @@ import { promisify } from "node:util";
 const installRoot = resolve(process.argv[2] ?? ".");
 const run = promisify(execFile);
 if (process.argv[3] !== "--installed-child") {
-  const driver = await mkdtemp(join(installRoot, ".shield-mcp-smoke-"));
+  const packageRoot = await realpath(join(installRoot, "node_modules/@provablehq/shield-swap-mcp"));
+  const driver = await mkdtemp(join(packageRoot, ".shield-mcp-smoke-"));
   try {
     const path = join(driver, "run.mjs");
     await writeFile(path, await readFile(new URL(import.meta.url)));

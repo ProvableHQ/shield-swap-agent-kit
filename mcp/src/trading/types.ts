@@ -10,6 +10,10 @@ export type HostedWallet = {
   appSecret?: SecretRef;
   authorizationKey?: SecretRef;
   environmentId?: string;
+  apiToken?: SecretRef;
+  metadata?: SecretRef;
+  password?: SecretRef;
+  keyShares?: SecretRef;
 };
 export type Policy = {
   swaps: boolean;

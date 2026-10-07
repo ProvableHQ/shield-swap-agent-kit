@@ -2,7 +2,7 @@
 
 AgentKit includes a [draft standalone TypeScript server](../../mcp/README.md) in `mcp/`. Installing the skill does not install its dependencies, register it, or launch it. Existing SDK servers expose different interfaces; inspect the selected implementation and actual tool catalog before making calls.
 
-Use an available MCP connection for capabilities it actually exposes when it fits the requested workflow. If a required capability is missing, consider a supported SDK or CLI path that the host can run while preserving the account and recovery state; see [tool selection](../../tools/SKILL.md). The standalone server README contains its current setup instructions and tool catalog. Its hosted wallet wiring and live validation are unfinished, so the SDK recipes remain the verified source-interface guidance for those operations.
+Use an available MCP connection for capabilities it actually exposes when it fits the requested workflow. If a required capability is missing, consider a supported SDK or CLI path that the host can run while preserving the account and recovery state; see [tool selection](../../tools/SKILL.md). The standalone server README contains its current setup instructions and tool catalog. Its live validation is unfinished, so the SDK recipes remain the verified source-interface guidance for those operations.
 
 ## AgentKit standalone server
 

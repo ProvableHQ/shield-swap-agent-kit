@@ -48,8 +48,21 @@ test("terminal setup encrypts an imported key and stdio survives process restart
       "--evm-key-env", "MCP_EVM_TEST_KEY", "--evm-rpc-url", "https://rpc.invalid"], { env: { ...env, MCP_EVM_TEST_KEY: evmKey } });
     assert.equal(JSON.parse(bridgeConfig.stdout).policy.bridges, false);
     assert.ok(!bridgeConfig.stdout.includes(evmKey) && !bridgeConfig.stderr.includes(evmKey));
+
+    const descriptor = { provider: "privy", address: JSON.parse(bridgeConfig.stdout).ethereumAddress,
+      rpcUrl: "https://rpc.invalid", walletId: "existing-wallet", appIdEnv: "PRIVY_TEST_APP", appSecretEnv: "PRIVY_TEST_SECRET" };
+    const hosted = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root,
+      "--evm-wallet-env", "MCP_TEST_WALLET"], { env: { ...env, MCP_TEST_WALLET: JSON.stringify(descriptor) } });
+    assert.equal(JSON.parse(hosted.stdout).policy.bridges, false);
+    const invalidHosted = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root,
+      "--evm-wallet-env", "MCP_TEST_WALLET"], { env: { ...env, MCP_TEST_WALLET: JSON.stringify({ ...descriptor, appSecret: "NEVER-ECHO-SECRET" }) } }).then(
+      () => { throw new Error("raw provider credential accepted"); },
+      error => error,
+    );
+    assert.ok(!String(invalidHosted.stdout).includes("NEVER-ECHO-SECRET") && !String(invalidHosted.stderr).includes("NEVER-ECHO-SECRET"));
+
     const store = new TradingStore(root, password);
-    assert.deepEqual(store.get<{ evm: { key: unknown } }>("profile:default")?.evm.key, { type: "env", name: "MCP_EVM_TEST_KEY" });
+    assert.deepEqual(store.get<{ evm: { appSecret: unknown } }>("profile:default")?.evm.appSecret, { type: "env", name: "PRIVY_TEST_SECRET" });
     assert.equal(store.get("secret:aleo:default"), account.privateKey);
     store.close();
     for (let restart = 0; restart < 2; restart++) {

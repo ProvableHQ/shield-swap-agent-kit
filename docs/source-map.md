@@ -57,11 +57,13 @@ Use the installed dependency's reference when writing executable code. The Pytho
 
 On 2026-10-07, the draft in `mcp/` was checked against published `@provablehq/veil-core`, `@provablehq/veil-aleo-sdk`, `@provablehq/shield-swap-sdk`, `@provablehq/aleo-bridge-sdk`, and `@provablehq/sdk` version **0.12.0**, pinned in its lockfile. This is separate from the older checkout observations above.
 
-Forty-one offline MCP tests, TypeScript checking, and the build pass. A tarball installed in a fresh project outside SDK workspaces passes SDK key import, encrypted persistence, all twenty tool schemas over stdio, and two process restarts. A separate crash test verifies that the operating system releases the wallet lock. No funded transaction is part of that evidence; local bridge wiring is implemented, with hosted wallets and mainnet validation still in progress.
+Forty-nine offline MCP tests, TypeScript checking, and the build pass. A tarball installed in a fresh project outside SDK workspaces passes SDK key import, encrypted persistence, all twenty tool schemas over stdio, and two process restarts. A separate crash test verifies that the operating system releases the wallet lock. No funded transaction is part of that evidence; local and hosted bridge wallet wiring is implemented; mainnet validation is still in progress.
 
 Recovery regressions exercise the installed Shield Swap SDK's negative history cache and pagination. Unresolved identities must be searched again after an empty scan, and incomplete scans need expanding coverage. A proving-adapter checkpoint distinguishes failures before submission from ambiguous results; a swap deposit is never replayed by recovery.
 
 Bridge regressions exercise the native SDK checkpoint format, Aleo prepared-transaction recovery, private mint destination transitions, and lost first approval/deposit responses. The owned EVM/Solana RPC transport persists signed transaction IDs before broadcasting; private mint checkpoints preserve the exact SDK hook data. No protocol or signing logic is reimplemented.
+
+Hosted-wallet checks use Privy 0.35.0 and Dynamic 1.1.24 with the bridge SDK\'s native adapters. Tests validate provider wallet identity and Dynamic creation metadata, and exercise all four hosted EVM/Solana signing paths with local signatures and mocked RPC broadcasts. pnpm retains the SDK-documented Privy/Kit peer mismatch; this is offline integration evidence, not proof of production authorization or balances.
 
 ## External integration evidence
 

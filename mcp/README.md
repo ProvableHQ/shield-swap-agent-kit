@@ -4,16 +4,18 @@ Draft TypeScript MCP server for terminal users, backed by the published Veil 0.1
 
 ## Run from this repository
 
-Requires Node.js 22.13 or newer.
+Requires Node.js 22.13 or newer and pnpm 10.33.2.
 
 ```sh
 cd mcp
-npm ci
-npm run build
+pnpm install --frozen-lockfile
+pnpm run build
 node dist/cli.js --help
 ```
 
-The package is private and unpublished. To install the build elsewhere, run `npm pack` here, then `npm install /absolute/path/to/provablehq-shield-swap-mcp-0.1.0.tgz` in the consuming project. The installed command is `shield-swap-mcp`.
+The package is private and unpublished. To install the build elsewhere, run `pnpm pack` here, then `pnpm add /absolute/path/to/provablehq-shield-swap-mcp-0.1.0.tgz` in the consuming project. The installed command is `shield-swap-mcp`.
+
+pnpm is used because Privy 0.35.0 declares an optional Solana Kit 5 peer while the bridge SDK uses Kit 8. The SDK documents this combination: its Privy adapter uses the wire-transaction API, and Kit 8 validates the signed wire. Installation reports that peer warning and warnings from unused Dynamic WalletConnect dependencies. Hosted provider packages are optional; `pnpm add --no-optional /absolute/path/to/the-built-package.tgz` supports local-wallet-only installations from a prebuilt tarball.
 
 ## Configure an existing wallet
 
@@ -52,6 +54,51 @@ EVM accepts a hex private key; Solana accepts a JSON array of 64 keypair bytes. 
 
 Use `list_bridge_routes` → `quote_bridge` → `execute_bridge`. Read progress with `bridge_status`, reconcile checkpoints with `recover_bridge_transactions`, and use `resume_operation` only for the SDK's required next step. Signed EVM/Solana transaction IDs are persisted before the RPC broadcast; Aleo uses the SDK's prepared-transaction checkpoints. A private xReserve mint retains its secret nonce encrypted for recovery.
 
+## Configure hosted bridge wallets
+
+Privy and Dynamic use the bridge SDK's native EVM and Solana adapters. Configure an existing wallet with a JSON descriptor supplied through an environment variable:
+
+```sh
+node dist/cli.js configure --profile default --evm-wallet-env SHIELD_EVM_WALLET
+node dist/cli.js configure --profile default --solana-wallet-env SHIELD_SOLANA_WALLET
+```
+
+These descriptors contain public wallet identity and **environment variable names**, never credential values. Supply the named credentials to the MCP process through your secret manager. Configuration validates and stores the descriptor locally without creating or funding a wallet; bridge access subsequently authenticates with the provider and checks wallet identity.
+
+Privy descriptor:
+
+```json
+{
+  "provider": "privy",
+  "address": "YOUR_EXISTING_WALLET_ADDRESS",
+  "walletId": "YOUR_EXISTING_WALLET_ID",
+  "rpcUrl": "https://your-chain-rpc.example",
+  "appIdEnv": "PRIVY_APP_ID",
+  "appSecretEnv": "PRIVY_APP_SECRET",
+  "authorizationKeyEnv": "PRIVY_AUTHORIZATION_PRIVATE_KEY"
+}
+```
+
+Omit `authorizationKeyEnv` when the wallet ownership policy does not require it. The server checks the wallet ID, chain, and address against Privy's API before constructing its signer.
+
+Dynamic descriptor:
+
+```json
+{
+  "provider": "dynamic",
+  "address": "YOUR_EXISTING_WALLET_ADDRESS",
+  "environmentId": "YOUR_DYNAMIC_ENVIRONMENT_ID",
+  "rpcUrl": "https://your-chain-rpc.example",
+  "apiTokenEnv": "DYNAMIC_API_TOKEN",
+  "metadataEnv": "DYNAMIC_WALLET_METADATA",
+  "passwordEnv": "DYNAMIC_WALLET_PASSWORD"
+}
+```
+
+`metadataEnv` names a variable containing the full `walletMetadata` JSON retained at wallet creation/import, including backup pointers. The server compares its identity with the provider before using it. For caller-managed MPC shares, use `keySharesEnv` pointing to a JSON array of shares; omit `passwordEnv` when no backup password is needed. Keep metadata current after resharing or password changes. The server never provisions a replacement wallet.
+
+Dynamic requires its native Node dependencies on a supported platform. Provider packages load only when a configured hosted wallet is used. Solana uses Dynamic network ID `101` and disables sponsorship to preserve bridge signatures. Provider credentials, metadata, and shares are not returned by tools.
+
 ## Connect an MCP client
 
 Configure the client to run Node with an absolute path to the built entrypoint:
@@ -89,7 +136,7 @@ Local encryption protects data at rest. An unlocked server can use configured si
 
 ## Current limitations
 
-- Local EVM and Solana bridge signers are wired to the SDK. Hosted Privy/Dynamic configuration is still in progress.
+- Local and Privy/Dynamic EVM/Solana adapters are wired and checked offline. Production provider authentication, wallet policies, and funded execution have not yet been validated.
 - Aleo bridge inputs currently use public balances. Private-record burns are not exposed. Inbound xReserve transfers support public, record, and private mint modes.
 - Bridge quotes display SDK fees, which the SDK recalculates before execution; token input caps do not cap network gas fees.
 - Bridge recovery requires this server's saved checkpoints. It does not import arbitrary external transactions.
@@ -101,7 +148,7 @@ Local encryption protects data at rest. An unlocked server can use configured si
 
 ## Development and verification
 
-Run `npm test`, `npm run typecheck`, and `npm run build`. Tests cover SDK quote retention, encrypted persistence, idempotency, delayed confirmations, submission uncertainty, concurrent recovery, OS lock release after a crash, terminal key import, and stdio restart. They use temporary test wallets without submitting transactions.
+Run `pnpm test`, `pnpm run typecheck`, and `pnpm run build`. Tests cover SDK quote retention, encrypted persistence, idempotency, delayed confirmations, submission uncertainty, concurrent recovery, OS lock release after a crash, terminal key import, provider identity matching, hosted EVM/Solana signing, and stdio restart. They use temporary test wallets without submitting transactions.
 
 After installing the tarball into an independent project, run:
 

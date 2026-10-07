@@ -5,6 +5,7 @@ import { emitKeypressEvents, type Key } from "node:readline";
 import { parseArgs } from "node:util";
 import { TradingStore } from "./trading/store";
 import { withWalletLocks } from "./trading/coordination";
+import { hostedWalletFromEnvironment, rpcEndpoint as endpoint } from "./trading/wallet-config";
 import { TradingError, type Profile, type Policy, type HostedWallet } from "./trading/types";
 
 export const help = `Shield Swap MCP
@@ -39,6 +40,8 @@ configure changes trusted terminal permissions:
   --evm-key-env NAME --evm-rpc-url URL
   --solana-key-env NAME --solana-rpc-url URL
                           Configure existing bridge wallets from environment keys
+  --evm-wallet-env NAME / --solana-wallet-env NAME
+                          Hosted wallet descriptor JSON with credential references
 
 New profiles have execution disabled. Setup/configure require a hidden
 passphrase prompt or SHIELD_SWAP_MCP_PASSWORD from your secret manager.
@@ -61,11 +64,12 @@ export function argumentsFor(argv: string[]) {
       "max-slippage-bps": { type: "string" },
       "evm-key-env": { type: "string" }, "evm-rpc-url": { type: "string" },
       "solana-key-env": { type: "string" }, "solana-rpc-url": { type: "string" },
+      "evm-wallet-env": { type: "string" }, "solana-wallet-env": { type: "string" },
     } });
     const command = parsed.positionals[0] ?? "serve";
     if (parsed.positionals.length > 1 || !["setup", "configure", "serve"].includes(command)) throw new Error();
     const allowed = command === "setup" ? new Set(["help", "state-dir", "profile", "network", "key-env", "store-key", "generate", "network-url", "api-url", "fee-master"])
-      : command === "configure" ? new Set(["help", "state-dir", "profile", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "swap-limit", "bridge-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url"])
+      : command === "configure" ? new Set(["help", "state-dir", "profile", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "swap-limit", "bridge-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
       : new Set(["help", "state-dir"]);
     if (Object.keys(parsed.values).some(key => !allowed.has(key))) throw new Error();
     return { command, values: parsed.values };
@@ -118,14 +122,6 @@ function profileId(options: Options): string {
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) throw new TradingError("invalid_profile", "Use 1–64 letters, digits, hyphens or underscores for a profile.");
   return id;
 }
-function endpoint(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  try {
-    const url = new URL(value);
-    if (url.username || url.password || (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)))) throw new Error();
-    return value;
-  } catch { throw new TradingError("invalid_endpoint", "Use HTTPS endpoints, or HTTP on localhost, without embedded credentials."); }
-}
 const readOnlyPolicy = (): Policy => ({ swaps: false, claims: false, bridges: false, maxSlippageBps: 100, swapLimits: {}, bridgeLimits: {} });
 
 export async function setup(options: Options): Promise<Record<string, unknown>> {
@@ -167,6 +163,11 @@ export async function setup(options: Options): Promise<Record<string, unknown>> 
 async function localBridgeWallet(chain: "evm" | "solana", options: Options): Promise<HostedWallet | undefined> {
   const keyEnv = options[chain === "evm" ? "evm-key-env" : "solana-key-env"];
   const rpcUrl = endpoint(options[chain === "evm" ? "evm-rpc-url" : "solana-rpc-url"]);
+  const hostedEnv = options[chain === "evm" ? "evm-wallet-env" : "solana-wallet-env"];
+  if (hostedEnv) {
+    if (keyEnv || rpcUrl) throw new TradingError("invalid_wallet", "Choose either local key options or a hosted wallet descriptor.");
+    return hostedWalletFromEnvironment(chain, hostedEnv);
+  }
   if (!keyEnv && !rpcUrl) return undefined;
   if (!keyEnv || !rpcUrl || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(keyEnv)) throw new TradingError("invalid_wallet", "Supply both the bridge key environment variable name and its RPC URL.");
   const key = process.env[keyEnv];
