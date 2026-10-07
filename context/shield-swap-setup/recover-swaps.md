@@ -6,6 +6,8 @@ A lost response is not a failed transaction. Pause new writes using the affected
 
 Preserve the same account, network, identity store/journal, transaction or proving-job ID, and failure stage. Keep an access-controlled backup before repair. Do not print raw handles or journals, reset counters, delete state, or create a new swap to recover the old one.
 
+Reopen the same account, network, and store that submitted the operation. Inspect that operation. Claim it only after its outcome is known; if the outcome stays unknown, stop. Veil's record is the configured blinded-identity file. Python's record is the profile journal. Keep that store when a transaction id is already known. This kit does not add an application database.
+
 ## Establish what happened
 
 1. Use the [original transaction check](../troubleshooting/proving-failures.md#confirm-the-original-transaction), or inspect its proving job through the configured provider when supported. No transaction found yet is not proof that it was never broadcast.

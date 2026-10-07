@@ -6,12 +6,17 @@ Use the account and persistent store from [configure account](configure-account.
 
 The examples quote **1.5 USDCx → ETH on testnet, with 50 basis points (0.5%) slippage**. Replace these with the user's actual pair, amount, network, and bounds. The example values are not a recommended strategy or permission to trade.
 
+Use the current [Veil release](https://github.com/ProvableHQ/veil/releases) and the [Shield docs](https://shield.fi/docs). The method names below follow those sources.
+
 ## Shared execution rules
 
 - Use token symbols or IDs resolved by the SDK; never invent decimals or pool keys. A quote finds a route without requiring a full pool scan first.
 - Human amounts are decimal strings. Veil quote results contain base-unit `bigint` values; Python quote amounts are token-unit strings. Returned transaction handles use base units.
 - Preserve the native quote and its minimum output through execution. A quote is an estimate, not a reservation of liquidity. Refresh stale quotes within the user's bounds; do not increase slippage to force execution.
-- Keep the client and recovery store for the whole operation. Identity persistence prevents lost claim material; it does not make the same input record safe for concurrent spending.
+- `GET /route` takes `amount_in` in human token units and returns `protocol_revision` with the route. A Veil quote exposes that revision as `protocolRevision`. Discard the quote when the revision is older than the current protocol configuration, then request another quote inside the authorized bounds.
+- `GET /unclaimed` is an indexer list of pending swaps. It does not submit the claim. Claiming is the second transaction, through `claimSwapOutput` or `claim_swap_output`.
+- Attach the durable store before `swap`, `claimSwapOutput`, or `claim_swap_output`. Veil uses the configured blinded-identity file. Python uses the profile journal with `track=True`. Keep that store when a transaction id is already known. Identity persistence prevents lost claim material; it does not make the same input record safe for concurrent spending.
+- A timeout or lost response after submit is an unknown result for that same operation. Reopen the same account, network, and store. If the swap id survived, use the inspect recipe below. If it did not, follow [unknown-operation recovery](recover-swaps.md) before any new swap or claim.
 
 ## CLI — inspect, plan, execute
 
@@ -70,6 +75,7 @@ console.log({
   minimumOut: formatUnits(quote.minOut, quote.to.decimals),
   outputToken: quote.to.symbol,
   route: quote.hops.map(hop => hop.poolKey),
+  protocolRevision: quote.protocolRevision,
   expiresAt: new Date(quote.expiresAt).toISOString(),
 })
 ```
@@ -92,7 +98,9 @@ console.log({
 
 Do not append this block to a quote-only script. Running a combined script submits a trade every time. Check the quote against the authorization immediately before execution; if approval named an exact earlier quote, retain that object rather than rerunning the quote call.
 
-The configured file store records the identity and handle. Do not print the whole handle: it contains claim material. A wait failure leaves the original operation to inspect, not a reason to submit another swap.
+The client must already be using its blinded-identity file before `swap` or `claimSwapOutput`. That file records the identity and, after a successful swap, the handle. Veil can still fail while recording the handle; keep the private error material and inspect the original operation. Do not print the whole handle: it contains claim material. A wait failure leaves the original operation to inspect, not a reason to submit another swap.
+
+An application that needs Veil's explicit route check and program imports can follow `planSwap` in the [SDK swap guide](https://shield.fi/docs/sdk/swaps). Copy the quote recipe above for a normal integration.
 
 ## Python — quote, prepare, submit, claim
 
@@ -125,11 +133,11 @@ print({"transaction_id": claim.transaction_id, "amount_out": claim.amount_out,
 
 `.delegate(wait=True)` submits and waits for confirmation. The claim method first waits up to 300 seconds for the original swap output; this is a bounded example wait, not an execution-speed promise. `SwapOutputNotFinalizedError` at that stage means no claim was submitted by that call. Resume the claim after inspecting progress; do not repeat the swap.
 
-The profile-bound client has a durable journal. Keep `track=True` (the default) and retain the journal through completion. The inspected Python quote has no Veil-style `expiresAt` field; do not assume identical freshness enforcement across SDKs. Requote if delayed, then check the new terms against authorization.
+Attach the profile journal before `dex.swap` or `claim_swap_output`. Keep `track=True` (the default). Python journals a provisional swap before the confirmation wait, so retain the journal through completion even when the returned transaction id is known. The inspected Python quote has no Veil-style `expiresAt` field; do not assume identical freshness enforcement across SDKs. Requote if delayed, then check the new terms against authorization.
 
 ## Resume an existing operation
 
-Reopen the same account/network/store and inspect first. These examples inspect one known swap; they do not resubmit it or claim all pending outputs. `SHIELD_SWAP_ID` is a recipe input supplied from the original operation's result.
+Reopen the same account, network, and store and inspect first. A restart continues the original operation. These examples inspect one known swap; they do not resubmit it or claim all pending outputs. `SHIELD_SWAP_ID` is a recipe input supplied from the original operation's result. When that id is missing, stop here and follow [unknown-operation recovery](recover-swaps.md).
 
 For Veil, save as `inspect-swap.mts` and run with `npx tsx inspect-swap.mts`:
 
