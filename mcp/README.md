@@ -132,7 +132,7 @@ A quote retains the SDK's executable route, input, minimum output, and expiry. `
 
 State is AES-256-GCM encrypted before SQLite writes it. Quotes, profiles, claim material, and bridge checkpoints belong to this local state; tool responses expose selected public fields. Per-account OS locks coordinate processes and profiles sharing Aleo, EVM, or Solana wallets in the same state directory, including history and quote refreshes, and release on process exit. Uncertain operations block new submissions and unrelated resumes across those profiles. SDK history recovery refreshes unresolved identities and expands incomplete scans on later polls.
 
-Local encryption protects data at rest. An unlocked server can use configured signing credentials. The Veil integration uses a remote scanner and delegated prover, whose service boundaries still apply. `--fee-master` enables fee sponsorship only when the prover has granted that capability.
+Local encryption protects data at rest. An unlocked server can use configured signing credentials. The Veil integration uses a remote scanner and delegated prover, whose service boundaries still apply. `configure --fee-master` requests fee sponsorship when the prover has granted that capability; `configure --no-fee-master` restores wallet-funded fees. This setting is also available at setup and is shown by `get_config`. Changing it invalidates earlier quotes, so finish pending operations first.
 
 ## Current limitations
 

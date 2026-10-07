@@ -19,7 +19,7 @@ export class TradingRuntime {
       wallets: [{ chain: "aleo", provider: "local", address: p.address },
         ...(p.evm ? [{ chain: "ethereum", provider: p.evm.provider, address: p.evm.address }] : []),
         ...(p.solana ? [{ chain: "solana", provider: p.solana.provider, address: p.solana.address }] : [])],
-      policy: p.policy,
+      policy: p.policy, useFeeMaster: p.useFeeMaster ?? false,
     }));
   }
   scope(profile: Profile): string { return [profile.network, profile.address, profile.program ?? "shield_swap.aleo"].join(":"); }

@@ -41,7 +41,8 @@ test("terminal setup encrypts an imported key and stdio survives process restart
     assert.equal(JSON.parse(result.stdout).address, account.address);
     assert.ok(!result.stdout.includes(account.privateKey) && !result.stderr.includes(account.privateKey));
     assert.equal(readFileSync(join(root, "state.sqlite")).includes(account.privateKey), false);
-    const configured = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root, "--allow-claims", "--swap-limit", "1field=1000", "--max-slippage-bps", "75"], { env });
+    const configured = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root, "--allow-claims", "--fee-master", "--swap-limit", "1field=1000", "--max-slippage-bps", "75"], { env });
+    assert.equal(JSON.parse(configured.stdout).useFeeMaster, true);
     assert.deepEqual(JSON.parse(configured.stdout).policy, { swaps: false, claims: true, bridges: false, maxSlippageBps: 75, swapLimits: { "1field": "1000" }, bridgeLimits: {} });
     const evmKey = "0x" + "01".repeat(32);
     const bridgeConfig = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root,
@@ -64,7 +65,11 @@ test("terminal setup encrypts an imported key and stdio survives process restart
     const store = new TradingStore(root, password);
     assert.deepEqual(store.get<{ evm: { appSecret: unknown } }>("profile:default")?.evm.appSecret, { type: "env", name: "PRIVY_TEST_SECRET" });
     assert.equal(store.get("secret:aleo:default"), account.privateKey);
+    assert.equal(store.get<{ useFeeMaster: boolean }>("profile:default")?.useFeeMaster, true);
     store.close();
+    const selfFunded = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root, "--no-fee-master"], { env });
+    assert.equal(JSON.parse(selfFunded.stdout).useFeeMaster, false);
+    assert.deepEqual(JSON.parse(selfFunded.stdout).policy, JSON.parse(configured.stdout).policy);
     for (let restart = 0; restart < 2; restart++) {
       // The imported key is deliberately absent from the server environment.
       const transport = new StdioClientTransport({ command: process.execPath, args: ["--import", "tsx", cli, "serve", "--state-dir", root], env: { SHIELD_SWAP_MCP_PASSWORD: password }, stderr: "pipe" });

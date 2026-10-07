@@ -28,7 +28,8 @@ Common options:
   --generate               Create a new wallet instead of importing
   --network-url URL        Aleo RPC override (setup only)
   --api-url URL            Shield Swap API override (setup only)
-  --fee-master             Enable the delegated prover's fee sponsorship
+  --fee-master             Request the delegated prover's fee sponsorship
+  --no-fee-master          Pay Aleo fees from the wallet (configure only)
 
 configure changes trusted terminal permissions:
   --allow-swaps / --deny-swaps
@@ -56,7 +57,7 @@ export function argumentsFor(argv: string[]) {
       help: { type: "boolean", short: "h" },
       "state-dir": { type: "string" }, profile: { type: "string" }, network: { type: "string" },
       "key-env": { type: "string" }, "store-key": { type: "boolean" }, generate: { type: "boolean" },
-      "network-url": { type: "string" }, "api-url": { type: "string" }, "fee-master": { type: "boolean" },
+      "network-url": { type: "string" }, "api-url": { type: "string" }, "fee-master": { type: "boolean" }, "no-fee-master": { type: "boolean" },
       "allow-swaps": { type: "boolean" }, "deny-swaps": { type: "boolean" },
       "allow-claims": { type: "boolean" }, "deny-claims": { type: "boolean" },
       "allow-bridges": { type: "boolean" }, "deny-bridges": { type: "boolean" },
@@ -69,7 +70,7 @@ export function argumentsFor(argv: string[]) {
     const command = parsed.positionals[0] ?? "serve";
     if (parsed.positionals.length > 1 || !["setup", "configure", "serve"].includes(command)) throw new Error();
     const allowed = command === "setup" ? new Set(["help", "state-dir", "profile", "network", "key-env", "store-key", "generate", "network-url", "api-url", "fee-master"])
-      : command === "configure" ? new Set(["help", "state-dir", "profile", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "swap-limit", "bridge-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
+      : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "swap-limit", "bridge-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
       : new Set(["help", "state-dir"]);
     if (Object.keys(parsed.values).some(key => !allowed.has(key))) throw new Error();
     return { command, values: parsed.values };
@@ -156,7 +157,7 @@ export async function setup(options: Options): Promise<Record<string, unknown>> 
       store.set("profile:" + id, profile);
       if (!store.get("settings")) store.set("settings", { defaultProfile: id, slippageBps: 50 });
     });
-    return { profileId: id, network, address: account.address, keyStorage: persistKey ? "encrypted" : "environment", stateDirectory: directory, policy: profile.policy };
+    return { profileId: id, network, address: account.address, keyStorage: persistKey ? "encrypted" : "environment", stateDirectory: directory, useFeeMaster: profile.useFeeMaster, policy: profile.policy };
   } finally { store.close(); }
 }
 
@@ -215,7 +216,9 @@ export async function configure(options: Options): Promise<Record<string, unknow
       if (!/^\d+$/.test(options["max-slippage-bps"]) || !Number.isInteger(value) || value < 0 || value > 1000) throw new TradingError("invalid_slippage", "Slippage must be a whole number from 0 to 1000 basis points.");
       policy.maxSlippageBps = value;
     }
-    const updated = { ...profile, ...(evm ? { evm } : {}), ...(solana ? { solana } : {}), policy };
+    if (options["fee-master"] && options["no-fee-master"]) throw new TradingError("invalid_arguments", "Choose either sponsored or wallet-funded Aleo fees.");
+    const useFeeMaster = options["fee-master"] ? true : options["no-fee-master"] ? false : profile.useFeeMaster ?? false;
+    const updated = { ...profile, useFeeMaster, ...(evm ? { evm } : {}), ...(solana ? { solana } : {}), policy };
     await withWalletLocks(store, [profile, updated], async () => store.transaction(() => {
       if (store.list<{ profileId: string; status: string }>("operation:").some(op => op.profileId === id && ["queued", "running"].includes(op.status))) {
         throw new TradingError("operation_pending", "Wait for the profile's active operation before changing its permissions.");
@@ -224,6 +227,6 @@ export async function configure(options: Options): Promise<Record<string, unknow
       if (JSON.stringify(current) !== JSON.stringify(profile)) throw new TradingError("profile_changed", "This profile changed during configuration; rerun configure.");
       store.set("profile:" + id, updated);
     }));
-    return { profileId: id, policy, ...(evm ? { ethereumAddress: evm.address } : {}), ...(solana ? { solanaAddress: solana.address } : {}) };
+    return { profileId: id, policy, useFeeMaster, ...(evm ? { ethereumAddress: evm.address } : {}), ...(solana ? { solanaAddress: solana.address } : {}) };
   } finally { store.close(); }
 }
