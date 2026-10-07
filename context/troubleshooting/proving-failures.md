@@ -14,7 +14,7 @@ Distinguish local preparation, proof generation, broadcast, confirmation, and cl
 
 Do not use a fresh swap as a prover health check. Preparing a swap can reserve an identity, and simulation can produce authorization material.
 
-Default Provable edge services do not require consumer registration or a minted JWT. DEX authentication is separate. Legacy endpoints and provisioned API keys have their own configuration; inspect the selected endpoint instead of adding obsolete credentials.
+Published Provable API docs describe proving at `https://api.provable.com/prove/{network}` and record scanning at `https://api.provable.com/scanner/{network}`. An `x-api-key` header selects a Standard or Enterprise key; a request without it uses the Free tier. Consumer registration and JWT exchange are retired. The account recipes keep the SDK edge defaults, `https://edge.provable.com/api/prove` and `https://edge.provable.com/api/scanner`, unless the user configured a host or key. DEX authentication is separate. Inspect the selected endpoint instead of adding obsolete credentials.
 
 ## Confirm the original transaction
 
