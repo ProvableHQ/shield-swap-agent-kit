@@ -4,6 +4,26 @@ Give an agent the context and working recipes to build on Shield Swap or operate
 
 Start with the [guided welcome](context/getting-started.md): **Configure an Aleo account for Shield Swap**, then **Fund your account**, with routes to trade, connect trading tools, build a strategy, or explore markets. Account setup and funding are part of connecting a trading tool; existing accounts and funds are reused.
 
+## Start with Claude Code
+
+From a checkout of this branch, run one command:
+
+```sh
+npm start
+```
+
+Requires macOS or Linux, Node.js 22.13+, and Claude Code installed and signed in. The launcher prepares the MCP tools, prints the Shield Swap intro, guides local account import or creation when needed, and opens Claude with the intro skill and MCP connection. Existing profiles are reused. Run it from this checkout to use `~/shield-swap-trading`, or use `npm start -- --project /path/to/your/trading-project`.
+
+The opening screen shows **SHIELD SWAP**, **Private asset trading**, setup status, and four choices: **Trade now**, **Connect trading tools**, **Build a strategy**, and **Explore markets**. Funding and transaction permissions remain steps in the chosen journey.
+
+Already inside Claude with the skill installed? Invoke `/shield-swap`, or ask “How do I trade with Shield Swap?” To try a checkout without reinstalling an older copy, send this single prompt:
+
+```text
+Read /path/to/shield-swap-agent-kit/SKILL.md and show the Shield Swap intro.
+```
+
+An introductory prompt shows the screen again even after account setup. The skill supplies the intro instructions; installing it alone does not run a startup hook. The launcher explicitly loads it for the new session.
+
 ## Current contents
 
 This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows.
@@ -14,7 +34,7 @@ The [draft standalone MCP server](mcp/README.md) provides terminal wallet setup,
 
 ```text
 AGENTS.md                    # Start the builder or trader journey
-SKILL.md                     # Thin entrypoint for skill installers
+SKILL.md                     # Intro-first entrypoint for skill installers
 context/
   getting-started.md          # Welcome, status panel, and canonical journeys
   decisions/                 # Choose the task and stack before provisioning
@@ -24,6 +44,7 @@ context/
   safety/                    # Permissions, custody, and unattended execution
   strategies/                # Strategy design; currently arbitrage
   troubleshooting/           # Scanner lag, record contention, proving failures
+scripts/launch-claude.mjs     # One-command local setup and Claude launch
 mcp/                         # Draft standalone TypeScript MCP server
 tools/
   SKILL.md                   # When to use SDKs, CLI, MCP, or scripts

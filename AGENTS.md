@@ -1,6 +1,6 @@
 # Shield Swap agent journey
 
-Start with [getting started](context/getting-started.md): check the existing setup, present the welcome once, and follow the requested journey. Preserve choices and authorization already supplied by the user. Connecting trading tools includes account setup and funding before declaring the operational integration complete. Explicit code-only or read-only tasks may defer those steps. Use [build or trade now](context/decisions/build-or-trade-now.md) for the detailed routing.
+Start with [getting started](context/getting-started.md): show the branded intro and setup status for introductory prompts, including after earlier setup, then follow the requested journey. Load detailed trading guides after presenting the intro. Preserve choices and authorization already supplied by the user. Connecting trading tools includes account setup and funding before declaring the operational integration complete. Explicit code-only or read-only tasks may defer those steps. Use [build or trade now](context/decisions/build-or-trade-now.md) for the detailed routing.
 
 Choose [Veil](context/toolchains/typescript.md), [Python](context/toolchains/python.md), the [CLI](context/toolchains/cli.md), or available [MCP tools](context/toolchains/mcp.md) according to the user's stack, custody model, and required operations. Preserve an explicitly selected interface. When none is specified, use the existing setup and verified capabilities to choose a suitable surface; read [tool selection](tools/SKILL.md) for the options and supported fallbacks.
 

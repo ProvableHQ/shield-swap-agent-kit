@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { renderWelcome } from "../../../tools/welcome.mjs";
 import type { TradingRuntime } from "./runtime";
 import type { Summary } from "./types";
 
@@ -40,9 +41,9 @@ const guidance: Record<string, string> = {
 };
 
 /** No provisioning or transaction execution. Remote checks are explicitly requested. */
-export async function onboardingStatus(runtime: TradingRuntime | undefined, input: z.infer<typeof setupSchema>, stateExists = false): Promise<SetupReport & { guidance: string }> {
+export async function onboardingStatus(runtime: TradingRuntime | undefined, input: z.infer<typeof setupSchema>, stateExists = false): Promise<SetupReport & { guidance: string; welcome: string }> {
   const report = await inspectOnboarding(runtime, input, stateExists);
-  return { ...report, guidance: guidance[report.nextAction] };
+  return { ...report, guidance: guidance[report.nextAction], welcome: renderWelcome(report) };
 }
 
 async function inspectOnboarding(

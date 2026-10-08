@@ -4,7 +4,7 @@ Use this page when the Shield Swap skill is invoked for setup, trading, or integ
 
 ## Welcome
 
-Show the banner once when beginning onboarding. Preserve its spacing in a fenced text block. In a narrow display, use **SHIELD SWAP** on one line with the same tagline instead of wrapping the block letters. Do not emit ANSI escapes into chat. Returning users get a compact status update and the next step rather than the full introduction again.
+Show the banner when beginning onboarding and whenever the user asks an introductory question or requests the welcome/menu, including after setup in the same conversation. “How do I trade with Shield Swap?” is an introductory question. Preserve its spacing in a fenced text block. In a narrow display, use **SHIELD SWAP** on one line with the same tagline instead of wrapping the block letters. Do not emit ANSI escapes into chat. Use compact updates for intermediate operation/status replies; having an existing account or prior-session memory does not suppress an explicitly requested introduction.
 
 ```text
 ███████╗██╗  ██╗██╗███████╗██╗     ██████╗     ███████╗██╗    ██╗ █████╗ ██████╗
@@ -16,6 +16,8 @@ Show the banner once when beginning onboarding. Preserve its spacing in a fenced
 
 Private asset trading
 ```
+
+For AgentKit MCP, render the `welcome` string returned by `setup` verbatim in a text block. It uses the shared [welcome renderer](../tools/welcome.mjs). For other interfaces, use the same layout below with verified facts. Keep **Tools**, **Aleo account**, and **Funding** as the three row labels. Do not substitute network rows or insert paths, script names, journals, SQLite, or signer implementation details.
 
 Follow it with the status panel. This example is illustrative: replace every value with observed facts. Use ✓ for a verified check, ○ for missing or unchecked, and ! for a failed check. Do not invent percentages or show a check as running unless it is actually running.
 
@@ -37,7 +39,7 @@ WHAT WOULD YOU LIKE TO DO?
   Explore markets        Discover assets and get quotes.
 ```
 
-If the user already supplied a goal, replace the menu with that goal and the next missing step. Do not ask them to select it again. Omit completed setup steps. Keep the account's existing configuration and the interface the user selected; do not add a network-choice step or a key-storage questionnaire to this introduction. Account storage is handled by the selected tool's local defaults and protected prompts. Resolve a real configuration conflict only when encountered.
+Show all four menu choices for introductory prompts, even when accounts are already configured. Only a concrete task (a specified swap, an identified tool to connect, or a strategy to build) replaces the menu with that task and its next missing step. Do not ask them to select it again. Omit completed setup steps. Report current unchecked funding as **Not checked**; historical funding notes do not prove present holdings. Give at most one short explanation of the swap lifecycle when helpful, and put technical detail in the relevant follow-up rather than turning the welcome into a protocol tutorial. Keep the account's existing configuration and the interface the user selected; do not add a network-choice step or a key-storage questionnaire to this introduction. Account storage is handled by the selected tool's local defaults and protected prompts. Resolve a real configuration conflict only when encountered.
 
 ## Check the existing setup
 
@@ -50,6 +52,12 @@ When account access and holdings are relevant, call `setup` with `checkBalances:
 If the required asset and amount are known, pass `funding: { tokenId, amount }`, with the discovered token ID and integer base-unit amount. This implies balance checking. `available` means sufficient aggregate private holdings for that requirement, or some private holdings if no requirement was given. Label the latter **Private funds found**, not **Ready to swap**. Public-only balances are insufficient for a private swap. Neither result verifies a covering record, fees, a valid quote, or execution permission. Keep those checks in the operation's existing preflight.
 
 Use the same distinctions with an SDK or CLI: inspect the configured session, authenticate when needed, and read private holdings through its existing recipes. An absent MCP server does not make an existing SDK/CLI setup unusable. [Configuration](shield-swap-setup/configure-shield-swap.md) and [funding](shield-swap-setup/bridge-funds.md) explain the effects of each interface.
+
+## Launch with local setup
+
+When the user wants the kit to handle local setup and the Claude connection, use the [one-command launcher](../README.md#start-with-claude-code): `npm start` from the complete kit checkout, in the user's own terminal. It prints this intro, collects protected account inputs locally, then starts Claude with the skill and a connected MCP server. Do not run it through an agent's captured tool input to collect secrets. It reuses the existing default or explicitly selected profile and does not move funds or grant execution permissions.
+
+For a plain introductory question in an existing agent conversation, show the screen immediately using current checks or **Not checked**. It does not require account creation or launching another Claude session first. Continue the selected journey afterward.
 
 ## The two setup steps
 

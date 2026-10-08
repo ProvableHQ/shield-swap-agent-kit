@@ -89,7 +89,7 @@ export function stateDirectory(options: Options): string {
   return resolve(options["state-dir"] ?? process.env.SHIELD_SWAP_MCP_STATE_DIR ?? join(homedir(), ".shield-swap-mcp"));
 }
 
-async function hiddenInput(label: string): Promise<string> {
+export async function hiddenInput(label: string): Promise<string> {
   if (!process.stdin.isTTY || !process.stderr.isTTY) throw new TradingError("terminal_required", "Use a trusted terminal prompt or configure the required environment variables.");
   process.stderr.write(label);
   emitKeypressEvents(process.stdin);
@@ -115,7 +115,7 @@ async function hiddenInput(label: string): Promise<string> {
     process.stdin.on("keypress", onKey);
   });
 }
-async function password(directory: string): Promise<string> {
+export async function password(directory: string): Promise<string> {
   const configured = process.env.SHIELD_SWAP_MCP_PASSWORD;
   if (configured) return configured;
   const value = await hiddenInput("Account passphrase (hidden): ");
@@ -131,7 +131,7 @@ function profileId(options: Options): string {
 }
 const readOnlyPolicy = (): Policy => ({ swaps: false, claims: false, bridges: false, maxSlippageBps: 100, swapLimits: {}, bridgeLimits: {} });
 
-export async function setup(options: Options): Promise<Record<string, unknown>> {
+export async function setup(options: Options, suppliedPassword?: string): Promise<Record<string, unknown>> {
   let id = profileId(options);
   const network = options.network ?? (options.guided ? "mainnet" : undefined);
   if (network !== "mainnet" && network !== "testnet") throw new TradingError("network_required", "Setup requires --network mainnet or --network testnet.");
@@ -140,7 +140,7 @@ export async function setup(options: Options): Promise<Record<string, unknown>> 
   if ((options.generate && (keyEnv || options["store-key"])) || (options["store-key"] && !keyEnv)) throw new TradingError("invalid_arguments", "Choose one key source: environment, hidden prompt, or --generate.");
   const networkUrl = endpoint(options["network-url"]), apiUrl = endpoint(options["api-url"]);
   const directory = stateDirectory(options);
-  const passphrase = await password(directory);
+  const passphrase = suppliedPassword ?? await password(directory);
   const store = new TradingStore(directory, passphrase, true);
   try {
     if (options.guided && !options.profile) {

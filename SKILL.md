@@ -1,10 +1,14 @@
 ---
 name: shield-swap
-description: Use when a user wants to build a Shield Swap integration or bot, choose a Shield Swap SDK or custody model, configure trading tools, or operate a Shield Swap account on Aleo.
+description: Use when a user asks how to trade with Shield Swap or get started, wants to build an integration or bot, configure trading tools, or operate a Shield Swap account on Aleo.
 ---
 
 # Shield Swap
 
-Read [AGENTS.md](AGENTS.md) and its [getting-started flow](context/getting-started.md) to check the existing setup, present the welcome once, and continue toward the user’s goal. It routes to the relevant files in [context/](context/) and the [tool-use guide](tools/SKILL.md).
+For introductory prompts such as “How do I trade with Shield Swap?”, “Get started”, or “Show the menu”, start with the [intro screen](context/getting-started.md). Show the **SHIELD SWAP** heading, **Private asset trading**, the three status rows **Tools**, **Aleo account**, **Funding**, and all four journey choices. Show it again when asked, even after setup. Existing accounts change status values; they never remove the heading or menu.
+
+Use the MCP `setup` response’s `welcome` text when available. Otherwise use the template in the intro guide. Keep paths, network rows, SDK choices, journals and protocol explanations out of this opening screen. Old notes about funding mean **Not checked** until current holdings are read.
+
+For a concrete task already supplied, retain the heading and status panel and continue that task without making the user select a menu option again. After the introduction, read [AGENTS.md](AGENTS.md) and the relevant [tool-use guide](tools/SKILL.md) to carry out the chosen journey. A broad introductory question is not a selected trade or spending authorization.
 
 This file is the installation entrypoint for the whole repository. Keep journey instructions in `AGENTS.md` and the supporting context files. Installing context does not configure tools, create an account, or authorize transactions.

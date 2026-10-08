@@ -17,6 +17,16 @@ The package is private and unpublished. To install the build elsewhere, run `pnp
 
 pnpm is used because Privy 0.35.0 declares an optional Solana Kit 5 peer while the bridge SDK uses Kit 8. The SDK documents this combination: its Privy adapter uses the wire-transaction API, and Kit 8 validates the signed wire. Installation reports that peer warning and warnings from unused Dynamic WalletConnect dependencies. Hosted provider packages are optional; `pnpm add --no-optional /absolute/path/to/the-built-package.tgz` supports local-wallet-only installations from a prebuilt tarball.
 
+## Claude Code launcher
+
+From the complete AgentKit checkout, `npm start` installs dependencies, builds the MCP server, shows the intro, guides protected account setup, and launches Claude with its session MCP connection. See [start with Claude Code](../README.md#start-with-claude-code). Requires macOS/Linux, Node.js 22.13+, and an existing Claude Code login. This helper is for the complete kit; the standalone MCP package still uses the setup and serve commands below.
+
+Passphrases and imported keys are entered in the local terminal before Claude starts. The launcher holds the MCP credentials, checks the selected account's key locally, and preflights the MCP connection without API authentication, balance reads, or transactions. Claude receives only terminal environment settings and a temporary configuration pointing to a stdio proxy. Environment-based Claude/provider authentication is not forwarded; use Claude's existing interactive login.
+
+The proxy connects through a private local Unix socket (directory `0700`, socket and configuration `0600`). A fresh MCP child receives the signing environment on each connection, so reconnecting does not require reentering secrets. Credentials are absent from Claude's environment, arguments and configuration file. This separates credential handoff, but is not a sandbox against programs running as the same OS user. Claude's normal filesystem and tool permissions still apply.
+
+Session files and MCP children are cleaned up when Claude exits. Rerun the launcher to start a new session; it reuses durable account and operation state. No permanent Claude MCP registration is changed. New accounts retain disabled execution permissions. Funding and bounded trading permissions follow the chosen journey. Existing external wallet credentials must already be supplied to the launcher through their configured references; hosted wallet login is not automated here.
+
 ## Guided account setup and readiness
 
 The [AgentKit welcome](../context/getting-started.md) presents **Configure an Aleo account for Shield Swap** and **Fund your account**, followed by the selected journey. Connecting trading tools includes both steps; funded profiles are reused.
@@ -44,7 +54,7 @@ Optional `funding: { "tokenId": "DISCOVERED_TOKEN_ID", "amount": "1000000" }` im
 
 Journey IDs are `trade_now`, `connect_trading_tools`, `build_strategy`, and `explore_markets`. `mode: "unattended"` gives the same checks and next action without prompting; the caller provides configuration and authority or handles the missing requirement. Setup does not add cumulative bot budgets, a scheduler, or a persistent onboarding journal.
 
-The host agent renders the welcome; the server never writes a banner on protocol stdout. After configuration, [fund the account](../context/shield-swap-setup/bridge-funds.md#agentkit-mcp--use-existing-funds-or-bridge) and continue the selected journey. For existing MCP processes, restart with the required secret references after terminal configuration; setup does not hot-reload a locked process.
+MCP `setup` includes a `welcome` string containing the shared heading, tagline, status panel and menu. The host agent displays it verbatim for introductory prompts, even after setup; the server never writes a banner directly on protocol stdout. After configuration, [fund the account](../context/shield-swap-setup/bridge-funds.md#agentkit-mcp--use-existing-funds-or-bridge) and continue the selected journey. The Claude launcher handles connection startup after account configuration. For independently configured MCP hosts, restart with the required secret references afterward; setup does not hot-reload a locked process.
 
 ## Configure an existing wallet
 
@@ -192,7 +202,7 @@ The USDC inputs were the smallest pair accepted by the SDK that could cover its 
 
 ## Development and verification
 
-Run `pnpm test`, `pnpm run typecheck`, and `pnpm run build`. Tests cover SDK quote retention, encrypted persistence, idempotency, delayed confirmations, submission uncertainty, concurrent recovery, OS lock release after a crash, terminal key import, provider identity matching, hosted EVM/Solana signing, and stdio restart. Onboarding tests cover missing/locked/configured accounts, guided profile reuse, public-only and insufficient private holdings, and scanner failures. They use temporary test wallets without submitting transactions.
+Run `pnpm test`, `pnpm run typecheck`, and `pnpm run build`. Tests cover SDK quote retention, encrypted persistence, idempotency, delayed confirmations, submission uncertainty, concurrent recovery, OS lock release after a crash, terminal key import, provider identity matching, hosted EVM/Solana signing, and stdio restart. Onboarding tests cover missing/locked/configured accounts, guided profile reuse, public-only and insufficient private holdings, and scanner failures. They use temporary test wallets without submitting transactions. Launcher tests use a local stand-in for Claude to check intro loading, account reuse, credential isolation, two MCP connections, cleanup, and failed unlocks. These checks do not establish that a real model reproduces the intro verbatim.
 
 After installing the tarball into an independent project, run:
 
