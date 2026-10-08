@@ -10,6 +10,12 @@ An authenticated account may still have no spendable private records. Configure 
 
 Read only the section for the selected interface. The SDK recipes continue the `session.mts` or `session.py` created on the account page.
 
+## AgentKit MCP
+
+Reuse the selected profile from [configure account](configure-account.md#agentkit-mcp). `get_wallet_status` checks signing readiness through the configured session, which authenticates with Shield Swap and may initialize scanner access; it does not submit a trade. Confirm the returned address, network, and policy against the requested account. No invite code is needed.
+
+Execution permissions and token caps are set in the [trusted terminal](../../mcp/README.md#configure-an-existing-wallet); MCP `update_config` cannot grant them. Keep execution disabled for inspection-only tasks. When setup is the task, continue to [funding](bridge-funds.md) without selecting or submitting a trade.
+
 ## CLI
 
 If setup has not run and its combined authentication/token/funding effects are wanted:

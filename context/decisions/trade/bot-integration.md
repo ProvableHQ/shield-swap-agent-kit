@@ -4,9 +4,11 @@ Use this page for a bot that receives trade requests or signals and calls Shield
 
 ## Build a one-account bot
 
-Use this route for a new bot with one account. Read it before copying a larger bot. Keep one signer, the SDK durable store, and one writer that spends records. Submit one swap, claim that same operation, and recover an unknown result before another write. Continue with the [TypeScript](../../toolchains/typescript.md) or [Python](../../toolchains/python.md) client, then the [swap](../../shield-swap-setup/swap.md) recipe.
+Use this route for a new bot with one account. Read it before copying a larger bot. Keep one signer and one writer that spends records. Submit one swap, claim that same operation, and recover an unknown result before another write. Choose the native SDK or MCP option below according to the selected runtime and signer. A refund or partial fill is the outcome of that operation. Report it as that outcome.
 
-The SDK store is the Veil blinded-identity file or the Python journal. A refund or partial fill is the outcome of that operation. Report it as that outcome.
+### Native SDK option
+
+Keep the SDK durable store: the Veil blinded-identity file or the Python journal. Continue with the [TypeScript](../../toolchains/typescript.md) or [Python](../../toolchains/python.md) client, then the [swap](../../shield-swap-setup/swap.md) recipe.
 
 Leave these production tactics out:
 
@@ -17,6 +19,12 @@ Leave these production tactics out:
 - race classification, plan reuse, or record-cap clipping
 - a deployment layout
 - execution on another venue
+
+### MCP option
+
+Use the [AgentKit standalone MCP server](../../toolchains/mcp.md#agentkit-standalone-server) when the bot or agent host supports MCP and the configured local Aleo signer fits the task. Reuse an existing profile, or follow its trusted-terminal setup when configuration is required. The server supplies encrypted SDK identity storage, operation IDs, idempotency, and wallet locks within one state directory; the bot does not need to implement those again.
+
+Follow [execute and claim one swap](../../toolchains/mcp.md#execute-and-claim-one-swap), including the quote-only stop when that is the requested milestone. The bot still retains the event-to-quote/operation association and waits for claim and recovery before its next trade. Use [MCP recovery](../../toolchains/mcp.md#recover-a-one-account-bot) after a restart or lost response. These locks do not coordinate an SDK or CLI writer using a different store; keep this account's writes on the chosen interface.
 
 ## Bind messages to operations
 

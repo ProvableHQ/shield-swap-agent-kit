@@ -4,6 +4,12 @@ Select the account, network, and persistent state before authenticating or tradi
 
 The examples use **testnet**. Keep the account's state outside the installed kit, exclude it from version control, and use a private working directory. On macOS/Linux, `umask 077` before running scripts makes newly created state owner-only. See [private keys and state](../safety/private-key-handling.md) for custody boundaries.
 
+## AgentKit MCP
+
+For an existing connection, use `get_config` and `list_wallets` to select the configured profile and verify its public address and network. Reuse that profile and state directory; do not create another account for a quote or an authorized swap.
+
+If no suitable profile exists, `setup` returns instructions for the [trusted-terminal wallet configuration](../../mcp/README.md#configure-an-existing-wallet). Import the selected existing key through an environment reference or hidden terminal input. Never pass keys or passphrases in MCP arguments. Account creation requires the explicit terminal `--generate` option. Setup stores configuration with execution disabled and does not authenticate, fund, or trade. Continue to [configure Shield Swap](configure-shield-swap.md).
+
 ## CLI
 
 Install the [CLI](../toolchains/cli.md) and run from the directory where trading state should live. The current `setup` command also authenticates, can create an API token, and requests testnet funds when it finds no holdings. Use it when that combined setup is wanted. For account configuration without those effects, use the SDK path below.

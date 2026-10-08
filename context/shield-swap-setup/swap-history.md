@@ -2,6 +2,12 @@
 
 Inspect the selected account's submitted swaps, pending claims, receipts, and refunds. Keep this separate from the [pool trade feed](discover-pools-and-get-quotes.md#read-market-trades).
 
+## AgentKit MCP
+
+Call `swap_history` with the selected `profileId`, `reconcile: true`, and an appropriate `offset`/`limit`. Inspect the original `swapId`, input/output token IDs, `amountOut`, `amountRemaining`, and claim transaction. Results are paginated, and the recovery fields and `unresolvableCount` describe incomplete coverage; an empty page is not proof that an uncertain submission failed.
+
+Use `list_operations` and `get_operation_status` for the server's saved execution state. Claims are separate operations. A completed claim can include returned input, so report its actual amounts and outcome using the interpretation below. See [MCP recovery](../toolchains/mcp.md#recover-a-one-account-bot) before another write.
+
 ## CLI
 
 Run from the same account/network working directory:

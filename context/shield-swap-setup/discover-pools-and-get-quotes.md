@@ -6,6 +6,10 @@ Discovery answers which pools and assets are available. A quote prices a particu
 
 These recipes reuse the selected account/network and [authenticated session](configure-shield-swap.md). They do not request funding, reserve input records, or submit a swap. Authentication may still involve an account signature. The examples use **1.5 USDCx → ETH on testnet with 50 bps (0.5%) slippage**; replace those values with the requested terms.
 
+## AgentKit MCP — quote only
+
+Reuse the connected server's configured account and network. Follow [quote on an existing profile](../toolchains/mcp.md#quote-on-an-existing-profile): inspect `get_config` and `list_wallets`, discover token/pool identifiers as needed, then call `quote` with `profileId`, `from`, `to`, decimal `amount`, and `slippageBps`. Return the saved quote's terms and expiry, then stop. No execution tool or funding step is needed. Other MCP implementations require their own verified catalog.
+
 ## CLI — discovery and plan-only quoting
 
 Assume `shield-swap` is installed and run from the existing trading directory:

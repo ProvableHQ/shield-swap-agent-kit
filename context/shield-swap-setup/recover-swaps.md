@@ -17,6 +17,12 @@ Reopen the same account, network, and store that submitted the operation. Inspec
 
 After resolving the original outcome, [resume one claim](#resume-one-claim) below. Neither an empty pending list nor a missing output settles an ambiguous broadcast.
 
+## AgentKit MCP recovery
+
+Use the saved operation ID with `get_operation_status`; if the caller lost that ID, inspect `list_operations` for the same profile and `swap_history` with `reconcile: true`. Keep the original quote, request keys, and state directory. Follow [MCP recovery](../toolchains/mcp.md#recover-a-one-account-bot) for lost responses and bounded history scans. `resume_operation` never repeats a swap deposit; uncertain submissions must remain unresolved until there is evidence of their outcome.
+
+When the original swap is claimable, use `claim_unclaimed_swaps` with its `swapIds` selection and a stable claim key. Poll the returned claim operation; an uncertain claim must be reconciled before another claim attempt. See the [complete MCP swap recipe](../toolchains/mcp.md#execute-and-claim-one-swap).
+
 ## CLI recovery
 
 From the original trading directory:
