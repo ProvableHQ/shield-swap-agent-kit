@@ -33,6 +33,11 @@ try {
   assert.ok(!setup.stdout.includes(key) && !setup.stderr.includes(key));
   assert.ok(!(await readFile(join(root, "state.sqlite"))).includes(key));
   const address = JSON.parse(setup.stdout).address;
+  const reused = await run(process.execPath, [entry, "setup", "--guided", "--state-dir", root], { cwd: installRoot, env, timeout: 30000 });
+  assert.equal(JSON.parse(reused.stdout).address, address);
+  assert.equal(JSON.parse(reused.stdout).network, "testnet");
+  assert.equal(JSON.parse(reused.stdout).reused, true);
+  assert.ok(!reused.stdout.includes(key) && !reused.stderr.includes(key));
   for (let restart = 0; restart < 2; restart++) {
     const client = new Client({ name: "installed-smoke", version: "1" });
     const transport = new StdioClientTransport({ command: process.execPath, args: [entry, "serve", "--state-dir", root], cwd: installRoot,
@@ -43,8 +48,10 @@ try {
       await client.connect(transport);
       const tools = await client.listTools();
       assert.equal(tools.tools.length, 20);
-      const setupResult = await client.callTool({ name: "setup", arguments: {} });
-      assert.equal(setupResult.structuredContent.ready, true);
+      const setupResult = await client.callTool({ name: "setup", arguments: { journey: "connect_trading_tools", mode: "unattended" } });
+      assert.equal(setupResult.structuredContent.checks.account.status, "configured");
+      assert.equal(setupResult.structuredContent.checks.funding.status, "not_checked");
+      assert.equal(setupResult.structuredContent.nextAction, "verify_account_access");
       const wallets = await client.callTool({ name: "list_wallets", arguments: {} });
       assert.equal(wallets.structuredContent.wallets[0].address, address);
       assert.ok(!JSON.stringify(wallets).includes(key));
@@ -55,6 +62,6 @@ try {
     } finally { await client.close(); }
     assert.ok(!stderr.includes(key));
   }
-  process.stdout.write("Installed package: SDK key import, encrypted persistence, 20 stdio tools, testnet bridge discovery, and two restarts passed. No network calls or transactions requested.\n");
+  process.stdout.write("Installed package: SDK key import, encrypted persistence, guided profile reuse, structured readiness, 20 stdio tools, testnet bridge discovery, and two restarts passed. No network calls or transactions requested.\n");
 } finally { await rm(root, { recursive: true, force: true }); }
 }

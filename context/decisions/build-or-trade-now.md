@@ -1,6 +1,6 @@
 # Build or trade now
 
-Use the user's request to select the path. Ask a focused question only if the intent or a consequential choice is missing.
+Use the [welcome and canonical journeys](../getting-started.md) and the user's request to select the path. Ask a focused question only if the intent or a consequential choice is missing.
 
 ## Build an integration
 
@@ -12,7 +12,7 @@ Identify the runtime and where signing keys belong. A browser application uses t
 - For Python services, notebooks, or bots, read [Python](../toolchains/python.md).
 - For exposing or consuming agent tools, also read [MCP](../toolchains/mcp.md).
 
-Start from the selected SDK's documented client and API. Set up an account only when a requested integration test or operation actually requires it. Do not run a first-swap example as an installation check: it may create an account, request funding, and submit a trade.
+Start from the selected SDK's documented client and API. For an operational connection to trading tools, configure the account and verify funding as part of the journey, carrying the same signer and recovery state into the integration. Explicit code-only or read-only work can defer these steps. Do not run a first-swap example as an installation check: it may create an account, request funding, and submit a trade.
 
 ## Operate an account
 

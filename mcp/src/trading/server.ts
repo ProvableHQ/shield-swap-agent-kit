@@ -3,6 +3,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { TradingRuntime } from "./runtime";
+import { onboardingStatus, setupSchema } from "./onboarding";
 import { TradingError, type Kind, type Summary } from "./types";
 
 const id = z.string().min(1).max(128);
@@ -11,7 +12,7 @@ const page = { limit: z.number().int().min(1).max(100).default(25), offset: z.nu
 const executeArgs = { quoteId: id, idempotencyKey: id };
 const operation = { operationId: id };
 const tools = {
-  setup: { description: "Check onboarding readiness and show trusted terminal setup steps. Never accepts keys or passwords.", schema: z.object({}).strict(), read: true },
+  setup: { description: "Report account, funding and execution checks for the selected journey. Optional access/balance checks may authenticate and initialize scanner state but never move funds. Never accepts keys or passwords.", schema: setupSchema, read: true },
   get_config: { description: "Read safe configuration and wallet execution permissions.", schema: z.object({}).strict(), read: true },
   update_config: { description: "Select an existing default profile and default slippage. Permissions and secret settings require terminal setup.", schema: z.object({ defaultProfile: id.optional(), slippageBps: z.number().int().min(0).max(1000).optional() }).strict(), read: false },
   list_wallets: { description: "List configured wallet profiles and public addresses.", schema: z.object({}).strict(), read: true },
@@ -37,7 +38,7 @@ type ToolName = keyof typeof tools;
 function json(value: unknown): Summary {
   return JSON.parse(JSON.stringify(value, (_key, item) => typeof item === "bigint" ? item.toString() : item)) as Summary;
 }
-export function createTradingServer(runtime?: TradingRuntime): Server {
+export function createTradingServer(runtime?: TradingRuntime, options: { stateExists?: boolean } = {}): Server {
   const server = new Server({ name: "shield-swap-mcp", version: "0.1.0" }, {
     capabilities: { tools: {} },
     instructions: "Trade through saved quotes and durable operations. setup reports required terminal configuration. Never request keys/passwords in chat. execute returns an operation ID. After uncertainty, inspect that operation; do not create a new swap as a retry. A swap's proceeds require a later claim.",
@@ -59,11 +60,7 @@ export function createTradingServer(runtime?: TradingRuntime): Server {
       if (!parsed.success) throw new TradingError("invalid_arguments", "Invalid tool arguments. Check the tool schema; keys and permission grants are never accepted.");
       const args = parsed.data as Summary;
       if (name === "setup") {
-        output = { ready: Boolean(runtime?.profiles().length), unlocked: Boolean(runtime), steps: [
-          "Run shield-swap-mcp setup in a trusted terminal to configure a wallet and encrypted state.",
-          "Set SHIELD_SWAP_MCP_PASSWORD in the MCP process environment through your secret manager.",
-          "Enable bounded execution permissions in terminal setup before executing swaps or bridges.",
-        ], deferredTools: ["rebalance_swap_inventory"] };
+        output = await onboardingStatus(runtime, setupSchema.parse(args), options.stateExists);
       } else {
         if (!runtime) throw new TradingError("setup_required", "Wallet state is not unlocked. Run terminal setup and configure the process passphrase.");
         output = await call(runtime, name, args);

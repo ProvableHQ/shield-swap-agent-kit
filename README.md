@@ -2,6 +2,8 @@
 
 Give an agent the context and working recipes to build on Shield Swap or operate a trading account. Choose Veil, Python, the CLI, or available MCP tools according to the user's environment and task. The context explains account setup, authentication, private funding, and the swap/claim lifecycle directly.
 
+Start with the [guided welcome](context/getting-started.md): **Configure an Aleo account for Shield Swap**, then **Fund your account**, with routes to trade, connect trading tools, build a strategy, or explore markets. Account setup and funding are part of connecting a trading tool; existing accounts and funds are reused.
+
 ## Current contents
 
 This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows.
@@ -14,6 +16,7 @@ The [draft standalone MCP server](mcp/README.md) provides terminal wallet setup,
 AGENTS.md                    # Start the builder or trader journey
 SKILL.md                     # Thin entrypoint for skill installers
 context/
+  getting-started.md          # Welcome, status panel, and canonical journeys
   decisions/                 # Choose the task and stack before provisioning
   shield-swap-setup/         # Operational runbooks, selected by task
   toolchains/                # TypeScript, Python, CLI, MCP, and Rust boundaries

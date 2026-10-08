@@ -14,7 +14,7 @@ A one-off request to trade belongs in [the trading path](../trade/what-is-your-t
 
 ## Extend an existing system
 
-Use this route when the project already has a runtime, signer, and network. Keep that client. Skip account creation, funding, and strategy selection unless the user asked for them.
+Use this route when the project already has a runtime, signer, and network. Keep that client. For an operational **Connect trading tools** journey, verify the existing account and its funding, then complete any missing setup before reporting the integration ready to trade. Skip account creation, funding, and strategy selection for an explicitly code-only or read-only milestone. Reuse an existing funded account instead of provisioning another.
 
 An existing MCP connection follows this route too: keep its configured profile, network, and state directory. Inspect `get_config` and `list_wallets` for the AgentKit server; other servers have different catalogs. Choosing MCP for a new integration does not automatically import an existing SDK client, browser signer, or recovery store.
 
@@ -36,6 +36,6 @@ Identify the runtime, who controls the signer, required operations, and whether 
 
 For a frontend, determine whether the wallet supports the required Aleo signing/proving flow. For an unattended worker, decide where its durable state lives and which process owns in-flight operations. Do not make a browser wallet export its key to fit a server example.
 
-A useful first milestone is a quote-only vertical slice: accept a pair and amount, resolve tokens, display native quote terms, and submit nothing. Account authentication may be needed; funding and trading are not prerequisites for that milestone.
+A useful first milestone is a quote-only vertical slice: accept a pair and amount, resolve tokens, display native quote terms, and submit nothing. Account authentication may be needed; funding and trading are not prerequisites for that milestone. It is an intermediate checkpoint for an operational connection: continue account/funding setup as needed rather than declaring the whole journey complete.
 
 Next: [choose the tool stack and SDK](choose-tool-stack-and-sdk.md), then [choose custody](choose-custody-mode.md).

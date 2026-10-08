@@ -14,7 +14,7 @@ No roadmap document is maintained here. Describe current functionality in the RE
 
 ## Authoring
 
-- Route builders and traders before account provisioning. Preserve an explicit SDK, framework, custody choice, or existing authorization from the user's request.
+- Identify the requested journey before account provisioning. Operational trading-tool integrations include account setup and funding; explicit code-only/read-only milestones can defer them. Preserve an explicit SDK, framework, custody choice, or existing authorization from the user's request.
 - Account and Shield Swap configuration end with a link to funding. Standalone inspection uses `discover-pools-and-get-quotes.md`; `swap.md` retains its own discovery and quoting instructions. Do not remove those instructions when maintaining the standalone guide. Neither discovery path is a setup prerequisite. `shield-swap-setup/` retains the user's broad collection of operational runbooks; its files are not one mandatory sequence.
 - Authentication grants access. Referrals are optional attribution. Never introduce an invite-code gate.
 - State exactly what a command changes. A constructor or status workflow may create a profile or register a scanner; inspect the implementation before calling it read-only.

@@ -2,6 +2,8 @@
 
 Use this page for a bot that receives trade requests or signals and calls Shield Swap. For existing products, read [BONKbot](../../integrations/bonkbot.md) or [Banana Gun](../../integrations/banana-gun.md) before assuming a supported connector exists.
 
+For an operational **Connect trading tools** journey, verify the product supports the intended integration, then complete [account setup](../../shield-swap-setup/configure-account.md), [Shield Swap access](../../shield-swap-setup/configure-shield-swap.md), and [funding](../../shield-swap-setup/bridge-funds.md). Bind the integration to that same account and recovery state. Read-only development can start earlier, but it is not a funded trading connection. Explicit code-only or dry-run requests may stop at their requested milestone.
+
 ## Build a one-account bot
 
 Use this route for a new bot with one account. Read it before copying a larger bot. Keep one signer and one writer that spends records. Submit one swap, claim that same operation, and recover an unknown result before another write. Choose the native SDK or MCP option below according to the selected runtime and signer. A refund or partial fill is the outcome of that operation. Report it as that outcome.

@@ -1,6 +1,6 @@
 # Configure an account
 
-Select the account, network, and persistent state before authenticating or trading. Reuse an existing account unless the user requests a new one. A builder can defer this page until an account-backed operation is needed.
+Select the account, network, and persistent state before authenticating or trading. Reuse an existing account unless the user requests a new one. An explicit code-only/read-only milestone can defer this page; an operational trading-tool connection includes this step and funding.
 
 The examples use **testnet**. Keep the account's state outside the installed kit, exclude it from version control, and use a private working directory. On macOS/Linux, `umask 077` before running scripts makes newly created state owner-only. See [private keys and state](../safety/private-key-handling.md) for custody boundaries.
 
@@ -8,7 +8,7 @@ The examples use **testnet**. Keep the account's state outside the installed kit
 
 For an existing connection, use `get_config` and `list_wallets` to select the configured profile and verify its public address and network. Reuse that profile and state directory; do not create another account for a quote or an authorized swap.
 
-If no suitable profile exists, `setup` returns instructions for the [trusted-terminal wallet configuration](../../mcp/README.md#configure-an-existing-wallet). Import the selected existing key through an environment reference or hidden terminal input. Never pass keys or passphrases in MCP arguments. Account creation requires the explicit terminal `--generate` option. Setup stores configuration with execution disabled and does not authenticate, fund, or trade. Continue to [configure Shield Swap](configure-shield-swap.md).
+MCP `setup` reports the selected profile’s account and funding checks. For guided configuration, run the installed `shield-swap-mcp setup --guided` (or `node dist/cli.js setup --guided` from the built `mcp/` directory). It reuses the configured default profile unless another is selected; for a missing profile it offers import or explicit creation. Existing profiles retain their configuration; new guided profiles default to mainnet, so preserve an explicitly requested testnet with `--network testnet`. Non-guided setup continues to require an explicit network. See [trusted-terminal wallet configuration](../../mcp/README.md#configure-an-existing-wallet). Import the selected existing key through an environment reference or hidden terminal input. Never pass keys or passphrases in MCP arguments. Account creation requires choosing Create in the trusted terminal or the explicit `--generate` option. Setup stores configuration with execution disabled and does not authenticate, fund, or trade. Continue to [configure Shield Swap](configure-shield-swap.md).
 
 ## CLI
 

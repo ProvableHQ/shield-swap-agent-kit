@@ -21,9 +21,10 @@ async function main(): Promise<void> {
   ]);
   const directory = stateDirectory(values);
   const passphrase = process.env.SHIELD_SWAP_MCP_PASSWORD;
-  const store = passphrase && existsSync(join(directory, "state.sqlite")) ? new TradingStore(directory, passphrase) : undefined;
+  const stateExists = existsSync(join(directory, "state.sqlite"));
+  const store = passphrase && stateExists ? new TradingStore(directory, passphrase) : undefined;
   const runtime = store ? new TradingRuntime(store, new VeilBackend(store)) : undefined;
-  const server = createTradingServer(runtime);
+  const server = createTradingServer(runtime, { stateExists });
   let closing = false;
   const close = async () => {
     if (closing) return;
