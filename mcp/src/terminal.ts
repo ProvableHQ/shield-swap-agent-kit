@@ -9,9 +9,14 @@ import { hostedWalletFromEnvironment, rpcEndpoint as endpoint } from "./trading/
 import { TradingError, type Profile, type Policy, type HostedWallet } from "./trading/types";
 
 export const help = `Shield Swap MCP
+  shield-swap-mcp setup --guided
   shield-swap-mcp setup --network mainnet --key-env ALEO_PRIVATE_KEY
   shield-swap-mcp configure --profile default --allow-claims
   shield-swap-mcp serve
+
+setup --guided reuses the selected profile or offers import/create in a trusted
+terminal. New guided profiles default to mainnet; existing profiles retain their
+configuration. Explicit --network overrides apply only to new profiles.
 
 setup imports an existing local Aleo wallet. With no --key-env, a hidden
 terminal prompt imports the key into encrypted storage. --store-key copies
@@ -22,7 +27,8 @@ wallet and stores its key encrypted. Setup never authenticates or trades.
 Common options:
   --state-dir PATH         Encrypted state (default ~/.shield-swap-mcp)
   --profile NAME           Profile name (default default)
-  --network mainnet|testnet  Required for setup
+  --guided                Guide account selection; reuse an existing profile
+  --network mainnet|testnet  Required except for guided setup
   --key-env NAME           Environment variable containing an existing key
   --store-key              Store the environment key encrypted
   --generate               Create a new wallet instead of importing
@@ -56,7 +62,7 @@ export function argumentsFor(argv: string[]) {
     const parsed = parseArgs({ args: argv, allowPositionals: true, strict: true, options: {
       help: { type: "boolean", short: "h" },
       "state-dir": { type: "string" }, profile: { type: "string" }, network: { type: "string" },
-      "key-env": { type: "string" }, "store-key": { type: "boolean" }, generate: { type: "boolean" },
+      "key-env": { type: "string" }, "store-key": { type: "boolean" }, generate: { type: "boolean" }, guided: { type: "boolean" },
       "network-url": { type: "string" }, "api-url": { type: "string" }, "fee-master": { type: "boolean" }, "no-fee-master": { type: "boolean" },
       "allow-swaps": { type: "boolean" }, "deny-swaps": { type: "boolean" },
       "allow-claims": { type: "boolean" }, "deny-claims": { type: "boolean" },
@@ -69,7 +75,7 @@ export function argumentsFor(argv: string[]) {
     } });
     const command = parsed.positionals[0] ?? "serve";
     if (parsed.positionals.length > 1 || !["setup", "configure", "serve"].includes(command)) throw new Error();
-    const allowed = command === "setup" ? new Set(["help", "state-dir", "profile", "network", "key-env", "store-key", "generate", "network-url", "api-url", "fee-master"])
+    const allowed = command === "setup" ? new Set(["help", "state-dir", "profile", "network", "guided", "key-env", "store-key", "generate", "network-url", "api-url", "fee-master"])
       : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "swap-limit", "bridge-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
       : new Set(["help", "state-dir"]);
     if (Object.keys(parsed.values).some(key => !allowed.has(key))) throw new Error();
@@ -83,7 +89,7 @@ export function stateDirectory(options: Options): string {
   return resolve(options["state-dir"] ?? process.env.SHIELD_SWAP_MCP_STATE_DIR ?? join(homedir(), ".shield-swap-mcp"));
 }
 
-async function hiddenInput(label: string): Promise<string> {
+export async function hiddenInput(label: string): Promise<string> {
   if (!process.stdin.isTTY || !process.stderr.isTTY) throw new TradingError("terminal_required", "Use a trusted terminal prompt or configure the required environment variables.");
   process.stderr.write(label);
   emitKeypressEvents(process.stdin);
@@ -109,10 +115,10 @@ async function hiddenInput(label: string): Promise<string> {
     process.stdin.on("keypress", onKey);
   });
 }
-async function password(directory: string): Promise<string> {
+export async function password(directory: string): Promise<string> {
   const configured = process.env.SHIELD_SWAP_MCP_PASSWORD;
   if (configured) return configured;
-  const value = await hiddenInput("State passphrase (hidden): ");
+  const value = await hiddenInput("Account passphrase (hidden): ");
   if (!existsSync(join(directory, "state.sqlite")) && value !== await hiddenInput("Repeat passphrase (hidden): ")) {
     throw new TradingError("passphrase_mismatch", "The passphrases did not match.");
   }
@@ -125,24 +131,40 @@ function profileId(options: Options): string {
 }
 const readOnlyPolicy = (): Policy => ({ swaps: false, claims: false, bridges: false, maxSlippageBps: 100, swapLimits: {}, bridgeLimits: {} });
 
-export async function setup(options: Options): Promise<Record<string, unknown>> {
-  const id = profileId(options), network = options.network;
+export async function setup(options: Options, suppliedPassword?: string): Promise<Record<string, unknown>> {
+  let id = profileId(options);
+  const network = options.network ?? (options.guided ? "mainnet" : undefined);
   if (network !== "mainnet" && network !== "testnet") throw new TradingError("network_required", "Setup requires --network mainnet or --network testnet.");
   const keyEnv = options["key-env"];
   if (keyEnv && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(keyEnv)) throw new TradingError("invalid_key_env", "--key-env must name an environment variable.");
   if ((options.generate && (keyEnv || options["store-key"])) || (options["store-key"] && !keyEnv)) throw new TradingError("invalid_arguments", "Choose one key source: environment, hidden prompt, or --generate.");
   const networkUrl = endpoint(options["network-url"]), apiUrl = endpoint(options["api-url"]);
   const directory = stateDirectory(options);
-  const passphrase = await password(directory);
+  const passphrase = suppliedPassword ?? await password(directory);
   const store = new TradingStore(directory, passphrase, true);
   try {
-    if (store.get("profile:" + id)) throw new TradingError("profile_exists", "This profile already exists. Use configure to change its permissions, or choose a new profile name.");
+    if (options.guided && !options.profile) {
+      const selected = store.get<{ defaultProfile?: string }>("settings")?.defaultProfile;
+      if (selected) id = profileId({ profile: selected });
+    }
+    const existing = store.get<Profile>("profile:" + id);
+    if (existing) {
+      const changesRequested = options.generate || keyEnv || options["store-key"] || options["network-url"] || options["api-url"] || options["fee-master"] || (options.network && options.network !== existing.network);
+      if (!options.guided || changesRequested) throw new TradingError("profile_exists", "This profile already exists. Use configure to change its permissions, or choose a new profile name.");
+      return { profileId: id, network: existing.network, address: existing.address, reused: true, nextAction: "check_funding", policy: existing.policy };
+    }
+    let generate = Boolean(options.generate);
+    if (options.guided && !generate && !keyEnv) {
+      const choice = await hiddenInput("Configure an Aleo account for Shield Swap\n  1. Import an existing account\n  2. Create a new account\nEnter 1 or 2, then press Return: ");
+      if (!["1", "2"].includes(choice.trim())) throw new TradingError("account_choice_required", "Choose import or create to continue. No account was created.");
+      generate = choice.trim() === "2";
+    }
     const { loadNetwork } = await import("@provablehq/veil-aleo-sdk");
     const sdk = await loadNetwork(network);
-    const key = options.generate ? undefined : keyEnv ? process.env[keyEnv] : await hiddenInput("Existing Aleo private key (hidden): ");
-    if (!options.generate && !key) throw new TradingError("key_missing", "The selected environment variable has no key.");
+    const key = generate ? undefined : keyEnv ? process.env[keyEnv] : await hiddenInput("Existing Aleo private key (hidden): ");
+    if (!generate && !key) throw new TradingError("key_missing", "The selected environment variable has no key.");
     let account;
-    try { account = options.generate ? sdk.generateAccount() : sdk.privateKeyToAccount(key!); }
+    try { account = generate ? sdk.generateAccount() : sdk.privateKeyToAccount(key!); }
     catch { throw new TradingError("invalid_key", "The configured Aleo key is invalid."); }
     const persistKey = !keyEnv || Boolean(options["store-key"]);
     const secretId = "aleo:" + id;
@@ -157,7 +179,7 @@ export async function setup(options: Options): Promise<Record<string, unknown>> 
       store.set("profile:" + id, profile);
       if (!store.get("settings")) store.set("settings", { defaultProfile: id, slippageBps: 50 });
     });
-    return { profileId: id, network, address: account.address, keyStorage: persistKey ? "encrypted" : "environment", stateDirectory: directory, useFeeMaster: profile.useFeeMaster, policy: profile.policy };
+    return { profileId: id, network, address: account.address, reused: false, nextAction: "check_funding", keyStorage: persistKey ? "encrypted" : "environment", stateDirectory: directory, useFeeMaster: profile.useFeeMaster, policy: profile.policy };
   } finally { store.close(); }
 }
 

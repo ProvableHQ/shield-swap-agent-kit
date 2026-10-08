@@ -15,7 +15,7 @@ test("an unconfigured server supports discovery and setup without creating a wal
     for (const name of ["quote", "execute", "swap_history", "claim_unclaimed_swaps", "bridge_status", "recover_bridge_transactions"]) assert.ok(names.includes(name));
     assert.equal(names.includes("rebalance_swap_inventory"), false);
     const setup = await client.callTool({ name: "setup", arguments: {} });
-    assert.equal((setup.structuredContent as Record<string, unknown>)?.ready, false);
+    assert.equal((setup.structuredContent as { checks: { account: { status: string } } }).checks.account.status, "missing");
     const wallets = await client.callTool({ name: "list_wallets", arguments: {} });
     assert.equal(wallets.isError, true);
     assert.equal(((wallets.structuredContent as Record<string, unknown>)?.error as { code: string }).code, "setup_required");

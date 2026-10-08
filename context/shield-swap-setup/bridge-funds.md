@@ -4,6 +4,21 @@ Check existing private holdings before requesting or transferring funds. Authent
 
 Choose the funding source: a testnet faucet, assets already on Aleo, or a supported cross-chain bridge. This page does not select a trade or authorize one. SDK examples use the authenticated client from [configure Shield Swap](configure-shield-swap.md).
 
+## AgentKit MCP — use existing funds or bridge
+
+Continue with the profile selected during [account setup](configure-account.md). This funding step also belongs to **Connect trading tools**: bind the terminal, bot, or app to this same funded account.
+
+1. Call `setup` with `profileId` and `checkBalances: true`, or read `get_balances` directly. If the intended asset and amount are known, supply `setup.funding` with its discovered `tokenId` and integer base-unit `amount`. Public-only holdings are not sufficient for a private swap. A scanner failure is unknown funding, not zero funds.
+2. If existing usable funds cover the task, skip the transfer. Otherwise choose receipt on Aleo or a supported bridge. Use `list_bridge_routes` to check the actual source/destination assets and availability before suggesting a source chain. The current MCP exposes Aleo, Ethereum and Solana; it does not expose Base, Arbitrum or Arc selectors.
+3. Reuse the source wallet, or configure it through the [trusted terminal](../../mcp/README.md#configure-local-bridge-wallets). Users can retain local keys outside the conversation or use an [existing Privy/Dynamic hosted wallet](../../mcp/README.md#configure-hosted-bridge-wallets). These adapters do not offer consumer email login or create hosted accounts; Aleo signing remains local.
+4. Call `quote_bridge` for the selected route, amount, and destination profile. Inspect minimums, fees, output and mint mode. Resolve source gas funding and any missing execution permission before signing. Enable only the intended route's base-unit cap through terminal configuration; a setup request alone does not authorize moving funds.
+5. For the authorized transfer, call `execute_bridge` once with the saved quote ID and a stable idempotency key. Retain the operation ID. Poll `bridge_status`; after a timeout or restart, use `recover_bridge_transactions` and the original operation. Call `resume_operation` only for a required safe next step. Do not create a new deposit to recover an uncertain one.
+6. Verify the bridge destination and then read the intended Aleo account's private holdings. A public mint may need a supported public-to-private conversion; the MCP has no general conversion tool, so report that gap and use a verified same-account SDK path when available. Scanner lag is a pending funding check, not a reason to bridge again.
+
+A bridge status requiring external destination verification is incomplete until that verification is supplied. In particular, the current SDK cannot verify some outbound Ethereum releases: follow the operation's guidance instead of repeating the transfer. The [MCP validation notes](../../mcp/README.md) distinguish live-verified routes from adapters that have only local test coverage.
+
+After funding, continue the selected journey: trade, verify the connected trading tool, or prepare the strategy. Keep fee and covering-record checks separate from aggregate holdings.
+
 ## CLI — check first, then fund if needed
 
 ```sh
@@ -88,7 +103,7 @@ For a known intended swap amount, `dex.has_swap_balance(token_id, "1.5")` checks
 
 For Aleo transfers, confirm the selected wallet's network, recipient, token, and private/public transfer mode. A public balance may require an additional supported conversion before it can fund a private swap.
 
-For cross-chain funding, choose the source chain, asset, amount, destination account/network, and supported route before signing. The [Veil bridge guide](https://github.com/ProvableHQ/veil/blob/main/packages/bridge/skills/SKILL.md) supplies route-specific examples and checkpoint recovery. Its inspected examples target mainnet; they are not testnet faucets. This kit does not yet include a verified bridge execution recipe.
+For cross-chain funding, choose the source chain, asset, amount, destination account/network, and supported route before signing. The [Veil bridge guide](https://github.com/ProvableHQ/veil/blob/main/packages/bridge/skills/SKILL.md) supplies route-specific examples and checkpoint recovery. Its inspected examples target mainnet; they are not testnet faucets. For the AgentKit MCP, use the bridge recipe above and its documented route-specific validation limits.
 
 Retain bridge checkpoints and inspect the original transfer after uncertain submission. Verify destination private records as well as bridge completion; do not bridge again just because the scanner is behind.
 

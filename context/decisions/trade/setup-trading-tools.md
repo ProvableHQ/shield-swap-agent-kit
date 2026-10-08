@@ -2,6 +2,8 @@
 
 Install and configure only the selected execution interface. Run in a stable application/trading directory outside the installed kit so updating the context cannot remove account state.
 
+For **Connect trading tools**, this setup includes the selected Aleo account and funding, then verification through the connected tool. Installing a library or obtaining a quote alone does not complete an operational integration with an unfunded account. Reuse an existing account and holdings; an explicitly requested code-only/read-only milestone can defer funding. See the [canonical journeys](../../getting-started.md).
+
 ## CLI path
 
 1. Use the installed `shield-swap` command; [install once](../../toolchains/cli.md) only if it is missing. Record the installed version and check `shield-swap setup --help` and `shield-swap swap --help` before using unfamiliar flags.
@@ -14,6 +16,8 @@ The existing CLI combines account setup, authentication, token creation, and con
 ## SDK or MCP path
 
 Use the selected [Veil](../../toolchains/typescript.md), [Python](../../toolchains/python.md), or [MCP](../../toolchains/mcp.md) guide. A CLI-to-Veil fallback uses the existing CLI session; it does not create a new account or reset the recovery store.
+
+Continue with [configure account](../../shield-swap-setup/configure-account.md), [Shield Swap access](../../shield-swap-setup/configure-shield-swap.md), and [funding](../../shield-swap-setup/bridge-funds.md) for each selected interface.
 
 For MCP, verify the server's actual catalog and signer binding. Installing context does not register a server. A future tool name in a design is not a callable capability.
 

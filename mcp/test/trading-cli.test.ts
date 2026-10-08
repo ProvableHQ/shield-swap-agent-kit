@@ -80,7 +80,7 @@ test("terminal setup encrypts an imported key and stdio survives process restart
         await client.connect(transport);
         assert.equal((await client.listTools()).tools.length, 20);
         const setup = await client.callTool({ name: "setup", arguments: {} });
-        assert.equal((setup.structuredContent as { ready: boolean }).ready, true);
+        assert.equal((setup.structuredContent as { checks: { account: { status: string } } }).checks.account.status, "configured");
         const wallets = await client.callTool({ name: "list_wallets", arguments: {} });
         assert.match(JSON.stringify(wallets), new RegExp(account.address));
         assert.ok(!JSON.stringify(wallets).includes(account.privateKey));
@@ -112,4 +112,59 @@ test("concurrent setup cannot replace a profile or discard its newly generated k
     else process.env.SHIELD_SWAP_MCP_PASSWORD = previous;
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+
+test("guided setup reuses a non-default testnet profile without changing signer or permissions", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { TradingStore } = await import("../src/trading/store");
+  const root = mkdtempSync(join(tmpdir(), "shield-guided-"));
+  const password = "test-password-long-enough";
+  const env = { ...process.env, SHIELD_SWAP_MCP_PASSWORD: password };
+  const store = new TradingStore(root, password, true);
+  const original = { id: "desk", network: "testnet", address: "aleo1existing", key: { type: "env", name: "ABSENT_KEY" },
+    policy: { swaps: false, claims: true, bridges: false, maxSlippageBps: 100, swapLimits: {}, bridgeLimits: {} } };
+  store.set("profile:desk", original);
+  store.set("settings", { defaultProfile: "desk" });
+  store.close();
+  try {
+    const cli = resolve("src/cli.ts");
+    const args = ["--import", "tsx", cli, "setup", "--guided", "--state-dir", root];
+    for (let restart = 0; restart < 2; restart++) {
+      const result = await run(process.execPath, args, { env });
+      const saved = JSON.parse(result.stdout);
+      assert.equal(saved.address, original.address);
+      assert.equal(saved.network, "testnet");
+      assert.equal(saved.profileId, "desk");
+      assert.equal(saved.reused, true);
+      assert.equal(saved.nextAction, "check_funding");
+    }
+    for (const conflicting of [["--generate"], ["--network", "mainnet"], ["--key-env", "ABSENT_KEY"]]) {
+      await assert.rejects(run(process.execPath, [...args, ...conflicting], { env }));
+    }
+    const reopened = new TradingStore(root, password);
+    try { assert.deepEqual(reopened.get("profile:desk"), original); }
+    finally { reopened.close(); }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("guided creation without a supplied choice fails without a TTY instead of generating a key", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { TradingStore } = await import("../src/trading/store");
+  const root = mkdtempSync(join(tmpdir(), "shield-guided-no-tty-"));
+  const password = "test-password-long-enough";
+  try {
+    await assert.rejects(run(process.execPath, ["--import", "tsx", resolve("src/cli.ts"), "setup", "--guided", "--state-dir", root],
+      { env: { ...process.env, SHIELD_SWAP_MCP_PASSWORD: password } }), (error: unknown) => {
+        assert.match((error as { stderr: string }).stderr, /trusted terminal/);
+        return true;
+      });
+    const store = new TradingStore(root, password);
+    try { assert.equal(store.list("profile:").length, 0); assert.equal(store.list("secret:").length, 0); }
+    finally { store.close(); }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

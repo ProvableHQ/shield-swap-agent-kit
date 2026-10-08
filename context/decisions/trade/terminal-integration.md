@@ -9,6 +9,8 @@ First distinguish three requests: use Shield Swap alongside a terminal, consume 
 | terminal.pump.fun | [Terminal](../../integrations/terminal.pump.fun.md) |
 | fomo.family | [fomo](../../integrations/fomo.family.md) |
 
+For an operational **Connect trading tools** journey, verify the product supports the intended integration, then complete [account setup](../../shield-swap-setup/configure-account.md), [Shield Swap access](../../shield-swap-setup/configure-shield-swap.md), and [funding](../../shield-swap-setup/bridge-funds.md). Bind the integration to that same account and recovery state. Read-only development can start earlier, but it is not a funded trading connection. Explicit code-only or dry-run requests may stop at their requested milestone.
+
 ## Connector boundary
 
 A connector translates a supported external event/order interface into the selected trading workflow. It must preserve the external order/event ID, venue, chain, asset identifiers, units, timestamp, and account binding. It then obtains a separate Shield Swap quote and checks the authorized limits before execution.
