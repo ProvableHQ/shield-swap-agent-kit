@@ -4,7 +4,7 @@ Use this page when the Shield Swap skill is invoked for setup, trading, or integ
 
 ## Welcome
 
-Show the banner when beginning onboarding and whenever the user asks an introductory question or requests the welcome/menu, including after setup in the same conversation. “How do I trade with Shield Swap?” is an introductory question. Preserve its spacing in a fenced text block. In a narrow display, use **SHIELD SWAP** on one line with the same tagline instead of wrapping the block letters. Do not emit ANSI escapes into chat. Use compact updates for intermediate operation/status replies; having an existing account or prior-session memory does not suppress an explicitly requested introduction.
+Opening the root skill without a concrete task starts this onboarding guide immediately; no separate menu request is needed. Show the banner when beginning onboarding and whenever the user asks an introductory question or requests the welcome/menu, including after setup in the same conversation. “How do I trade with Shield Swap?” is an introductory question. Preserve its spacing in a fenced text block. In a narrow display, use **SHIELD SWAP** on one line with the same tagline instead of wrapping the block letters. Do not emit ANSI escapes into chat. Use compact updates for intermediate operation/status replies; having an existing account or prior-session memory does not suppress an explicitly requested introduction.
 
 ```text
 ███████╗██╗  ██╗██╗███████╗██╗     ██████╗     ███████╗██╗    ██╗ █████╗ ██████╗

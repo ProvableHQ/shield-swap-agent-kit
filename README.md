@@ -4,6 +4,20 @@ Give an agent the context and working recipes to build on Shield Swap or operate
 
 Start with the [guided welcome](context/getting-started.md): **Configure an Aleo account for Shield Swap**, then **Fund your account**, with routes to trade, connect trading tools, build a strategy, or explore markets. Account setup and funding are part of connecting a trading tool; existing accounts and funds are reused.
 
+## Open the onboarding guide
+
+The root `shield-swap` skill is the usual top-level guide. Once [installed](#install-the-context), invoke `/shield-swap` in Claude Code or `$shield-swap` in Codex. With no specific task attached, it immediately presents the welcome, setup status, shared account/funding steps, and four journeys. No extra “show the menu” prompt is needed. A concrete task continues directly through its relevant journey.
+
+To open the guide from this PR branch in a fresh agent session:
+
+```sh
+npx --yes skills@latest use 'ProvableHQ/shield-swap-agent-kit#feat/guided-onboarding' --skill shield-swap --agent claude-code
+```
+
+Use `--agent codex` for Codex CLI. The selected agent must already be installed and signed in. After the onboarding changes merge to the default branch, the source can be shortened to `ProvableHQ/shield-swap-agent-kit`.
+
+This entrypoint works with SDK, CLI, or MCP paths. Opening the guide does not require a wallet or MCP connection; unknown setup facts start as **Not checked**. The optional launcher below also handles protected local account setup and the Claude MCP connection.
+
 ## Start with Claude Code
 
 From a checkout of this branch, run one command:
