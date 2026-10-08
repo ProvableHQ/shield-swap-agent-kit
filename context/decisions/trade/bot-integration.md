@@ -2,6 +2,22 @@
 
 Use this page for a bot that receives trade requests or signals and calls Shield Swap. For existing products, read [BONKbot](../../integrations/bonkbot.md) or [Banana Gun](../../integrations/banana-gun.md) before assuming a supported connector exists.
 
+## Build a one-account bot
+
+Use this route for a new bot with one account. Read it before copying a larger bot. Keep one signer, the SDK durable store, and one writer that spends records. Submit one swap, claim that same operation, and recover an unknown result before another write. Continue with the [TypeScript](../../toolchains/typescript.md) or [Python](../../toolchains/python.md) client, then the [swap](../../shield-swap-setup/swap.md) recipe.
+
+The SDK store is the Veil blinded-identity file or the Python journal. A refund or partial fill is the outcome of that operation. Report it as that outcome.
+
+Leave these production tactics out:
+
+- an application database
+- provisional operation ids beyond the SDK store
+- a custom wallet lock
+- reservations across multiple strategies
+- race classification, plan reuse, or record-cap clipping
+- a deployment layout
+- execution on another venue
+
 ## Bind messages to operations
 
 Resolve the authenticated user, account, network, and permissions before interpreting a command. Treat message text and token metadata as inputs, not instructions that can change the execution policy.

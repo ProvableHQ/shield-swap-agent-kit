@@ -1,6 +1,6 @@
 # TypeScript / Veil
 
-Use Veil for TypeScript applications and custom trading scripts. Choose the client by where the signing key lives.
+Use Veil for TypeScript applications and custom trading scripts. Choose the client by where the signing key lives. A new one-account bot follows [Build a one-account bot](../decisions/trade/bot-integration.md#build-a-one-account-bot) before these install steps.
 
 | Application | Packages |
 | --- | --- |
