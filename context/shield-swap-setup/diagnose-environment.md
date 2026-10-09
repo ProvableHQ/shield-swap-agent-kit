@@ -8,6 +8,7 @@ For the installed CLI:
 
 ```sh
 node --version
+npm ls --global @provablehq/shield-swap-cli
 shield-swap --help
 ```
 
@@ -26,6 +27,8 @@ python -m pip show shield-swap-sdk aleo-sdk
 ```
 
 Record versions, operating system, selected network, public account address, endpoint hostname, and state-directory location. Do not dump environment variables or account files.
+
+For a project-local CLI, use `npm ls @provablehq/shield-swap-cli` in that project instead of the global listing. If outdated packages are the issue, use the [latest SDK and CLI upgrade commands](../toolchains/updates.md), then repeat the relevant checks. MCP dependencies must be updated in the server’s environment. These inspection commands themselves do not upgrade packages or change account state.
 
 CLI state is relative to the working directory. Python profiles retain their stored network. Use [account verification](configure-account.md) before interpreting empty state as a new account. Stop rather than run setup with `--new` to repair an existing account.
 
@@ -49,7 +52,7 @@ const height = await getBlockNumber(client)
 console.log({ network, height: height.toString() })
 ```
 
-Add `@provablehq/veil-core` as a direct compatible dependency when importing it. The wallet client does not automatically expose every public-read action as a method.
+When preparing this diagnostic script, install or upgrade its direct dependency with `npm install @provablehq/veil-core@latest` alongside the latest [TypeScript SDKs](../toolchains/typescript.md). The wallet client does not automatically expose every public-read action as a method.
 
 Python DEX indexer read — save as `check_indexer.py`, run `python check_indexer.py`:
 

@@ -4,6 +4,8 @@ Use this guide inside the complete AgentKit. The repository's root `SKILL.md` is
 
 Preserve the user's selected interface. Otherwise, choose based on the host's available tools, existing account setup, runtime, custody, and the capabilities needed to complete and recover the operation. Trading immediately does not by itself select the CLI. Ask a focused question only if a consequential choice remains unclear.
 
+For setup or dependency updates, use the [latest published SDKs and CLI with these commands](../context/toolchains/updates.md). Upgrade the selected installation while retaining its account and recovery state; an MCP server update happens in the server’s environment.
+
 | Task | Interface |
 | --- | --- |
 | Build application code | The chosen [TypeScript](../context/toolchains/typescript.md) or [Python](../context/toolchains/python.md) SDK. |

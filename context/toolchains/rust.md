@@ -8,7 +8,7 @@ A Rust application can own strategy logic while a supported Veil/Python worker o
 
 For the subprocess path:
 
-1. Install and pin the [CLI](cli.md) in a stable runtime directory. Invoke the executable with an argument array, not shell-concatenated user input.
+1. Install or upgrade to the latest published [CLI](cli.md) in a stable runtime directory, then record the resolved version for deployment. Invoke the executable with an argument array, not shell-concatenated user input.
 2. Set an explicit working directory and network. Keep credentials out of arguments; the configured session owns the key and identity store.
 3. Parse JSON only for commands that support it. Decode base-unit integer strings losslessly; do not use floating-point amounts.
 4. Persist the application operation ID before starting a write. Retain transaction/swap IDs and distinguish process failure from transaction rejection.

@@ -14,6 +14,8 @@ No roadmap document is maintained here. Describe current functionality in the RE
 
 ## Authoring
 
+- Recommend the latest published SDKs and CLI for setup and dependency updates, using explicit `@latest` npm tags and `python -m pip install --upgrade`. Keep the [shared upgrade commands](context/toolchains/updates.md) and toolchain guides consistent. Retain resolved versions in lockfiles and record historical validation versions separately; do not turn old inspection versions into install requirements.
+
 - Identify the requested journey before account provisioning. Operational trading-tool integrations include account setup and funding; explicit code-only/read-only milestones can defer them. Preserve an explicit SDK, framework, custody choice, or existing authorization from the user's request.
 - Account and Shield Swap configuration end with a link to funding. Standalone inspection uses `discover-pools-and-get-quotes.md`; `swap.md` retains its own discovery and quoting instructions. Do not remove those instructions when maintaining the standalone guide. Neither discovery path is a setup prerequisite. `shield-swap-setup/` retains the user's broad collection of operational runbooks; its files are not one mandatory sequence.
 - Authentication grants access. Referrals are optional attribution. Never introduce an invite-code gate.

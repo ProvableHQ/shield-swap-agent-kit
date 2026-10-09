@@ -45,6 +45,8 @@ Show all four menu choices for introductory prompts, even when accounts are alre
 
 Start with the available interface and an existing account; see [tool selection](../tools/SKILL.md). Never inspect or print secret file contents to fill the panel.
 
+When the journey reaches tool installation or an update, use the [latest published SDKs and CLI](toolchains/updates.md) and show the relevant command. Keep commands in that setup step, after the introduction. An available tool alone does not establish that its installed version is current.
+
 For the AgentKit MCP, call `setup` with the selected `journey` and optional `profileId`. It performs local configuration inspection by default. `checks.account.status` distinguishes `missing`, `locked`, and `configured`; a configured profile is not yet verified signing access. Follow `nextAction` rather than rerunning account creation. A locked store does not reveal which profiles it contains.
 
 When account access and holdings are relevant, call `setup` with `checkBalances: true`. It verifies signing/API access before reading balances. This may authenticate and initialize scanner state but never funds, signs a transaction, or grants execution permissions. Successful access is `usable`; failed access or scanning is `unavailable`, never a zero balance. Use `checkAccess: true` for account access alone.

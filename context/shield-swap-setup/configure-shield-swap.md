@@ -32,7 +32,7 @@ shield-swap balances --network testnet --all --json
 
 Operational commands load and authenticate the existing session. A balance read does not mint a token, request funds, or submit a swap. Check the returned `address` and `network`; zero holdings mean funding may be needed, not that authentication failed.
 
-The inspected `setup` command still checks an obsolete invite gate. If it returns `NEEDS_INVITE_CODE`, use the [CLI session fallback](../toolchains/cli.md#reuse-a-cli-account-from-a-script) and the Veil recipes below. Do not obtain a code to satisfy outdated behavior. No separate `configure` subcommand is assumed here.
+If an older `setup` command returns `NEEDS_INVITE_CODE`, [upgrade to the latest CLI](../toolchains/cli.md) and check its documented setup behavior. If still blocked, use the [CLI session fallback](../toolchains/cli.md#reuse-a-cli-account-from-a-script) and the Veil recipes below. Do not obtain a code to satisfy outdated behavior. No separate `configure` subcommand is assumed here.
 
 ## Veil — authenticate without funding
 
@@ -98,7 +98,7 @@ Successful authentication establishes API access, not proof that the scanner or 
 
 - **401 or expired session:** authenticate the selected client again. Check for an explicitly configured stale API token.
 - **404 or unreachable DEX API:** check network and endpoint overrides. The CLI can pin an API origin in state or override it with `SHIELD_SWAP_API_URL`; only change it to a verified deployment for that network.
-- **Invite-code prompt:** use the SDK fallback above. Authentication grants access without referral attribution.
+- **Invite-code prompt:** upgrade to the latest CLI, then use the SDK fallback above if still needed. Authentication grants access without referral attribution.
 - **No funds:** continue to funding; do not use a swap as an authentication check.
 
 Next: [fund the account](bridge-funds.md). If the CLI already requested an airdrop, inspect that job and its records instead of starting another request.

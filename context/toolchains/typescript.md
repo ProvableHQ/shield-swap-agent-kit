@@ -9,17 +9,17 @@ Use Veil for TypeScript applications and custom trading scripts. Choose the clie
 | Non-React application with a connected wallet | `@provablehq/veil-aleo-wallet-adapter` and `@provablehq/shield-swap-sdk` |
 | Script extending a CLI session | `@provablehq/shield-swap-cli/session`; see [CLI session reuse](cli.md#reuse-a-cli-account-from-a-script) |
 
-## Install for a local-key application
+## Install or upgrade for a local-key application
 
-Use Node.js 22 or newer for these examples. In the application's directory:
+Use Node.js 22 or newer for these examples. Install or upgrade to the latest published SDKs in the application's directory:
 
 ```sh
-npm install @provablehq/veil-aleo-sdk @provablehq/shield-swap-sdk
+npm install @provablehq/veil-aleo-sdk@latest @provablehq/shield-swap-sdk@latest
 npm install --save-dev tsx typescript @types/node
 npm ls @provablehq/veil-aleo-sdk @provablehq/shield-swap-sdk
 ```
 
-Retain the lockfile and record the resolved versions. The [source map](../../docs/source-map.md) records the versions used to check these recipes.
+Rerun the same install command to upgrade an existing application. Retain the lockfile and record the resolved versions. The [source map](../../docs/source-map.md) records the versions used to check these recipes.
 
 Use `.mts` for the example scripts so imports and top-level `await` run as ESM:
 

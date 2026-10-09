@@ -6,7 +6,7 @@ Use an available MCP connection for capabilities it actually exposes when it fit
 
 ## AgentKit standalone server
 
-The draft server pins published Veil packages to 0.12.0 and runs over stdio on Node.js 22.13 or newer. `setup` reports structured account/funding checks and next-step guidance for the [canonical journeys](../getting-started.md); signing keys and execution permissions are configured only in the trusted terminal. Starting an unconfigured server does not create an account.
+The draft server runs over stdio on Node.js 22.13 or newer. Use the [MCP SDK update and build commands](../../mcp/README.md#run-from-this-repository) to get the latest published Veil packages. Its checked-in lockfile records the versions used for the documented validation. `setup` reports structured account/funding checks and next-step guidance for the [canonical journeys](../getting-started.md); signing keys and execution permissions are configured only in the trusted terminal. Starting an unconfigured server does not create an account.
 
 Its swap workflow is `quote` → `execute` → operation polling → `claim_unclaimed_swaps`. Executions consume durable quotes using idempotency keys. `swap_history` reads the encrypted identity store and reports recovery coverage. SDKs still own transaction construction, signing, and protocol logic; this server adds transport, operation IDs, encrypted storage, and local policy enforcement.
 
@@ -68,14 +68,14 @@ The standalone server's locks coordinate profiles and processes using its state 
 
 ## Existing Python server
 
-The Python SDK has a stdio entrypoint. Its package documents installation and launch as:
+The Python SDK has a stdio entrypoint. In the application's virtual environment, install or upgrade to the latest published SDKs with the MCP extra, then launch the server:
 
 ```sh
-python -m pip install 'shield-swap-sdk[mcp]'
+python -m pip install --upgrade 'shield-swap-sdk[mcp]' aleo-sdk
 python -m aleo_shield_swap.mcp
 ```
 
-These commands describe the existing SDK server, not an AgentKit server or a required setup step. Evaluate and pin the dependency version before using it with an account.
+These commands describe the existing SDK server, not an AgentKit server or a required setup step. After upgrading, check the installed API and tool catalog and record the resolved versions before using it with an account.
 
 The inspected server binds `ALEO_PRIVATE_KEY` when supplied, otherwise creates/loads a signing profile through `ShieldSwap.from_profile()`. Omitting the environment key does not make it read-only. Resolve the profile before launch. Its fallback does not forward the initially read network/endpoint settings into `from_profile()`; inspect the profile's stored configuration.
 

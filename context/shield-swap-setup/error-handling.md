@@ -2,6 +2,8 @@
 
 Classify an error by the last completed stage and possible side effects, not just its message. Keep the original operation identity across recovery.
 
+For outdated commands, missing SDK methods, or obsolete setup prompts, inspect the installed versions and use the [latest SDK and CLI upgrade commands](../toolchains/updates.md). Preserve any pending operation and its recovery material; a dependency update is not a retry of the original transaction.
+
 | Symptom | Action | Do not |
 | --- | --- | --- |
 | Invalid network, token, amount, or configuration | Correct the input before preparing a transaction. | Guess identifiers or silently switch accounts. |

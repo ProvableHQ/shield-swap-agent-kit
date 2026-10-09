@@ -18,6 +18,8 @@ Use this route when the project already has a runtime, signer, and network. Keep
 
 An existing MCP connection follows this route too: keep its configured profile, network, and state directory. Inspect `get_config` and `list_wallets` for the AgentKit server; other servers have different catalogs. Choosing MCP for a new integration does not automatically import an existing SDK client, browser signer, or recovery store.
 
+When updating this integration’s dependencies, use the [latest published SDKs and CLI](../../toolchains/updates.md) in the existing runtime and keep its signer and durable state. Continue read-only inspection and recovery on the current setup when no dependency update is requested.
+
 ### Quote only
 
 Read [discover pools and get quotes](../../shield-swap-setup/discover-pools-and-get-quotes.md). Call quote on the existing client and return that quote. Stop there. Do not create an account, request funding, or submit a swap.

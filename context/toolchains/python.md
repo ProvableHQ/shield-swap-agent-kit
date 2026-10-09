@@ -2,12 +2,14 @@
 
 Use `shield-swap-sdk`, imported as `aleo_shield_swap`, for Python bots, notebooks, and services. A new one-account bot follows [Build a one-account bot](../decisions/trade/bot-integration.md#build-a-one-account-bot) before these install steps. The package depends on `aleo-sdk` and requires Python 3.10 or newer. The inspected persistent journal uses POSIX file locking; use macOS, Linux, or WSL for these profile-based recipes.
 
-## Install in the application
+## Install or upgrade in the application
+
+Use the latest published SDKs. Create a virtual environment for a new application, or activate its existing environment before running the upgrade command:
 
 ```sh
 python -m venv .venv
 . .venv/bin/activate
-python -m pip install shield-swap-sdk
+python -m pip install --upgrade shield-swap-sdk aleo-sdk
 python -m pip show shield-swap-sdk aleo-sdk
 ```
 
