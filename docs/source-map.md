@@ -2,6 +2,8 @@
 
 Rechecked on 2026-10-01 for the cross-surface context and operational documentation. These are local checkout observations, not published-version or live-network verification. The sources below inform the kit; their existing runbooks are not copied wholesale.
 
+Use the [latest published SDKs and CLI](../context/toolchains/updates.md) for setup and dependency updates. Versions and revisions below identify historical inspection and validation evidence; they are not installation targets or proof that a newer release has the same limitations.
+
 ## Sources
 
 | Source | Inspected revision / package version | Reuse |

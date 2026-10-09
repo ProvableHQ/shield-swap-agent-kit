@@ -2,6 +2,8 @@
 
 Use the application's existing language and runtime. The SDKs remain the source of transaction construction, proving, signing, and recovery state; the kit teaches how to use them.
 
+Use the [latest published SDKs and CLI](../../toolchains/updates.md) for the selected stack, including when updating an existing application. The linked commands install or upgrade packages and report their resolved versions.
+
 | Requirement | Choice | Guide |
 | --- | --- | --- |
 | TypeScript bot or service with its own signer | Veil + Shield Swap SDK | [TypeScript](../../toolchains/typescript.md) |

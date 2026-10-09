@@ -32,6 +32,6 @@ If setup is needed, follow [configure account](../shield-swap-setup/configure-ac
 
 ## Shared rules
 
-Authentication grants access; referrals are optional. If an older tool requires an invite code, identify the version mismatch and use a verified corrected path. Do not invent a code or disable authentication.
+Authentication grants access; referrals are optional. If an older tool requires an invite code, [upgrade to the latest published SDK or CLI](../toolchains/updates.md), check its documented behavior, and use the supported session fallback if still needed. Do not invent a code or disable authentication.
 
 Keep setup separate from strategy execution. Never choose a trade size, token, network, or unattended strategy merely because an example uses it. Report missing tool support directly; this initial context package does not provide terminal connectors or strategy implementations.

@@ -14,7 +14,7 @@ Distinguish local preparation, proof generation, broadcast, confirmation, and cl
 
 Do not use a fresh swap as a prover health check. Preparing a swap can reserve an identity, and simulation can produce authorization material.
 
-Published Provable API docs describe proving at `https://api.provable.com/prove/{network}` and record scanning at `https://api.provable.com/scanner/{network}`. An `x-api-key` header selects a Standard or Enterprise key; a request without it uses the Free tier. Consumer registration and JWT exchange are retired. The account recipes keep the SDK edge defaults, `https://edge.provable.com/api/prove` and `https://edge.provable.com/api/scanner`, unless the user configured a host or key. DEX authentication is separate. Inspect the selected endpoint instead of adding obsolete credentials.
+For SDK compatibility or obsolete setup guidance, use the [latest SDK and CLI upgrade commands](../toolchains/updates.md). Follow the installed SDK’s endpoint and authentication defaults, preserving any explicitly configured service and its required credentials. DEX authentication is separate. Inspect the failed operation and its selected endpoint before retrying any stage.
 
 ## Confirm the original transaction
 
@@ -30,7 +30,7 @@ const confirmed = await getConfirmedTransaction(client, { id: transactionId })
 console.log({ transactionId, status: confirmed.status })
 ```
 
-Use a compatible direct `@provablehq/veil-core` dependency. Preserve transport errors; an explicit not-found response still does not prove permanent failure. The inspected convenience `transactionStatus()` can mask read failures as `not_found`, so it is insufficient on its own for recovery decisions.
+For this script, install or upgrade `@provablehq/veil-core` with `npm install @provablehq/veil-core@latest` alongside the latest [TypeScript SDKs](../toolchains/typescript.md). Preserve transport errors; an explicit not-found response still does not prove permanent failure. The inspected convenience `transactionStatus()` can mask read failures as `not_found`, so it is insufficient on its own for recovery decisions.
 
 Python — set the same variable, save as `check_transaction.py`, run `python check_transaction.py`:
 

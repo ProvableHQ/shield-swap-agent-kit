@@ -12,7 +12,7 @@ npm ls --global @provablehq/shield-swap-cli
 shield-swap --help
 ```
 
-For repeatable bot deployments, pin the dependency version and expose its binary through the application's runtime environment. The recipes were checked against the source versions in the [source map](../../docs/source-map.md), not every published release. Check the installed command's help when its flags differ.
+For repeatable bot deployments, lock the resolved version after installing or upgrading to the latest release and expose its binary through the application's runtime environment. The recipes were checked against the source versions in the [source map](../../docs/source-map.md), not every published release. Check the installed command's help when its flags differ.
 
 Run commands from the same trading directory: state is relative to the working directory, not the installed skill.
 

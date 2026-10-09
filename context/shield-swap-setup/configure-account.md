@@ -12,7 +12,7 @@ MCP `setup` reports the selected profile’s account and funding checks. For gui
 
 ## CLI
 
-Install the [CLI](../toolchains/cli.md) and run from the directory where trading state should live. The current `setup` command also authenticates, can create an API token, and requests testnet funds when it finds no holdings. Use it when that combined setup is wanted. For account configuration without those effects, use the SDK path below.
+Install or upgrade to the latest published [CLI](../toolchains/cli.md) and run from the directory where trading state should live. The current `setup` command also authenticates, can create an API token, and requests testnet funds when it finds no holdings. Use it when that combined setup is wanted. For account configuration without those effects, use the SDK path below.
 
 Choose **one**:
 
@@ -31,11 +31,11 @@ The command prints the account address and state directory. Check the address ag
 
 If `NEEDS_CONFIG_DECISION` appears, the directory has no configured account. Choose import or new rather than assuming the user has no account elsewhere. A different imported key is rejected when state already belongs to another account; choose a separate working directory instead of overwriting it.
 
-The inspected CLI still has an obsolete invite-code check after authentication. If it blocks setup, use the [CLI session fallback](../toolchains/cli.md#reuse-a-cli-account-from-a-script), which reuses the saved account. Authentication grants access; no invite code is needed.
+Older inspected CLI releases had an obsolete invite-code check after authentication. If encountered, [upgrade to the latest CLI](../toolchains/cli.md) and check its documented setup behavior. If still blocked, use the [CLI session fallback](../toolchains/cli.md#reuse-a-cli-account-from-a-script), which reuses the saved account. Authentication grants access; no invite code is needed.
 
 ## Veil — local-key applications
 
-Install the [TypeScript dependencies](../toolchains/typescript.md). Have the user supply `SHIELD_SWAP_PRIVATE_KEY_FILE` or `SHIELD_SWAP_PRIVATE_KEY` outside chat. Do not put a key literal in a script.
+Install or upgrade to the latest published [TypeScript SDKs](../toolchains/typescript.md). Have the user supply `SHIELD_SWAP_PRIVATE_KEY_FILE` or `SHIELD_SWAP_PRIVATE_KEY` outside chat. Do not put a key literal in a script.
 
 Save this as `session.mts` in the application. If extending an existing CLI account, use the CLI's `session.mts` recipe instead so its recovery store is retained.
 
@@ -91,7 +91,7 @@ A browser application uses its connected wallet instead. Do not embed this local
 
 ## Python — existing profile or key import
 
-Install the [Python dependencies](../toolchains/python.md). Select `SHIELD_SWAP_HOME` if the account uses a non-default profile directory. Otherwise the SDK uses `~/.shield-swap`.
+Install or upgrade to the latest published [Python SDKs](../toolchains/python.md). Select `SHIELD_SWAP_HOME` if the account uses a non-default profile directory. Otherwise the SDK uses `~/.shield-swap`.
 
 Save this as `session.py` in the application:
 

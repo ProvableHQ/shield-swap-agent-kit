@@ -1,23 +1,34 @@
 # Shield Swap MCP
 
-Draft TypeScript MCP server for terminal users, backed by the published Veil 0.12.0 packages. Wallet configuration happens in a trusted terminal; MCP exposes structured trading tools. The server is a draft; validation coverage and remaining limits are recorded below.
+Draft TypeScript MCP server for terminal users, backed by published Veil packages. Use the latest SDK releases with the update commands below; historical validation records identify the versions actually tested. Wallet configuration happens in a trusted terminal; MCP exposes structured trading tools. The server is a draft; validation coverage and remaining limits are recorded below.
 
 ## Run from this repository
 
 Requires Node.js 22.13 or newer and pnpm 10.33.2.
 
+Install or upgrade the SDKs to their latest published releases, then check and rebuild the server:
+
 ```sh
 cd mcp
-pnpm install --frozen-lockfile
+pnpm update --latest '@provablehq/*'
+pnpm list --depth 0
+pnpm test
+pnpm run typecheck
 pnpm run build
 node dist/cli.js --help
 ```
 
+The update command changes SDK dependencies in `package.json` and `pnpm-lock.yaml`. Keep both files after verification. `pnpm install --frozen-lockfile` reproduces those resolved versions for subsequent builds; it does not upgrade them. The mainnet evidence below applies to its recorded versions, not every later release.
+
 The package is private and unpublished. To install the build elsewhere, run `pnpm pack` here, then `pnpm add /absolute/path/to/provablehq-shield-swap-mcp-0.1.0.tgz` in the consuming project. The installed command is `shield-swap-mcp`.
+
+After an SDK upgrade, rebuild, pack, and reinstall the updated tarball in the consuming project, then restart the host’s MCP connection using the same profile and state directory. Updating a separate global CLI does not update this server’s SDKs.
 
 pnpm is used because Privy 0.35.0 declares an optional Solana Kit 5 peer while the bridge SDK uses Kit 8. The SDK documents this combination: its Privy adapter uses the wire-transaction API, and Kit 8 validates the signed wire. Installation reports that peer warning and warnings from unused Dynamic WalletConnect dependencies. Hosted provider packages are optional; `pnpm add --no-optional /absolute/path/to/the-built-package.tgz` supports local-wallet-only installations from a prebuilt tarball.
 
 ## Claude Code launcher
+
+Run the SDK update and verification commands above before launching when setting up or updating dependencies. The launcher installs from the current lockfile and rebuilds; it does not fetch newer SDK versions automatically.
 
 From the complete AgentKit checkout, `npm start` installs dependencies, builds the MCP server, shows the intro, guides protected account setup, and launches Claude with its session MCP connection. See [start with Claude Code](../README.md#start-with-claude-code). Requires macOS/Linux, Node.js 22.13+, and an existing Claude Code login. This helper is for the complete kit; the standalone MCP package still uses the setup and serve commands below.
 

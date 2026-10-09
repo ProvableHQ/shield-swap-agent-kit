@@ -4,6 +4,8 @@ Give an agent the context and working recipes to build on Shield Swap or operate
 
 Start with the [guided welcome](context/getting-started.md): **Configure an Aleo account for Shield Swap**, then **Fund your account**, with routes to trade, connect trading tools, build a strategy, or explore markets. Account setup and funding are part of connecting a trading tool; existing accounts and funds are reused.
 
+Use the latest published SDKs and CLI for setup and dependency updates. The [install and upgrade commands](context/toolchains/updates.md) cover TypeScript, Python, CLI, and MCP workflows; rerun the command for the selected interface to update an existing installation.
+
 ## Open the onboarding guide
 
 The root `shield-swap` skill is the usual top-level guide. Once [installed](#install-the-context), invoke `/shield-swap` in Claude Code or `$shield-swap` in Codex. With no specific task attached, it immediately presents the welcome, setup status, shared account/funding steps, and four journeys. No extra “show the menu” prompt is needed. A concrete task continues directly through its relevant journey.
@@ -19,6 +21,8 @@ Use `--agent codex` for Codex CLI. The selected agent must already be installed 
 This entrypoint works with SDK, CLI, or MCP paths. Opening the guide does not require a wallet or MCP connection; unknown setup facts start as **Not checked**. The optional launcher below also handles protected local account setup and the Claude MCP connection.
 
 ## Start with Claude Code
+
+For the latest SDKs, first follow the [MCP update and build commands](mcp/README.md#run-from-this-repository). The launcher uses the checkout’s lockfile; rerunning it alone does not select newer SDK releases.
 
 From a checkout of this branch, run one command:
 
@@ -42,7 +46,7 @@ An introductory prompt shows the screen again even after account setup. The skil
 
 This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows.
 
-The [draft standalone MCP server](mcp/README.md) provides terminal wallet setup, encrypted state, stdio transport, and 20 swap, bridge, and recovery tools. Its README distinguishes completed live checks from remaining validation. The kit does not include its own trading CLI, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. CLI recipes assume the CLI is installed and use `shield-swap` directly; selecting an SDK or MCP path does not require installing the CLI.
+The [draft standalone MCP server](mcp/README.md) provides terminal wallet setup, encrypted state, stdio transport, and 20 swap, bridge, and recovery tools. Its README distinguishes completed live checks from remaining validation. The kit does not include its own trading CLI, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. CLI recipes use the latest published CLI via the [install/upgrade guide](context/toolchains/cli.md) and invoke `shield-swap` directly; selecting an SDK or MCP path does not require installing the CLI.
 
 ## Layout
 
@@ -90,7 +94,7 @@ shield-swap-setup/
 Install the version published to GitHub:
 
 ```sh
-npx skills add ProvableHQ/shield-swap-agent-kit --skill shield-swap
+npx skills@latest add ProvableHQ/shield-swap-agent-kit --skill shield-swap
 ```
 
 The installer discovers the root `SKILL.md` and copies the root package, including `AGENTS.md`, `context/`, and `tools/`, to the selected agent. It does not install SDK dependencies, connect an MCP server, create an account, or authorize transactions.
@@ -98,7 +102,7 @@ The installer discovers the root `SKILL.md` and copies the root package, includi
 To test an unpublished checkout, run the following from a separate consuming project, replacing the path with the checkout location. Keep the destination outside the source checkout because the root package is copied:
 
 ```sh
-npx skills add /path/to/shield-swap-agent-kit --skill shield-swap
+npx skills@latest add /path/to/shield-swap-agent-kit --skill shield-swap
 ```
 
 See the [skills installer documentation](https://github.com/vercel-labs/skills) for agent selection and installation scope. Consumers that do not use the installer start directly from [AGENTS.md](AGENTS.md).
