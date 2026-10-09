@@ -1,6 +1,6 @@
 # Source map
 
-Rechecked on 2026-10-01 for the cross-surface context and operational documentation. Proving and record-scanning SDK authentication was inspected on 2026-10-06. Deployment guidance was corrected on 2026-10-09 using maintainer confirmation from 2026-10-08 supplied by the user; this was not a live service test. These are local checkout observations, not published-version or live-network verification. The sources below inform the kit; their existing runbooks are not copied wholesale.
+Rechecked on 2026-10-01 for the cross-surface context and operational documentation. These are local checkout observations, not published-version or live-network verification. The sources below inform the kit; their existing runbooks are not copied wholesale.
 
 ## Sources
 
@@ -10,8 +10,6 @@ Rechecked on 2026-10-01 for the cross-surface context and operational documentat
 | [Shield Swap CLI](https://github.com/ProvableHQ/veil/tree/main/packages/shield-swap-cli) | Same Veil revision; CLI `0.11.1` | Account configuration, network-scoped session state, command registry, JSON output, and transaction planning. |
 | [Python Shield Swap SDK](https://github.com/ProvableHQ/python-sdk/tree/master/shield-swap-sdk) | `dba135bec7f88585952e16ee39a5e765f30f50de`; SDK `0.6.0` | Profile/journal lifecycle, authentication, balance and faucet checks, native quote/swap/claim methods. The MCP observations below came from the earlier `0.5.1` inspection at `1152925d6aea1ef3f529df2716005d7b3bc0ae56`. |
 | [Shield Swap documentation source](https://github.com/ProvableHQ/shield-swap-documentation) | No release compatibility claim | Canonical product and protocol reference; publish AgentKit discovery and installation instructions there. |
-| [Provable API documentation](https://docs.provable.com/docs/intro) | [Introduction](https://docs.provable.com/docs/intro) and [authentication](https://docs.provable.com/docs/auth), checked 2026-10-06 | API reference for service URLs and key authentication. The keyless cutover described by the upcoming documentation is not deployed; use the deployment correction below. |
-| [Veil proving and scanning defaults](https://github.com/ProvableHQ/veil/tree/v0.12.0/packages/provable-sdk) | Veil `19a595b360bea8379f9dc1ccd609b04e4f548047`; `@provablehq/sdk` `9bbe5e63b29dcadc93fad29fe4631e8c186ce639`; both packages `0.12.0` | Default prover, scanner, and network URLs, plus provisioned-key and legacy JWT authentication. Quote, swap, and claim methods remain the 2026-10-01 SDK `0.11.1` inspection above. |
 
 Use the installed dependency's reference when writing executable code. The Python package prints its bundled guide with `python -m aleo_shield_swap`; TypeScript ships its SDK README and skill runbooks. The kit does not assert that all capabilities are available through every SDK or MCP surface.
 
@@ -31,7 +29,7 @@ Use the installed dependency's reference when writing executable code. The Pytho
 | Finding | Required treatment |
 | --- | --- |
 | TS setup and runbooks retain invite-code assumptions. | Current product behavior is authentication-based access with optional referrals. Remove obsolete gates in the owning SDK/CLI and depend on a verified release; never ask a user for an invite code to work around old guidance. |
-| Upcoming Provable API documentation precedes the keyless service cutover. | Maintainers confirmed on 2026-10-08 that only `https://edge.provable.com/api` currently exposes keyless routes. JWT authentication remains required for the non-API-key path on `https://api.provable.com`; do not claim that omitting `x-api-key` there enables Free-tier access or that consumer registration/JWT exchange is retired. Inspected SDK `0.12.0` defaults proving to `https://edge.provable.com/api/prove` and scanning to `https://edge.provable.com/api/scanner`, with no credential. A provisioned key uses `X-API-Key`; retain its supplied endpoint/authentication configuration. Keep the SDK defaults until the service cutover and SDK support are confirmed. DEX authentication remains separate. |
+| Some docs still describe default Provable consumer registration. | Default proving/scanning uses `https://edge.provable.com/api` without consumer registration. Legacy endpoints can have different credentials. DEX authentication remains separate. |
 | Python `from_profile()` creates/loads key material and attempts scanner setup before `status()`. | Establish intent, custody, account, and profile location before constructing a profile-bound client. Do not use it to discover whether a user has an account. |
 | Python first-swap example defaults `ENABLE_JOURNAL` to false. | Enable durable journaling before adopting this as an operational example. A handle held only in memory is not a recovery workflow. |
 | TS runbooks mix legacy state paths and counter-allocation guidance with newer store behavior. | Follow the configured network-scoped session and current persistent identity store. Record contention is a separate concurrency concern. |

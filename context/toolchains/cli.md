@@ -2,18 +2,14 @@
 
 Use the existing `@provablehq/shield-swap-cli` for terminal-command workflows. It installs the `shield-swap` command; AgentKit does not require a second CLI.
 
-## Use the installed command
+## Install or upgrade the command
 
-The runbooks assume `shield-swap` is already installed and on `PATH`:
+Install or upgrade to the latest published CLI, then check the installed version and command help:
 
 ```sh
+npm install --global @provablehq/shield-swap-cli@latest
+npm ls --global @provablehq/shield-swap-cli
 shield-swap --help
-```
-
-If it is missing, install it once:
-
-```sh
-npm install --global @provablehq/shield-swap-cli
 ```
 
 For repeatable bot deployments, pin the dependency version and expose its binary through the application's runtime environment. The recipes were checked against the source versions in the [source map](../../docs/source-map.md), not every published release. Check the installed command's help when its flags differ.
@@ -37,10 +33,10 @@ Both pool reads and swap planning use a configured, authenticated session. The c
 
 ## Reuse a CLI account from a script
 
-When a CLI flag cannot express a task, use the session export. The shared SDK recipes also import formatting helpers from the Shield Swap SDK. Install the CLI locally for module imports (a global executable does not supply project imports), alongside a compatible SDK and the script runner:
+When a CLI flag cannot express a task, use the session export. The shared SDK recipes also import formatting helpers from the Shield Swap SDK. Install or upgrade to the latest published CLI and SDK locally for module imports (a global executable does not supply project imports), alongside the script runner:
 
 ```sh
-npm install @provablehq/shield-swap-cli @provablehq/shield-swap-sdk
+npm install @provablehq/shield-swap-cli@latest @provablehq/shield-swap-sdk@latest
 npm install --save-dev tsx
 npm ls @provablehq/shield-swap-cli @provablehq/shield-swap-sdk
 ```

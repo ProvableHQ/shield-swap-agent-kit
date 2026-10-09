@@ -68,10 +68,10 @@ The standalone server's locks coordinate profiles and processes using its state 
 
 ## Existing Python server
 
-The Python SDK has a stdio entrypoint. Its package documents installation and launch as:
+The Python SDK has a stdio entrypoint. In the application's virtual environment, install or upgrade to the latest published SDKs with the MCP extra, then launch the server:
 
 ```sh
-python -m pip install 'shield-swap-sdk[mcp]'
+python -m pip install --upgrade 'shield-swap-sdk[mcp]' aleo-sdk
 python -m aleo_shield_swap.mcp
 ```
 
