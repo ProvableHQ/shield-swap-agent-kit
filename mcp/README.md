@@ -1,6 +1,6 @@
 # Shield Swap MCP
 
-Draft TypeScript MCP server for terminal users, backed by the published Veil 0.12.0 packages. Wallet configuration happens in a trusted terminal; MCP exposes structured trading tools. The server is a draft; validation coverage and remaining limits are recorded below.
+Draft TypeScript MCP server for terminal users, backed by the published Veil 0.12.1 packages. Wallet configuration happens in a trusted terminal; MCP exposes structured trading tools. The server is a draft; validation coverage and remaining limits are recorded below.
 
 ## Run from this repository
 
@@ -182,7 +182,7 @@ Local encryption protects data at rest. An unlocked server can use configured si
 - Bridge quotes display SDK fees, which the SDK recalculates before execution; token input caps do not cap network gas fees.
 - Bridge recovery requires this server's saved checkpoints. It does not import arbitrary external transactions.
 - `rebalance_swap_inventory` is deferred until the SDK exposes that operation.
-- Aleo-to-Ethereum xReserve recovery confirms the source burn, but SDK 0.12.0 does not verify the Ethereum release. Its status remains `DELIVERY_PENDING` with `nextAction: "verify_destination_externally"` and `deliveryVerification: "unsupported_by_sdk"`; inspect destination delivery independently and do not repeat the transfer.
+- Aleo-to-Ethereum xReserve recovery confirms the source burn, but SDK 0.12.1 does not verify the Ethereum release. Its status remains `DELIVERY_PENDING` with `nextAction: "verify_destination_externally"` and `deliveryVerification: "unsupported_by_sdk"`; inspect destination delivery independently and do not repeat the transfer.
 - History discovery probes a bounded identity window and reports incomplete coverage; it cannot promise discovery across arbitrary missing counter gaps.
 - Existing Shield Swap CLI file stores do not share this package's encryption or locking. Do not operate the same wallet concurrently through an uncoordinated CLI or another state directory.
 - Permission changes are refused while the profile has a queued or running operation.
