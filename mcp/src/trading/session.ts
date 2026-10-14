@@ -19,6 +19,10 @@ export type SwapSubmission = {
   checkpoint: Record<string, unknown>;
 };
 export const swapContext = new AsyncLocalStorage<SwapSubmission>();
+export const claimContext = new AsyncLocalStorage<{
+  beforeSubmit(): void;
+  submitted(transactionId: string): void;
+}>();
 export function trackSwapSubmission(proving: ProvingConfig): void {
   const execute = proving.execute;
   if (!execute) throw new TradingError("proving_unavailable", "The configured SDK cannot submit Aleo transactions.");
@@ -30,7 +34,12 @@ export function trackSwapSubmission(proving: ProvingConfig): void {
       active.execution.checkpoint(active.checkpoint);
       active.submissionStarted = true;
     }
-    return execute(options);
+    const claim = claimContext.getStore();
+    claim?.beforeSubmit();
+    const result = await execute(options);
+    // Keep the confirmed ID even if later SDK bookkeeping or our result write fails.
+    claim?.submitted(result.transactionId);
+    return result;
   };
 }
 export function walletScope(profile: Profile): string {

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { executeContract, type Client, type ProvingConfig } from "@provablehq/veil-core";
-import { swapContext, trackSwapSubmission, type SwapSubmission } from "../src/trading/session";
+import { claimContext, swapContext, trackSwapSubmission, type SwapSubmission } from "../src/trading/session";
 
 test("the public SDK execution path checkpoints before entering its proving adapter", async () => {
   const events: string[] = [];
@@ -31,4 +31,28 @@ test("failed checkpoint persistence prevents proving and submission", async () =
   await assert.rejects(swapContext.run(state, () => proving.execute!({ programName: "shield_swap.aleo", functionName: "swap", inputs: [], fee: 0n })), /disk full/);
   assert.equal(calls, 0);
   assert.equal(state.submissionStarted, false);
+});
+
+test("claims persist the boundary before proving and the returned ID before SDK bookkeeping", async () => {
+  const events: string[] = [];
+  const proving: ProvingConfig = { mode: "delegated", execute: async () => {
+    events.push("proving");
+    return { transactionId: "at1claim", transitions: [], outputs: [] };
+  } };
+  trackSwapSubmission(proving);
+  const client = { account: { type: "local", sign() {} }, proving } as unknown as Client;
+  await claimContext.run({ beforeSubmit: () => { events.push("checkpoint"); }, submitted: id => { events.push(id); } }, async () => {
+    await executeContract(client, { program: "shield_swap.aleo", function: "claim_swap_output", inputs: [] });
+    events.push("sdk-bookkeeping");
+  });
+  assert.deepEqual(events, ["checkpoint", "proving", "at1claim", "sdk-bookkeeping"]);
+});
+
+test("failed claim boundary persistence prevents proving and submission", async () => {
+  let calls = 0;
+  const proving: ProvingConfig = { mode: "delegated", execute: async () => { calls++; throw new Error("must not execute"); } };
+  trackSwapSubmission(proving);
+  await assert.rejects(claimContext.run({ beforeSubmit: () => { throw new Error("disk full"); }, submitted: () => {} },
+    () => proving.execute!({ programName: "shield_swap.aleo", functionName: "claim_swap_output", inputs: [], fee: 0n })), /disk full/);
+  assert.equal(calls, 0);
 });
