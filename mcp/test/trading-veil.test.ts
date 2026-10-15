@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { executeContract, FinalizeRevertError, TransactionTimeoutError, type Client, type ProvingConfig } from "@provablehq/veil-core";
 import { TradingStore } from "../src/trading/store";
 import { TradingRuntime } from "../src/trading/runtime";
 import { VeilBackend } from "../src/trading/veil";
-import { swapContext, type AleoSession } from "../src/trading/session";
+import { swapContext, trackSwapSubmission, type AleoSession } from "../src/trading/session";
 import type { Profile, SavedQuote } from "../src/trading/types";
 
 const profile: Profile = { id: "alice", network: "testnet", address: "aleo1test", key: { type: "env", name: "TEST_KEY" },
@@ -73,6 +74,31 @@ test("a reserved identity followed by quote expiry before proving is a definitiv
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE-DETAIL/);
   } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
 });
+
+for (const rejected of [false, true]) {
+  test(`swap ${rejected ? "rejection" : "timeout"} preserves sanitized transaction evidence`, async () => {
+    const root = mkdtempSync(join(tmpdir(), "shield-swap-error-"));
+    const store = new TradingStore(root, "test-password-long-enough", true);
+    const error = rejected ? new FinalizeRevertError("at1swap", { feeTransactionId: "at1fee", cause: new Error("PRIVATE-DETAIL") })
+      : new TransactionTimeoutError({ transactionId: "at1swap", timeoutMs: 1, cause: new Error("PRIVATE-DETAIL") });
+    const proving: ProvingConfig = { mode: "delegated", execute: async () => { throw error; } };
+    trackSwapSubmission(proving);
+    const session = { submissionTracked: true, client: {
+      swap: () => executeContract({ account: { type: "local", sign() {} }, proving } as unknown as Client,
+        { program: "shield_swap.aleo", function: "swap", inputs: [] }),
+    }, identities: { load: async () => [], save: async () => {} } } as unknown as AleoSession;
+    try {
+      const backend = new VeilBackend(store, async () => session);
+      const quote: SavedQuote = { id: "q", kind: "swap", profile, scope: "", createdAt: 0, expiresAt: 1, plan: offer, summary: {} };
+      const result = await backend.execute(quote, { operationId: "o", checkpoint: value => store.set("checkpoint", value) });
+      assert.equal(result.status, rejected ? "failed" : "uncertain");
+      assert.equal(result.result.transactionId, "at1swap");
+      assert.equal(result.result.feeTransactionId, rejected ? "at1fee" : undefined);
+      assert.equal(store.get<{ transactionId: string }>("checkpoint")?.transactionId, "at1swap");
+      assert.doesNotMatch(JSON.stringify(result), /PRIVATE-DETAIL/);
+    } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+  });
+}
 
 test("balances include underlying public bridge tokens and native credits without double counting", async () => {
   const root = mkdtempSync(join(tmpdir(), "shield-balances-"));

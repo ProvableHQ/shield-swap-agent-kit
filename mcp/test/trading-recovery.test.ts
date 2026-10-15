@@ -20,8 +20,12 @@ function fixture() {
     load: async () => store.get<BlindedIdentityRecord[]>("test:identities")!,
     save: async (records: BlindedIdentityRecord[]) => { store.set("test:identities", records); },
   };
-  let accepted = false, historyRequests = 0, depth = 0;
+  let accepted = false, historyRequests = 0, depth = 0, rejected = false;
   const rpc = { request: async ({ method, params }: { method: string; params: Record<string, unknown> }) => {
+    if (method === "getConfirmedTransaction") {
+      if (!rejected) throw new Error("not found");
+      return { status: "rejected", transaction: { id: "at1fee" } };
+    }
     if (method === "getProgramCallsPaginated") {
       historyRequests++;
       const page = Number(params.cursorBlockNumber ?? 0);
@@ -34,7 +38,7 @@ function fixture() {
     }] } };
     throw new Error("unexpected RPC");
   } } as unknown as Client;
-  const session = { identities, client: {
+  const session = { identities, publicClient: rpc, client: {
     reconcileSwapHistory: (params: { maxPages?: number }) => reconcileSwapHistory(rpc, { ...params, store: identities }),
     getUnclaimedSwaps: async () => ({ swaps: [], unresolvable: [] }),
   } } as unknown as AleoSession;
@@ -42,7 +46,7 @@ function fixture() {
   const quote: SavedQuote = { id: "q", kind: "swap", profile, scope: "testnet:aleo1test:shield_swap.aleo", createdAt: 0, expiresAt: 0, plan: {}, summary: {} };
   const operation: Operation = { id: "o", kind: "swap", profileId: "alice", scope: quote.scope, quoteId: "q", requestKey: "r",
     status: "uncertain", result: {}, checkpoint: { phase: "reserved", counter: 0 }, createdAt: 0, updatedAt: 0 };
-  return { backend, quote, operation, identities, accept: () => { accepted = true; }, depth: (value: number) => { depth = value; },
+  return { backend, quote, operation, identities, accept: () => { accepted = true; }, reject: () => { rejected = true; }, depth: (value: number) => { depth = value; },
     requests: () => historyRequests, close: () => { store.close(); rmSync(root, { recursive: true, force: true }); } };
 }
 test("recovery discovers a later accepted claim after an earlier empty history scan", async () => {
@@ -64,5 +68,19 @@ test("repeated recovery expands incomplete history coverage beyond ten pages", a
     assert.equal(first.status, "uncertain");
     assert.equal((first.result.historyRecovery as { complete: boolean }).complete, false);
     assert.equal((await f.backend.reconcile(f.quote, f.operation)).status, "complete");
+  } finally { f.close(); }
+});
+
+test("swap reconciliation resolves a confirmed rejection without replaying its deposit", async () => {
+  const f = fixture();
+  try {
+    f.operation.checkpoint = { phase: "submitting", counter: 0, transactionId: "at1swap" };
+    assert.equal((await f.backend.reconcile(f.quote, f.operation)).status, "uncertain");
+    f.reject();
+    const result = await f.backend.reconcile(f.quote, f.operation);
+    assert.equal(result.status, "failed");
+    assert.equal(result.result.transactionId, "at1swap");
+    assert.equal(result.result.feeTransactionId, "at1fee");
+    await assert.rejects(f.backend.resume(f.quote, f.operation, { operationId: "o", checkpoint() {} }), /cannot be resubmitted/);
   } finally { f.close(); }
 });

@@ -175,6 +175,14 @@ State is AES-256-GCM encrypted before SQLite writes it. Quotes, profiles, claim 
 
 Local encryption protects data at rest. An unlocked server can use configured signing credentials. The Veil integration uses a remote scanner and delegated prover, whose service boundaries still apply. `configure --fee-master` requests fee sponsorship when the prover has granted that capability; `configure --no-fee-master` restores wallet-funded fees. This setting is also available at setup and is shown by `get_config`. Changing it invalidates earlier quotes, so finish pending operations first.
 
+### Claim failures and recovery
+
+Claims checkpoint preparation separately from entry into the SDK's proving/submission adapter. A failure before that boundary leaves the original claim operation `pending`, with `nextAction: "claim"` and per-item `lastFailure.code: "not_submitted"`. Correct the cause, then explicitly call `resume_operation` with that operation ID. Resume rechecks permissions and claimability and skips claims already completed in the batch.
+
+SDK confirmation timeouts retain their public transaction ID; confirmed rejections also retain the fee transaction ID when supplied. A confirmed claim rejection leaves the claim pending for an explicit resume, with `lastFailure.code: "transaction_rejected"`. A confirmed swap rejection ends that operation as failed; recovery never repeats its deposit. Fees may already have been consumed.
+
+After a lost response or restart, `get_operation_status` reconciles history and checks known transaction IDs for confirmed rejection. An absent transaction, RPC error, or accepted transaction without sufficient claim-history evidence does not authorize another claim. Such claims remain uncertain and block unrelated writes. Older ambiguous checkpoints without submission-boundary evidence or a transaction ID remain conservative; this update does not infer that those transactions failed.
+
 ## Current limitations
 
 - Privy/Dynamic EVM/Solana adapters are checked offline. Production provider authentication, wallet policies, and funded hosted-wallet execution have not yet been validated.
@@ -208,6 +216,9 @@ After installing the tarball into an independent project, run:
 
 ```sh
 node scripts/smoke-installed.mjs /absolute/path/to/independent-project
+node scripts/smoke-installed-recovery.mjs /absolute/path/to/independent-project
 ```
+
+The recovery smoke requires Node 22.15 or newer for module hooks. It runs the installed CLI over MCP with simulated SDK outcomes, checking preparation failure, partial batches, uncertain submission, confirmed rejection, and explicit resume across three process restarts. It uses disposable test wallets and makes no network calls or transactions.
 
 This checks the installed SDK/WASM files, local key import, encrypted state, guided profile reuse, structured readiness, all 20 tool schemas over stdio, and restart. No real wallet material belongs in this repository.

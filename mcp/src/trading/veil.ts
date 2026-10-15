@@ -1,12 +1,35 @@
 import type { BlindedIdentityRecord, SwapQuote } from "@provablehq/shield-swap-sdk";
+import { FinalizeRevertError, TransactionTimeoutError, getConfirmedTransaction } from "@provablehq/veil-core";
 import { BridgeBackend } from "./bridge";
 import { TradingStore } from "./store";
-import { createSessionFactory, swapContext, walletScope, type AleoSession, type SessionFactory, type SwapSubmission } from "./session";
+import { claimContext, createSessionFactory, swapContext, walletScope, type AleoSession, type SessionFactory, type SwapSubmission } from "./session";
 import { TradingError, type ExecutionContext, type Kind, type Operation, type Profile, type Progress, type SavedQuote, type Summary, type TradingBackend } from "./types";
 
-type ClaimItem = { swapId: string; status: "pending" | "submitting" | "claimed" | "uncertain"; transactionId?: string; amountOut?: string; amountRemaining?: string };
+type Failure = { code: "not_submitted" | "transaction_rejected"; transactionId?: string; feeTransactionId?: string };
+type ClaimItem = { swapId: string; status: "pending" | "preparing" | "submitting" | "claimed" | "uncertain"; transactionId?: string; amountOut?: string; amountRemaining?: string; lastFailure?: Failure };
 type ClaimPlan = { swapIds: string[] };
-type SwapCheckpoint = { submissionBoundary?: number; phase?: string; counter?: number; swapId?: string; transactionId?: string };
+type SwapCheckpoint = { submissionBoundary?: number; phase?: string; counter?: number; swapId?: string; transactionId?: string; feeTransactionId?: string };
+
+function transactionId(value: unknown): string | undefined {
+  return typeof value === "string" && /^at1[a-z0-9]{1,128}$/.test(value) ? value : undefined;
+}
+// Only documented SDK error fields cross the operation boundary, never messages,
+// causes, handles or arbitrary error properties.
+function transactionEvidence(error: unknown): { transactionId?: string; feeTransactionId?: string } {
+  if (!(error instanceof TransactionTimeoutError) && !(error instanceof FinalizeRevertError)) return {};
+  return { transactionId: transactionId(error.transactionId),
+    ...(error instanceof FinalizeRevertError ? { feeTransactionId: transactionId(error.feeTransactionId) } : {}) };
+}
+async function confirmedRejection(session: AleoSession, id?: string): Promise<Failure | undefined> {
+  if (!id) return;
+  try {
+    const confirmed = await getConfirmedTransaction(session.publicClient, { id });
+    if (confirmed.status === "rejected") return { code: "transaction_rejected", transactionId: id,
+      feeTransactionId: transactionId(confirmed.transaction.id) };
+  } catch {
+    // Transport errors and not-found responses never establish rejection.
+  }
+}
 export class VeilBackend implements TradingBackend {
   private session: SessionFactory;
   private bridge: BridgeBackend;
@@ -46,7 +69,16 @@ export class VeilBackend implements TradingBackend {
     try {
       handle = await swapContext.run(state, () => session.client.swap({ quote: quote.plan as SwapQuote }));
     } catch (error) {
-      if (!session.submissionTracked || state.submissionStarted) throw error;
+      if (!session.submissionTracked || state.submissionStarted) {
+        const evidence = transactionEvidence(error);
+        const rejected = error instanceof FinalizeRevertError;
+        const checkpoint = { ...state.checkpoint, ...evidence, ...(rejected ? { phase: "rejected" } : {}) };
+        context.checkpoint(checkpoint);
+        return { status: rejected ? "failed" : "uncertain", checkpoint,
+          result: { ...evidence, error: { code: rejected ? "transaction_rejected" : "submission_uncertain",
+            message: rejected ? "The swap transaction was rejected. Inspect its fee effects before a newly authorized attempt."
+              : "The submission result is uncertain. Reconcile this operation before any retry." } } };
+      }
       return { status: "failed", result: { error: { code: "not_submitted",
         message: "Swap preparation failed before proving or submission. Check balances and request a fresh quote." } },
         checkpoint: state.checkpoint };
@@ -169,6 +201,9 @@ export class VeilBackend implements TradingBackend {
     if (quote.kind === "claim") return this.reconcileClaims(quote, operation, session);
     const checkpoint = operation.checkpoint as SwapCheckpoint | undefined;
     if (!checkpoint || checkpoint.phase === "preparing" || (checkpoint.submissionBoundary === 1 && checkpoint.phase === "reserved")) return { status: "failed", result: { error: { code: "not_submitted", message: "Execution did not reach the proving or submission boundary." } } };
+    const rejection = checkpoint.phase === "rejected" ? { code: "transaction_rejected", transactionId: checkpoint.transactionId, feeTransactionId: checkpoint.feeTransactionId }
+      : await confirmedRejection(session, checkpoint.transactionId);
+    if (rejection) return { status: "failed", result: { ...rejection, error: rejection } };
     const historyRecovery = await this.reconcileHistory(session, quote.profile);
     const records = await session.identities.load();
     const record = records.find(item => checkpoint.swapId ? item.swapId === checkpoint.swapId : item.counter === checkpoint.counter);
@@ -178,28 +213,52 @@ export class VeilBackend implements TradingBackend {
     const found = pending.swaps.find(swap => swap.swapId === (record?.swapId ?? checkpoint.swapId));
     if (found) return { status: "submitted", result: { historyRecovery, swapId: found.swapId, transactionId: record?.handle?.transactionId ?? checkpoint.transactionId,
       claimable: found.claimable, amountOut: found.output.amount_out.toString(), nextAction: "claim_when_ready" } };
-    return { status: record?.handle || checkpoint.transactionId ? "pending" : "uncertain",
+    // A timeout can carry a transaction ID without proving acceptance. Keep
+    // that wallet blocked until chain/history evidence resolves the outcome.
+    return { status: record?.handle || checkpoint.phase === "submitted" ? "pending" : "uncertain",
       result: { historyRecovery, swapId: record?.swapId ?? checkpoint.swapId, transactionId: record?.handle?.transactionId ?? checkpoint.transactionId, nextAction: "wait" } };
   }
 
   private async claim(quote: SavedQuote, context: ExecutionContext, prior: ClaimItem[] = []): Promise<Progress> {
-    const { client } = await this.session(quote.profile);
+    const session = await this.session(quote.profile);
+    const { client } = session;
     const items: ClaimItem[] = (quote.plan as ClaimPlan).swapIds.map(swapId => prior.find(item => item.swapId === swapId) ?? { swapId, status: "pending" });
     for (const item of items) {
       if (item.status === "claimed") continue;
       if (item.status === "uncertain" || item.status === "submitting") return { status: "uncertain", result: { claims: items, nextAction: "reconcile" } };
       const owed = (await client.getUnclaimedSwaps()).swaps.find(swap => swap.swapId === item.swapId);
-      if (!owed?.handle) return { status: "pending", result: { claims: items, nextAction: "wait" }, checkpoint: { claims: items } };
-      item.status = "submitting";
+      if (!owed?.handle || !owed.claimable) return { status: "pending", result: { claims: items, nextAction: "wait" }, checkpoint: { claims: items } };
+      const handle = owed.handle;
+      // New tracked claims distinguish preparation from a call that can broadcast.
+      // Legacy/untracked submitting checkpoints remain ambiguous on recovery.
+      item.status = session.submissionTracked ? "preparing" : "submitting";
+      delete item.transactionId;
       context.checkpoint({ claims: items });
+      let submissionStarted = !session.submissionTracked;
       try {
-        const result = await client.claimSwapOutput({ handle: owed.handle });
+        const result = await claimContext.run({
+          beforeSubmit: () => {
+            item.status = "submitting";
+            context.checkpoint({ claims: items });
+            submissionStarted = true;
+          },
+          submitted: id => {
+            item.transactionId = transactionId(id);
+            context.checkpoint({ claims: items });
+          },
+        }, () => client.claimSwapOutput({ handle }));
         Object.assign(item, { status: "claimed", transactionId: result.transactionId, amountOut: result.amountOut.toString(), amountRemaining: result.amountRemaining.toString() });
         context.checkpoint({ claims: items });
-      } catch {
-        item.status = "uncertain";
+      } catch (error) {
+        const evidence = transactionEvidence(error);
+        if (evidence.transactionId) item.transactionId = evidence.transactionId;
+        if (!submissionStarted || error instanceof FinalizeRevertError) {
+          item.status = "pending";
+          item.lastFailure = { code: submissionStarted ? "transaction_rejected" : "not_submitted", ...evidence };
+        } else item.status = "uncertain";
         context.checkpoint({ claims: items });
-        return { status: "uncertain", result: { claims: items, nextAction: "reconcile" } };
+        return { status: item.status === "pending" ? "pending" : "uncertain",
+          result: { claims: items, nextAction: item.status === "pending" ? "claim" : "reconcile" }, checkpoint: { claims: items } };
       }
     }
     return { status: "complete", result: { claims: items }, checkpoint: { claims: items } };
@@ -209,12 +268,19 @@ export class VeilBackend implements TradingBackend {
     const historyRecovery = await this.reconcileHistory(session, quote.profile);
     const records = await session.identities.load();
     const previous = (operation.checkpoint as { claims?: ClaimItem[] } | undefined)?.claims ?? [];
-    const items = (quote.plan as ClaimPlan).swapIds.map(swapId => {
+    const items: ClaimItem[] = [];
+    for (const swapId of (quote.plan as ClaimPlan).swapIds) {
       const record = records.find(record => record.swapId === swapId);
       const prior = previous.find(item => item.swapId === swapId);
-      return record?.claim ? { swapId, status: "claimed" as const, transactionId: record.claim.transactionId, amountOut: record.claim.amountOut, amountRemaining: record.claim.amountRemaining }
-        : prior ?? { swapId, status: "pending" as const };
-    });
+      let item: ClaimItem = record?.claim ? { swapId, status: "claimed", transactionId: record.claim.transactionId, amountOut: record.claim.amountOut, amountRemaining: record.claim.amountRemaining }
+        : prior ?? { swapId, status: "pending" };
+      if (item.status === "preparing") item = { ...item, status: "pending", lastFailure: { code: "not_submitted" } };
+      if (item.status === "submitting" || item.status === "uncertain") {
+        const rejection = await confirmedRejection(session, item.transactionId);
+        if (rejection) item = { ...item, status: "pending", lastFailure: rejection };
+      }
+      items.push(item);
+    }
     const uncertain = items.some(item => item.status === "submitting" || item.status === "uncertain");
     const complete = items.every(item => item.status === "claimed");
     return { status: complete ? "complete" : uncertain ? "uncertain" : "pending",
