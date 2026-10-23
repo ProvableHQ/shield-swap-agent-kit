@@ -11,8 +11,8 @@ test("an unconfigured server supports discovery and setup without creating a wal
   try {
     await Promise.all([server.connect(a), client.connect(b)]);
     const names = (await client.listTools()).tools.map(tool => tool.name);
-    assert.equal(names.length, 20);
-    for (const name of ["quote", "execute", "swap_history", "claim_unclaimed_swaps", "bridge_status", "recover_bridge_transactions"]) assert.ok(names.includes(name));
+    assert.equal(names.length, 24);
+    for (const name of ["quote", "execute", "swap_history", "claim_unclaimed_swaps", "bridge_status", "recover_bridge_transactions", "get_record_inventory", "plan_record_inventory", "rebalance_record_inventory", "reconcile_record_inventory"]) assert.ok(names.includes(name));
     assert.equal(names.includes("rebalance_swap_inventory"), false);
     const setup = await client.callTool({ name: "setup", arguments: {} });
     assert.equal((setup.structuredContent as { checks: { account: { status: string } } }).checks.account.status, "missing");

@@ -41,8 +41,11 @@ configure changes trusted terminal permissions:
   --allow-swaps / --deny-swaps
   --allow-claims / --deny-claims
   --allow-bridges / --deny-bridges
+  --allow-inventory / --deny-inventory
+                          Record inventory joins and splits (rebalance, rebroadcast)
   --swap-limit TOKEN=RAW   Per-operation base-unit input cap (repeatable)
   --bridge-limit ASSET=RAW Per-operation base-unit input cap (repeatable)
+  --inventory-fee-limit N  Total network fee in microcredits per rebalance; 0 disables
   --max-slippage-bps N     Maximum swap slippage (0–1000)
   --evm-key-env NAME --evm-rpc-url URL
   --solana-key-env NAME --solana-rpc-url URL
@@ -67,8 +70,9 @@ export function argumentsFor(argv: string[]) {
       "allow-swaps": { type: "boolean" }, "deny-swaps": { type: "boolean" },
       "allow-claims": { type: "boolean" }, "deny-claims": { type: "boolean" },
       "allow-bridges": { type: "boolean" }, "deny-bridges": { type: "boolean" },
+      "allow-inventory": { type: "boolean" }, "deny-inventory": { type: "boolean" },
       "swap-limit": { type: "string", multiple: true }, "bridge-limit": { type: "string", multiple: true },
-      "max-slippage-bps": { type: "string" },
+      "inventory-fee-limit": { type: "string" }, "max-slippage-bps": { type: "string" },
       "evm-key-env": { type: "string" }, "evm-rpc-url": { type: "string" },
       "solana-key-env": { type: "string" }, "solana-rpc-url": { type: "string" },
       "evm-wallet-env": { type: "string" }, "solana-wallet-env": { type: "string" },
@@ -76,7 +80,7 @@ export function argumentsFor(argv: string[]) {
     const command = parsed.positionals[0] ?? "serve";
     if (parsed.positionals.length > 1 || !["setup", "configure", "serve"].includes(command)) throw new Error();
     const allowed = command === "setup" ? new Set(["help", "state-dir", "profile", "network", "guided", "key-env", "store-key", "generate", "network-url", "api-url", "fee-master"])
-      : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "swap-limit", "bridge-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
+      : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "allow-inventory", "deny-inventory", "swap-limit", "bridge-limit", "inventory-fee-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
       : new Set(["help", "state-dir"]);
     if (Object.keys(parsed.values).some(key => !allowed.has(key))) throw new Error();
     return { command, values: parsed.values };
@@ -129,7 +133,7 @@ function profileId(options: Options): string {
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) throw new TradingError("invalid_profile", "Use 1–64 letters, digits, hyphens or underscores for a profile.");
   return id;
 }
-const readOnlyPolicy = (): Policy => ({ swaps: false, claims: false, bridges: false, maxSlippageBps: 100, swapLimits: {}, bridgeLimits: {} });
+const readOnlyPolicy = (): Policy => ({ swaps: false, claims: false, bridges: false, inventory: false, maxSlippageBps: 100, swapLimits: {}, bridgeLimits: {} });
 
 export async function setup(options: Options, suppliedPassword?: string): Promise<Record<string, unknown>> {
   let id = profileId(options);
@@ -219,12 +223,17 @@ export async function configure(options: Options): Promise<Record<string, unknow
     if (!profile) throw new TradingError("profile_missing", "Profile does not exist; run setup first.");
     const [evm, solana] = await Promise.all([localBridgeWallet("evm", options), localBridgeWallet("solana", options)]);
     if (solana && profile.network !== "mainnet") throw new TradingError("unsupported_network", "The SDK registry has no Solana testnet bridge route.");
-    const policy = structuredClone(profile.policy);
-    for (const permission of ["swaps", "claims", "bridges"] as const) {
+    // Profiles written before record management carry no inventory fields.
+    const policy = structuredClone({ inventory: false, ...profile.policy });
+    for (const permission of ["swaps", "claims", "bridges", "inventory"] as const) {
       const allow = options[("allow-" + permission) as "allow-swaps"];
       const deny = options[("deny-" + permission) as "deny-swaps"];
       if (allow && deny) throw new TradingError("invalid_arguments", "Cannot both allow and deny the same permission.");
       if (allow || deny) policy[permission] = Boolean(allow);
+    }
+    if (options["inventory-fee-limit"] !== undefined) {
+      if (!/^(0|[1-9][0-9]{0,19})$/.test(options["inventory-fee-limit"])) throw new TradingError("invalid_limit", "The inventory fee limit must be a nonnegative integer in microcredits; zero disables rebalancing.");
+      policy.inventoryFeeLimit = options["inventory-fee-limit"];
     }
     for (const [option, target] of [["swap-limit", policy.swapLimits], ["bridge-limit", policy.bridgeLimits]] as const) {
       for (const entry of options[option] ?? []) {

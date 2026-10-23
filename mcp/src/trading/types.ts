@@ -19,6 +19,10 @@ export type Policy = {
   swaps: boolean;
   claims: boolean;
   bridges: boolean;
+  /** Record inventory maintenance (joins and splits). Absent in profiles written before 0.14.0; treated as false. */
+  inventory?: boolean;
+  /** Total network-fee ceiling in microcredits for one inventory rebalance operation; absent or zero prevents execution. */
+  inventoryFeeLimit?: string;
   maxSlippageBps: number;
   swapLimits: Record<string, string>;
   bridgeLimits: Record<string, string>;
@@ -36,7 +40,7 @@ export type Profile = {
   solana?: HostedWallet;
   policy: Policy;
 };
-export type Kind = "swap" | "bridge" | "claim";
+export type Kind = "swap" | "bridge" | "claim" | "inventory";
 export type Status = "queued" | "running" | "submitted" | "pending" | "complete" | "uncertain" | "failed";
 export type Summary = Record<string, unknown>;
 export type SavedQuote = {

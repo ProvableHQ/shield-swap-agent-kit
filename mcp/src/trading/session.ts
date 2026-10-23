@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { LocalAccount, PublicClient, WalletClient, ProvingConfig } from "@provablehq/veil-core";
 import type { BlindedIdentityRecord, BlindedIdentityStore, ShieldSwapActions } from "@provablehq/shield-swap-sdk";
 import { TradingStore } from "./store";
+import { createRecordInventoryStore } from "./inventory";
 import { TradingError, type ExecutionContext, type Profile, type SecretRef } from "./types";
 
 export type AleoSession = {
@@ -23,6 +24,9 @@ export const claimContext = new AsyncLocalStorage<{
   beforeSubmit(): void;
   submitted(transactionId: string): void;
 }>();
+// Inventory maintenance submits several transactions. Record each proved
+// transaction ID before its broadcast so a crash mid-plan leaves evidence.
+export const inventoryContext = new AsyncLocalStorage<{ prepared(transactionId: string): void }>();
 export function trackSwapSubmission(proving: ProvingConfig): void {
   const execute = proving.execute;
   if (!execute) throw new TradingError("proving_unavailable", "The configured SDK cannot submit Aleo transactions.");
@@ -36,7 +40,14 @@ export function trackSwapSubmission(proving: ProvingConfig): void {
     }
     const claim = claimContext.getStore();
     claim?.beforeSubmit();
-    const result = await execute(options);
+    const inventory = inventoryContext.getStore();
+    const onProgress = options.onProgress;
+    // Managed writes always supply a progress handler; only observe an existing
+    // one so the SDK's broadcast behavior for unmanaged calls stays unchanged.
+    const result = await execute(inventory && onProgress ? { ...options, onProgress: async event => {
+      if (event.type === "transaction-prepared") inventory.prepared(event.transactionId);
+      await onProgress(event);
+    } } : options);
     // Keep the confirmed ID even if later SDK bookkeeping or our result write fails.
     claim?.submitted(result.transactionId);
     return result;
@@ -62,8 +73,12 @@ export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv
         ]);
         const network = await loadNetwork(profile.network);
         const key = resolveSecret(profile.key, store, env);
+        // Shared record reservations use the same encrypted state as every
+        // other document, so swaps, claims and inventory maintenance from any
+        // process on this state directory see each other's held inputs.
         const pair = network.createAleoClient({ privateKey: key, networkUrl: profile.networkUrl,
-          provingMode: "delegated", useFeeMaster: profile.useFeeMaster ?? false });
+          provingMode: "delegated", useFeeMaster: profile.useFeeMaster ?? false,
+          recordManagement: { enabled: true, store: createRecordInventoryStore(store), chainId: "aleo:" + profile.network } });
         if (pair.account.address !== profile.address) throw new TradingError("wallet_mismatch", "Configured key does not match this profile's address.");
         if (!pair.walletClient.proving) throw new TradingError("proving_unavailable", "The configured SDK has no proving adapter.");
         trackSwapSubmission(pair.walletClient.proving);

@@ -62,7 +62,7 @@ async function inspectOnboarding(
     completedCheckpoints: ["tools_available"],
     nextAction: stateExists && !runtime ? "unlock_account" : "configure_account",
     steps: ["Configure an Aleo account for Shield Swap", "Fund your account"],
-    deferredTools: ["rebalance_swap_inventory"],
+    deferredTools: [],
   };
   if (!runtime) return report;
   const profileId = input.profileId ?? runtime.store.get<Summary>("settings")?.defaultProfile ?? "default";
