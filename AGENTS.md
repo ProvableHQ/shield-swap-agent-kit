@@ -28,7 +28,8 @@ For inspection without execution, use [discover pools and get quotes](context/sh
 | Submission or claim outcome is unknown | [Recover the original operation](context/shield-swap-setup/recover-swaps.md) |
 | Inspect this account's swaps or accounting | [Swap history](context/shield-swap-setup/swap-history.md) |
 | Read pool-wide market activity | [Pool trade feed](context/shield-swap-setup/discover-pools-and-get-quotes.md#read-market-trades) |
-| Prepare records for repeated trading | [UTXO management](context/shield-swap-setup/swap-utxo-management.md) |
+| Prepare records for repeated trading, or inspect, plan, and rebalance private record inventory | [UTXO management](context/shield-swap-setup/swap-utxo-management.md) |
+| Submit several swaps at once and claim each output | [Concurrent swaps](context/shield-swap-setup/concurrent-swaps.md) |
 | Diagnose a broken environment or operation | [Diagnostics](context/shield-swap-setup/diagnose-environment.md) / [error handling](context/shield-swap-setup/error-handling.md) |
 | Integrate a terminal or chat bot | [Terminal integration](context/decisions/trade/terminal-integration.md) / [bot integration](context/decisions/trade/bot-integration.md) |
 | Build a one-account bot from scratch | [One-account bot](context/decisions/trade/bot-integration.md#build-a-one-account-bot): native SDK or MCP |
@@ -47,6 +48,7 @@ Load only the pages relevant to the task. The [Rust guide](context/toolchains/ru
 - A submission timeout is an unknown result. Inspect the original operation and persistent state before retrying; do not launch another swap to recover a missing response.
 - Preserve an executable quote's route, expiry, and minimum output. Distinguish human decimal quote inputs from base-unit transaction fields using the installed SDK's documentation.
 - Discover token metadata, pools, and liquidity. Do not invent identifiers or assume a public balance includes private records.
+- A swap spends one covering private record. Record management (SDK 0.14.0, Python 0.8.0, CLI 0.14.0, AgentKit MCP) can inspect, plan, and rebalance records and reserve inputs across participating writers that share one store; it is opt-in, and reshaping submits its own transactions.
 - Public-chain confidentiality does not guarantee privacy from the chosen wallet, scanner, prover, or API operator. Use the documented service and custody boundaries when explaining privacy.
 
 The [Shield Swap documentation](https://shield.fi/docs) supplies the deeper product and protocol reference. Documentation retrieval does not itself execute an operation or authorize spending.

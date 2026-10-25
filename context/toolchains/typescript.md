@@ -8,6 +8,7 @@ Use Veil for TypeScript applications and custom trading scripts. Choose the clie
 | React application with a connected wallet | `@provablehq/veil-aleo-react-hooks`, supported wallet adapters, and `@provablehq/shield-swap-sdk` |
 | Non-React application with a connected wallet | `@provablehq/veil-aleo-wallet-adapter` and `@provablehq/shield-swap-sdk` |
 | Script extending a CLI session | `@provablehq/shield-swap-cli/session`; see [CLI session reuse](cli.md#reuse-a-cli-account-from-a-script) |
+| Record inventory and concurrent swaps with a durable journal | The local-key packages plus `@provablehq/shield-swap-cli/storage` for its SQLite record store; Node.js 22.13 or newer |
 
 ## Install for a local-key application
 
@@ -34,6 +35,8 @@ npx tsx filename.mts
 [Configure Shield Swap](../shield-swap-setup/configure-shield-swap.md) adds an `authenticate.mts` module. Funding and trading scripts import that module so a new process establishes its own DEX session.
 
 The default Provable edge gateway handles proving and record scanning without consumer registration. DEX authentication is a separate signed challenge. Preserve the same client and store while a process is running; rebuilding them for every call adds setup work and risks using different state.
+
+Since SDK 0.14.0, wallet clients also carry record inventory methods (`getRecordInventory`, `planRecordInventory`, `rebalanceRecordInventory`, `reconcileRecordInventory`) and the DEX actions add `planInventory` and `rebalanceInventory`. Reservations and recovery stay disabled until the client is created with `recordManagement: { enabled: true, store, chainId }`; [UTXO management](../shield-swap-setup/swap-utxo-management.md#veil--managed-session-and-inventory-methods) supplies that `managed-session.mts`. Use it for every script that trades or maintains an account whose records are coordinated, and keep `session.mts` for single-writer scripts that do not need reservations.
 
 The local-key recipes do not apply to a browser wallet. A browser uses the connected wallet's account and signing path, not a private-key environment variable or Node file store. Use the [wallet integration reference](https://github.com/ProvableHQ/veil/tree/main/packages/wallet-adapter) for that client; the [SDK reference](https://github.com/ProvableHQ/veil/tree/main/packages/shield-swap) documents compatible DEX actions.
 

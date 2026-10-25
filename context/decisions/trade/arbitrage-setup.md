@@ -19,7 +19,7 @@ Stop when the size cap or the minimum edge is missing. Do not invent either valu
 
 ## Plumbing on testnet
 
-Reuse the selected account or configure the [account](../../shield-swap-setup/configure-account.md) and [Shield Swap access](../../shield-swap-setup/configure-shield-swap.md) when needed. Keep one signer and one writer that spends records. Native clients use the SDK durable store; the standalone MCP uses its encrypted state directory.
+Reuse the selected account or configure the [account](../../shield-swap-setup/configure-account.md) and [Shield Swap access](../../shield-swap-setup/configure-shield-swap.md) when needed. Keep one signer and one writer that spends records. Native clients use the SDK durable store; the standalone MCP uses its encrypted state directory. Leave record reshaping and concurrent legs out of this setup; when the bot later needs several covering records, prepare them through [UTXO management](../../shield-swap-setup/swap-utxo-management.md).
 
 For MCP, follow [quote on an existing profile](../../toolchains/mcp.md#quote-on-an-existing-profile) on the selected testnet profile. Apply the requested size cap and maximum quote age before comparing prices. `quote` returns Shield Swap terms; it does not enforce the strategy's minimum edge or obtain a second-venue quote.
 

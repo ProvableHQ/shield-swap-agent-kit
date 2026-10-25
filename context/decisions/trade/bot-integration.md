@@ -6,7 +6,7 @@ For an operational **Connect trading tools** journey, verify the product support
 
 ## Build a one-account bot
 
-Use this route for a new bot with one account. Read it before copying a larger bot. Keep one signer and one writer that spends records. Submit one swap, claim that same operation, and recover an unknown result before another write. Choose the native SDK or MCP option below according to the selected runtime and signer. A refund or partial fill is the outcome of that operation. Report it as that outcome.
+Use this route for a new bot with one account. Read it before copying a larger bot. Keep one signer and one writer that spends records. Submit one swap, claim that same operation, and recover an unknown result before another write. Add simultaneous same-token swaps inside that one writer only after it works, through the SDK's record management in [concurrent swaps](../../shield-swap-setup/concurrent-swaps.md). Choose the native SDK or MCP option below according to the selected runtime and signer. A refund or partial fill is the outcome of that operation. Report it as that outcome.
 
 ### Native SDK option
 
@@ -16,7 +16,7 @@ Leave these production tactics out:
 
 - an application database
 - provisional operation ids beyond the SDK store
-- a custom wallet lock
+- a custom wallet lock or record journal beyond the SDK's record management store
 - reservations across multiple strategies
 - race classification, plan reuse, or record-cap clipping
 - a deployment layout
@@ -42,7 +42,7 @@ Use a native Veil/Python client in a long-lived worker, or an available MCP tool
 
 The worker owns the operation through claim and recovery. Losing a chat connection or HTTP request must not cancel bookkeeping or launch a replacement swap. Reply with submitted, awaiting output, claiming, or completed status according to the actual evidence; a transaction ID alone is not a completed fill.
 
-Isolate users' signers and stores. Multiple strategies for one account need shared input-record reservations; separate journals do not make shared records safe to spend concurrently.
+Isolate users' signers and stores. Multiple strategies for one account must share one record management store and chain identity so their reservations exclude each other's inputs; separate journals do not make shared records safe to spend concurrently. Prepare enough covering records with a reviewed inventory plan before enabling parallel strategies; see [UTXO management](../../shield-swap-setup/swap-utxo-management.md).
 
 ## Verify before enabling writes
 

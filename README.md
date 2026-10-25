@@ -40,9 +40,9 @@ An introductory prompt shows the screen again even after account setup. The skil
 
 ## Current contents
 
-This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows.
+This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history, record inventory management and concurrent swaps, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows. The record management recipes follow Shield Swap SDK 0.14.0 (Veil), Python SDK 0.8.0, and CLI 0.14.0.
 
-The [draft standalone MCP server](mcp/README.md) provides terminal wallet setup, encrypted state, stdio transport, and 20 swap, bridge, and recovery tools. Its README distinguishes completed live checks from remaining validation. The kit does not include its own trading CLI, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. CLI recipes assume the CLI is installed and use `shield-swap` directly; selecting an SDK or MCP path does not require installing the CLI.
+The [draft standalone MCP server](mcp/README.md) provides terminal wallet setup, encrypted state, stdio transport, and 24 swap, bridge, record inventory, and recovery tools. Its README distinguishes completed live checks from remaining validation. The kit does not include its own trading CLI, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. CLI recipes assume the CLI is installed and use `shield-swap` directly; selecting an SDK or MCP path does not require installing the CLI.
 
 ## Layout
 
@@ -81,6 +81,7 @@ shield-swap-setup/
   swap-history.md
   recover-swaps.md
   swap-utxo-management.md
+  concurrent-swaps.md
   diagnose-environment.md
   error-handling.md
 ```
