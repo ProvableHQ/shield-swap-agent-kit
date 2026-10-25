@@ -28,8 +28,11 @@ export class TradingRuntime {
     const profile = this.profile(profileId);
     const priced = await withWalletLocks(this.store, [profile], () => this.backend.quote(kind, profile, input));
     const now = Date.now();
+    // An inventory plan is a snapshot that execution rechecks input by input,
+    // so it may be reviewed longer than a priced swap quote.
+    const lifetime = kind === "inventory" ? 600_000 : 60_000;
     const quote: SavedQuote = { id: randomUUID(), kind, profile, scope: this.scope(profile),
-      createdAt: now, ...priced, expiresAt: Math.min(now + 60_000, priced.expiresAt ?? Infinity) };
+      createdAt: now, ...priced, expiresAt: Math.min(now + lifetime, priced.expiresAt ?? Infinity) };
     if (kind === "swap") {
       if (BigInt(String(priced.summary.minOut ?? "0")) <= 0n) throw new TradingError("unquoted_swap", "No executable minimum output is available for this route.");
     }
@@ -52,6 +55,12 @@ export class TradingRuntime {
     const p = profile.policy;
     if (quote.kind === "claim") {
       if (!p.claims) throw new TradingError("permission_required", "Claim permission must be enabled in terminal setup.");
+      return;
+    }
+    if (quote.kind === "inventory") {
+      if (!p.inventory) throw new TradingError("permission_required", "Inventory maintenance permission must be enabled in terminal setup.");
+      const limit = p.inventoryFeeLimit;
+      if (!limit || !/^\d+$/.test(limit) || BigInt(limit) <= 0n) throw new TradingError("spend_limit", "A positive inventory fee limit must be configured in terminal setup.");
       return;
     }
     const bridge = quote.kind === "bridge";

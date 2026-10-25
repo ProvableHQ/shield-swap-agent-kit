@@ -30,6 +30,8 @@ Run commands from the same trading directory: state is relative to the working d
 | `swap ... --json` | Checks private balance and prepares a quote; does not submit. |
 | `swap ... --execute --json` | Obtains a fresh quote, submits the swap, and attempts its claim. |
 | `history --network testnet --json` | Inspects swaps and pending proceeds; can update local history. |
+| `inventory inspect|plan|rebalance|run|status` | Reads, plans, and (with `--execute`) reshapes spendable records through a SQLite journal; `status` lists pending maintenance. CLI 0.14.0, Node.js 22.13+. |
+| `swap-concurrent ... --json` | Plans several legs, one per input token, before submitting any; cannot sell the same token twice in one batch. |
 
 `--json` is supported by the operational commands above, but not by the inspected `setup` command. JSON token amounts are base-unit strings; use each token's decimals rather than floating-point conversion.
 
@@ -62,5 +64,7 @@ Use this path after setup has saved the account, including when the obsolete inv
 ## Persistent state
 
 The current CLI keeps the key and API credentials in `.shield-swap/<network>/state.json`, and swap identities and handles in `.shield-swap/<network>/blinded.json`. Keep the directory private and exclude it from version control. Changing the working directory can make an existing account look unconfigured.
+
+Inventory commands keep a separate record journal, by default `.veil/inventory.sqlite` relative to the working directory, holding record nonces and pending proved transactions. Trading commands coordinate with it only when `VEIL_INVENTORY_DB` names the same file; `loadSession` from the session export then enables record management on its client too. Keep that journal across restarts and never delete it to clear a pending spend; see [UTXO management](../shield-swap-setup/swap-utxo-management.md#cli--inventory-commands).
 
 Continue with [configure account](../shield-swap-setup/configure-account.md), or go directly to the requested [swap](../shield-swap-setup/swap.md) if setup and funding are already complete.

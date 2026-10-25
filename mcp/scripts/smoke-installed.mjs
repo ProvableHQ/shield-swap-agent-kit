@@ -47,7 +47,7 @@ try {
     try {
       await client.connect(transport);
       const tools = await client.listTools();
-      assert.equal(tools.tools.length, 20);
+      assert.equal(tools.tools.length, 24);
       const setupResult = await client.callTool({ name: "setup", arguments: { journey: "connect_trading_tools", mode: "unattended" } });
       assert.equal(setupResult.structuredContent.checks.account.status, "configured");
       assert.equal(setupResult.structuredContent.checks.funding.status, "not_checked");
@@ -62,6 +62,6 @@ try {
     } finally { await client.close(); }
     assert.ok(!stderr.includes(key));
   }
-  process.stdout.write("Installed package: SDK key import, encrypted persistence, guided profile reuse, structured readiness, 20 stdio tools, testnet bridge discovery, and two restarts passed. No network calls or transactions requested.\n");
+  process.stdout.write("Installed package: SDK key import, encrypted persistence, guided profile reuse, structured readiness, 24 stdio tools, testnet bridge discovery, and two restarts passed. No network calls or transactions requested.\n");
 } finally { await rm(root, { recursive: true, force: true }); }
 }
