@@ -56,6 +56,19 @@ export function trackSwapSubmission(proving: ProvingConfig): void {
     return result;
   };
 }
+// The SDK rewrites the whole identity list on every save, and concurrent swaps
+// in one operation each see the others' counters. The record a save belongs
+// to is the one it changed: a counter this swap already owns, or a new counter
+// outside the set that existed when the swap began.
+export function attributeIdentitySave(previous: BlindedIdentityRecord[], next: BlindedIdentityRecord[], active: SwapSubmission): BlindedIdentityRecord | undefined {
+  const before = new Map(previous.map(record => [record.counter, record]));
+  const changed = next.filter(record => {
+    const old = before.get(record.counter);
+    return !old || old.status !== record.status || old.swapId !== record.swapId || old.handle?.transactionId !== record.handle?.transactionId;
+  });
+  const owned = active.checkpoint.counter;
+  return changed.find(record => record.counter === owned) ?? (owned === undefined ? changed.find(record => !active.initial.has(record.counter)) : undefined);
+}
 export function walletScope(profile: Profile): string {
   return [profile.network, profile.address, profile.program ?? "shield_swap.aleo"].join(":");
 }
@@ -94,9 +107,10 @@ export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv
           load: async () => store.get<BlindedIdentityRecord[]>(recordId) ?? [],
           save: async records => {
             store.transaction(() => {
+              const previous = store.get<BlindedIdentityRecord[]>(recordId) ?? [];
               store.set(recordId, records);
               const active = swapContext.getStore();
-              const reserved = active && records.find(record => !active.initial.has(record.counter));
+              const reserved = active && attributeIdentitySave(previous, records, active);
               if (active && reserved) {
                 active.checkpoint = {
                   phase: reserved.handle ? "submitted" : active.submissionStarted ? "submitting" : "reserved",

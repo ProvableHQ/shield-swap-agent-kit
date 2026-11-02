@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { executeContract, type Client, type ProvingConfig } from "@provablehq/veil-core";
-import { claimContext, inventoryContext, swapContext, trackSwapSubmission, type SwapSubmission } from "../src/trading/session";
+import type { BlindedIdentityRecord } from "@provablehq/shield-swap-sdk";
+import { attributeIdentitySave, claimContext, inventoryContext, swapContext, trackSwapSubmission, type SwapSubmission } from "../src/trading/session";
 
 test("the public SDK execution path checkpoints before entering its proving adapter", async () => {
   const events: string[] = [];
@@ -73,4 +74,20 @@ test("failed claim boundary persistence prevents proving and submission", async 
   await assert.rejects(claimContext.run({ beforeSubmit: () => { throw new Error("disk full"); }, submitted: () => {} },
     () => proving.execute!({ programName: "shield_swap.aleo", functionName: "claim_swap_output", inputs: [], fee: 0n })), /disk full/);
   assert.equal(calls, 0);
+});
+
+test("concurrent swaps attribute interleaved identity saves to their own checkpoints", () => {
+  const initial = new Set<number>([0]);
+  const a = { execution: { operationId: "o", checkpoint() {} }, initial, submissionStarted: false, checkpoint: {} } as SwapSubmission;
+  const b = { ...a, checkpoint: {} } as SwapSubmission;
+  const base = [{ counter: 0, status: "swapped" }] as BlindedIdentityRecord[];
+  const afterA = [...base, { counter: 1, status: "reserved" }] as BlindedIdentityRecord[];
+  const afterB = [...afterA, { counter: 2, status: "reserved" }] as BlindedIdentityRecord[];
+  assert.equal(attributeIdentitySave(base, afterA, a)?.counter, 1);
+  a.checkpoint = { counter: 1 };
+  assert.equal(attributeIdentitySave(afterA, afterB, b)?.counter, 2);
+  b.checkpoint = { counter: 2 };
+  const aSubmitted = afterB.map(record => record.counter === 1 ? { ...record, status: "swapped", swapId: "s1", handle: { transactionId: "at1a" } } : record) as BlindedIdentityRecord[];
+  assert.equal(attributeIdentitySave(afterB, aSubmitted, a)?.counter, 1, "a later save of A's record belongs to A");
+  assert.equal(attributeIdentitySave(afterB, aSubmitted, b), undefined, "B does not claim A's change even though counter 1 is outside B's initial set");
 });
