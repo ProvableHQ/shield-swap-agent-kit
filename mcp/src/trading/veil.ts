@@ -65,6 +65,17 @@ async function unjournaledStatus(session: AleoSession, id: string): Promise<stri
     return (error as { status?: number }).status === 404 ? "not_submitted" : "unknown";
   }
 }
+// Unreserved records of the input token that each cover the quoted input.
+// Test doubles without an inventory reader yield undefined, which skips the
+// count; the real client always has one.
+async function coveringRecordCount(session: AleoSession, quote: SwapQuote): Promise<number | undefined> {
+  const client = session.client as Partial<AleoSession["client"]>;
+  if (typeof client.getRecordInventory !== "function" || typeof client.tokenData !== "function") return undefined;
+  const token = await client.tokenData(quote.from.id);
+  if (!token.underlyingProgram) return 0;
+  const inventory = await client.getRecordInventory({ asset: { program: token.underlyingProgram } });
+  return inventory.available.filter(record => record.amount >= quote.amountIn).length;
+}
 async function confirmedRejection(session: AleoSession, id?: string): Promise<Failure | undefined> {
   if (!id) return;
   try {
@@ -82,7 +93,8 @@ export class VeilBackend implements TradingBackend {
 
   async quote(kind: Kind, profile: Profile, input: Summary) {
     if (kind === "bridge") return this.bridge.quote(profile, input);
-    const { client } = await this.session(profile);
+    const session = await this.session(profile);
+    const { client } = session;
     if (kind === "inventory") return this.planInventory(client, input);
     if (kind === "claim") {
       const pending = await client.getUnclaimedSwaps();
@@ -95,11 +107,14 @@ export class VeilBackend implements TradingBackend {
     const defaults = this.store.get<{ slippageBps?: number }>("settings");
     const quote = await client.quote({ from: String(input.from), to: String(input.to), amountIn: String(input.amount),
       slippageBps: Number(input.slippageBps ?? defaults?.slippageBps ?? 50) });
+    // One swap spends one covering record, so the count sizes a batch.
+    const coveringRecords = await coveringRecordCount(session, quote);
     return { plan: quote, expiresAt: quote.expiresAt, summary: {
       tokenIn: quote.from.id, tokenOut: quote.to.id, inputSymbol: quote.from.symbol, outputSymbol: quote.to.symbol,
       inputDecimals: quote.from.decimals, outputDecimals: quote.to.decimals,
       amountIn: quote.amountIn.toString(), expectedOut: quote.expectedOut.toString(), minOut: quote.minOut.toString(),
       slippageBps: quote.slippageBps, route: quote.hops.map(hop => hop.poolKey), expiresAt: quote.expiresAt,
+      ...(coveringRecords !== undefined ? { coveringRecords } : {}),
     } };
   }
 
@@ -191,6 +206,15 @@ export class VeilBackend implements TradingBackend {
     if (quote.kind === "claim") return this.claim(quote, context);
     if (quote.kind === "inventory") return this.rebalance(quote, context);
     const session = await this.session(quote.profile);
+    // Refuse before reserving anything: a batch that would run short of
+    // covering records must not leave a partial set of reservations behind.
+    const needed = Number(quote.summary.count ?? 1);
+    const covering = await coveringRecordCount(session, quote.plan as SwapQuote);
+    if (covering !== undefined && covering < needed) {
+      return { status: "failed", checkpoint: { phase: "preparing" }, result: { covering, needed,
+        remedies: ["rebalance_record_inventory", "maintain_inventory"],
+        error: { code: "insufficient_records", message: `${covering} unreserved record(s) cover this input; ${needed} needed. Reshape once with rebalance_record_inventory or keep a floor with maintain_inventory, then quote again.` } } };
+    }
     const initial = new Set((await session.identities.load()).map(record => record.counter));
     const state: SwapSubmission = { execution: context, initial, submissionStarted: false,
       checkpoint: { phase: "preparing", ...(session.submissionTracked ? { submissionBoundary: 1 } : {}) } };

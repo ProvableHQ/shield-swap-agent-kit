@@ -154,3 +154,57 @@ test("balances include underlying public bridge tokens and native credits withou
     await assert.rejects(backend.read("get_balances", profile, { tokens: ["3field"] }), /RPC unavailable/);
   } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
 });
+
+const inventoryToken = { id: "1field", symbol: "USDCx", decimals: 6, ammTokenProgram: "wrapped_usdcx.aleo", underlyingProgram: "usdcx.aleo" };
+function inventorySession(available: bigint[], token: Record<string, unknown> = inventoryToken) {
+  const swaps: unknown[] = [];
+  const session = { client: {
+    quote: async () => offer,
+    tokenData: async () => token,
+    getRecordInventory: async ({ asset }: { asset: { program: string } }) => {
+      assert.equal(asset.program, token.underlyingProgram);
+      return { available: available.map((amount, index) => ({ id: `${index}group`, amount })), reserved: [] };
+    },
+    swap: async (input: unknown) => { swaps.push(input); return { swapId: "4field", transactionId: "at1test", blindingFactor: "PRIVATE-CLAIM-SECRET" }; },
+  }, identities: { load: async () => [], save: async () => {} } } as unknown as AleoSession;
+  return { session, swaps };
+}
+
+test("swap quotes report covering records and execute refuses a shortfall before reserving", async () => {
+  const root = mkdtempSync(join(tmpdir(), "shield-veil-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  const { session, swaps } = inventorySession([1_000_000n, 999_999n]);
+  const backend = new VeilBackend(store, async () => session);
+  try {
+    const priced = await backend.quote("swap", profile, { from: "USDCx", to: "ETH", amount: "1", slippageBps: 50 });
+    assert.equal((priced.summary as Record<string, unknown>).coveringRecords, 1);
+    const quote: SavedQuote = { id: "q", kind: "swap", profile, scope: "", createdAt: 0, expiresAt: offer.expiresAt, ...priced, summary: { ...priced.summary, count: 2 } };
+    const short = await backend.execute(quote, { operationId: "o", checkpoint: () => {} });
+    assert.equal(short.status, "failed");
+    assert.equal((short.result.error as { code: string }).code, "insufficient_records");
+    assert.equal(short.result.covering, 1);
+    assert.equal(short.result.needed, 2);
+    assert.deepEqual(short.result.remedies, ["rebalance_record_inventory", "maintain_inventory"]);
+    assert.equal(swaps.length, 0, "a refused batch reserves and submits nothing");
+    const enough = await backend.execute({ ...quote, summary: { ...priced.summary, count: 1 } }, { operationId: "o2", checkpoint: () => {} });
+    assert.equal(enough.status, "submitted");
+    assert.equal(swaps.length, 1);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a token without a private record program counts zero covering records", async () => {
+  const root = mkdtempSync(join(tmpdir(), "shield-veil-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  const { session, swaps } = inventorySession([1_000_000n], { ...inventoryToken, underlyingProgram: undefined });
+  const backend = new VeilBackend(store, async () => session);
+  try {
+    const priced = await backend.quote("swap", profile, { from: "USDCx", to: "ETH", amount: "1", slippageBps: 50 });
+    assert.equal((priced.summary as Record<string, unknown>).coveringRecords, 0);
+    const quote: SavedQuote = { id: "q", kind: "swap", profile, scope: "", createdAt: 0, expiresAt: offer.expiresAt, ...priced };
+    const result = await backend.execute(quote, { operationId: "o", checkpoint: () => {} });
+    assert.equal(result.status, "failed");
+    assert.equal((result.result.error as { code: string }).code, "insufficient_records");
+    assert.equal(result.result.covering, 0);
+    assert.equal(swaps.length, 0);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
