@@ -1,5 +1,5 @@
 import {
-  createBridgeCheckpoint, DEFAULT_BRIDGE_REGISTRY, parseDecimalAmount,
+  BridgeRoutePausedError, createBridgeCheckpoint, DEFAULT_BRIDGE_REGISTRY, parseDecimalAmount,
   type BridgeCheckpoint, type BridgeClient, type BridgeProgress, type BridgeQuote, type BridgeReceipt,
 } from "@provablehq/aleo-bridge-sdk";
 import { TradingStore } from "./store";
@@ -77,6 +77,10 @@ export class BridgeBackend {
       if (field in quote) amounts[field] = String((quote as unknown as Summary)[field]);
     }
     if ("approvalRequired" in quote) amounts.approvalRequired = quote.approvalRequired;
+    // SDK 0.16.0 reads each route's on-chain pause flags while quoting. Report
+    // them so a halted route is visible before execution refuses it.
+    const route = quote as unknown as { paused?: boolean; routeStatus?: unknown };
+    if (route.paused !== undefined) { amounts.paused = route.paused; amounts.routeStatus = route.routeStatus; }
     return { plan, summary: {
       quoteKind: quote.kind, routeId: quote.plan.route.id, protocol: quote.plan.protocol,
       sourceChain, destinationChain, tokenIn: quote.plan.sourceAsset.id, tokenOut: quote.plan.destinationAsset.id,
@@ -95,10 +99,10 @@ export class BridgeBackend {
     const result = publicReceipt(value.receipt, value.next);
     if (value.receipt.status === "DELIVERY_PENDING" && value.plan.protocol === "xreserve" &&
       ["aleo", "aleo-testnet"].includes(value.plan.sourceAsset.chainId)) {
-      // SDK 0.12 confirms these burns but cannot verify the EVM release.
+      // The SDK confirms these burns but cannot verify the EVM release.
       result.nextAction = "verify_destination_externally";
       result.deliveryVerification = "unsupported_by_sdk";
-      result.message = "The source burn is confirmed. SDK 0.12 cannot verify destination delivery for this route. Check the destination receipt independently. Do not repeat the transfer.";
+      result.message = "The source burn is confirmed. The SDK cannot verify destination delivery for this route. Check the destination receipt independently. Do not repeat the transfer.";
     }
     return { status: value.next === "done" ? "complete" : value.next === "failed" ? "failed" : "pending",
       result, checkpoint: state };
@@ -125,6 +129,10 @@ export class BridgeBackend {
         if (state.checkpoint || state.unknownSubmission) throw error;
         state.notSubmitted = true;
         persist();
+        // The SDK refuses a paused route before touching any wallet; name the
+        // halted program or contract instead of suggesting a balance problem.
+        if (error instanceof BridgeRoutePausedError) return { status: "failed", result: { routeStatus: error.status,
+          error: { code: "route_paused", message: error.message + ". Nothing was submitted. Quote again once the route is active." } }, checkpoint: state };
         return { status: "failed", result: { error: { code: "not_submitted",
           message: "Bridge preparation failed before submission. Check balances and request a fresh quote." } }, checkpoint: state };
       }
@@ -167,9 +175,18 @@ export class BridgeBackend {
     const onCheckpoint = (checkpoint: BridgeCheckpoint) => { state.checkpoint = mergeCheckpoint(state.checkpoint, checkpoint); persist(); };
     return bridgeContext.run({ state, persist }, async () => {
       const options = { progress, privateMintSecretNonce: (offer.plan as BridgeOffer).privateMintSecretNonce, onCheckpoint };
-      const result = progress.next === "resume"
-        ? await client.resume({ ...options, progress, confirmationTimeoutMs: 30_000 })
-        : await client.complete({ ...options, progress });
+      let result;
+      try {
+        result = progress.next === "resume"
+          ? await client.resume({ ...options, progress, confirmationTimeoutMs: 30_000 })
+          : await client.complete({ ...options, progress });
+      } catch (error) {
+        if (!(error instanceof BridgeRoutePausedError)) throw error;
+        // The SDK refuses before touching a wallet or node, so the transfer
+        // stays exactly where recovery found it; the same step applies later.
+        return { status: "pending", result: { ...publicReceipt(progress.receipt, progress.next), routeStatus: error.status,
+          error: { code: "route_paused", message: error.message + ". Nothing was submitted. Resume this operation once the route is active." } }, checkpoint: state };
+      }
       state.checkpoint = mergeCheckpoint(state.checkpoint, createBridgeCheckpoint(progress.plan, result.receipt));
       persist();
       return this.progress({ next: result.receipt.status === "COMPLETED" ? "done" : "wait", plan: progress.plan, receipt: result.receipt }, state);

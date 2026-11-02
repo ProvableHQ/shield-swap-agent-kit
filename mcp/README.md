@@ -1,6 +1,6 @@
 # Shield Swap MCP
 
-Draft TypeScript MCP server for terminal users, backed by the published Veil 0.14.0 packages. Wallet configuration happens in a trusted terminal; MCP exposes structured trading tools. The server is a draft; validation coverage and remaining limits are recorded below.
+Draft TypeScript MCP server for terminal users, backed by the published Veil 0.16.0 packages. Wallet configuration happens in a trusted terminal; MCP exposes structured trading tools. The server is a draft; validation coverage and remaining limits are recorded below.
 
 ## Run from this repository
 
@@ -99,7 +99,7 @@ node dist/cli.js configure --profile default --allow-bridges --bridge-limit ethe
 
 EVM accepts a hex private key; Solana accepts a JSON array of 64 keypair bytes. Configuration derives and stores the public address and environment reference locally. It does not broadcast or grant bridge permission unless explicitly requested. Solana routes currently require mainnet; Ethereum testnet uses Sepolia.
 
-Use `list_bridge_routes` → `quote_bridge` → `execute_bridge`. Read progress with `bridge_status`, reconcile checkpoints with `recover_bridge_transactions`, and use `resume_operation` only for the SDK's required next step. Signed EVM/Solana transaction IDs are persisted before the RPC broadcast; Aleo uses the SDK's prepared-transaction checkpoints. A private xReserve mint retains its secret nonce encrypted for recovery.
+Use `list_bridge_routes` → `quote_bridge` → `execute_bridge`. Read progress with `bridge_status`, reconcile checkpoints with `recover_bridge_transactions`, and use `resume_operation` only for the SDK's required next step. Signed EVM/Solana transaction IDs are persisted before the RPC broadcast; Aleo uses the SDK's prepared-transaction checkpoints. A private xReserve mint retains its secret nonce encrypted for recovery. SDK 0.16.0 reads each route's on-chain pause flags: a quote reports `paused` and `routeStatus`, and execution, resumption, or completion of a paused route fails with `route_paused` before any wallet is asked to sign. An execution refused this way is `not_submitted`; a deposited transfer whose completion is refused stays `pending` with the same `nextAction` for a later resume.
 
 ## Configure hosted bridge wallets
 
@@ -198,9 +198,9 @@ The session creates its Veil wallet client with `recordManagement` enabled, usin
 
 `get_record_inventory` resolves the token's underlying record program and reports available and reserved records with base-unit amounts; it reserves nothing. `plan_record_inventory` saves a plan as a durable quote of kind `inventory` (ten-minute lifetime) and returns `planId`, the resolved asset, target, steps, and intrinsic deduction. `minRecordAmount` is a human decimal amount converted with the token's decimals. `rebalance_record_inventory` consumes that plan once under the inventory permission and fee limit and returns an operation ID. The SDK rechecks each input before every step, so a plan whose inventory changed stops before proving.
 
-Each proved transaction ID is checkpointed before its broadcast. A `complete` operation lists `transactionIds` and `completedSteps`. An interruption with no submitted transaction fails as `not_submitted`. An interruption after submission is `uncertain` with `reasonCode` (`confirmation_timeout`, `inventory_changed`, `transaction_rejected`, `fee_limit`, `cancelled`, or `interrupted`); `get_operation_status` reconciles the journal until every listed transaction is confirmed or rejected, then reports `failed` with `nextAction: "plan_again"`. Accepted joins and splits remain on chain, and `resume_operation` never re-executes a plan.
+Each proved transaction ID is checkpointed once the SDK has journaled it and before its broadcast; a proof the SDK rejects, such as one over the fee limit, is never recorded as evidence. The wallet client waits up to ten minutes for each managed write to confirm, matching the per-step inventory timeout. A `complete` operation lists `transactionIds` and `completedSteps`. An interruption with no submitted transaction fails as `not_submitted`. An interruption after submission is `uncertain` with `reasonCode` (`confirmation_timeout`, `inventory_changed`, `transaction_rejected`, `fee_limit`, `cancelled`, or `interrupted`); `get_operation_status` reconciles the journal until every listed transaction is confirmed or rejected, then reports `failed` with `nextAction: "plan_again"`. A checkpointed ID the journal never recorded is looked up on chain; because the SDK journals every proof before broadcasting it, an ID absent from both resolves as `not_submitted` rather than blocking the wallet. Accepted joins and splits remain on chain, and `resume_operation` never re-executes a plan.
 
-`reconcile_record_inventory` returns the journal without saved transaction payloads. With `rebroadcast: true` it resends saved proved transactions unchanged, recording `rebroadcastAttempts` and `lastRebroadcastError` per entry; broadcast acceptance is not confirmation. Swap and claim reconciliation also reconciles the journal so settled inputs are released. The server still runs one operation per wallet at a time; it does not submit simultaneous same-token swaps.
+`reconcile_record_inventory` returns the journal without saved transaction payloads. With `rebroadcast: true` it resends saved proved transactions unchanged, recording `rebroadcastAttempts` and `lastRebroadcastError` per entry; broadcast acceptance is not confirmation. Every reconcile also cancels a local reservation that still has no transaction ID: its writer died before proving while holding the wallet lock, so nothing was broadcast and its inputs are released. Entries with a saved proof stay reserved until rebroadcast or a chain outcome. Swap and claim reconciliation also reconciles the journal so settled inputs are released. The server still runs one operation per wallet at a time; it does not submit simultaneous same-token swaps.
 
 ## Current limitations
 
@@ -209,11 +209,27 @@ Each proved transaction ID is checkpointed before its broadcast. A `complete` op
 - Bridge quotes display SDK fees, which the SDK recalculates before execution; token input caps do not cap network gas fees.
 - Bridge recovery requires this server's saved checkpoints. It does not import arbitrary external transactions.
 - Inventory maintenance pays public fees or uses FeeMaster; managed private fee selection is not exposed. Rebalances run one at a time per wallet, and simultaneous same-token swaps remain an SDK workflow.
-- Record inventory tools have offline test coverage only. No live join, split, or reservation-backed swap has been executed through this server yet.
-- Aleo-to-Ethereum xReserve recovery confirms the source burn, but SDK 0.14.0 does not verify the Ethereum release. Its status remains `DELIVERY_PENDING` with `nextAction: "verify_destination_externally"` and `deliveryVerification: "unsupported_by_sdk"`; inspect destination delivery independently and do not repeat the transfer.
+- Record inventory tools were exercised once on testnet (see below); rebroadcast of a saved inventory transaction has not been exercised live.
+- Status reconciliation doubles its history page bound on every incomplete poll. On an account with a long swap history one `get_operation_status` call grew from 11 seconds at 10 pages to 79 seconds at 80 pages, beyond a 60-second MCP client request timeout; configure clients to allow long status calls.
+- Queued operations run inside the server process. Closing the MCP transport ends them; a rebalance interrupted before its first proof reconciles to `not_submitted` and its reservations are released on the next reconcile.
+- Aleo-to-Ethereum xReserve recovery confirms the source burn, but SDK 0.16.0 does not verify the Ethereum release. Its status remains `DELIVERY_PENDING` with `nextAction: "verify_destination_externally"` and `deliveryVerification: "unsupported_by_sdk"`; inspect destination delivery independently and do not repeat the transfer.
 - History discovery probes a bounded identity window and reports incomplete coverage; it cannot promise discovery across arbitrary missing counter gaps.
 - Existing Shield Swap CLI file stores and inventory journals do not share this package's encryption, locking, or record reservations. Do not operate the same wallet concurrently through an uncoordinated CLI or another state directory.
 - Permission changes are refused while the profile has a queued or running operation.
+
+## Testnet validation
+
+On 2026-11-02, the built stdio server used an existing funded testnet wallet, Veil 0.16.0, and fee sponsorship for these checks through one persistent server process:
+
+| Flow | Evidence |
+| --- | --- |
+| `plan_record_inventory` for 8 credits records of at least 5 ALEO (`preserve`) | 18 inputs planned as 2 joins and 7 splits; the plan joined every record, including the two that already qualified. |
+| `rebalance_record_inventory` | Completed all 9 steps in 113 seconds; the journal lists each transaction with its fee (53,320 and 3,833 microcredits for the joins, 0 for the sponsored splits). Inventory afterwards: 8 records of 668.74 ALEO. |
+| Three rebalances interrupted before proving | Reservations left by killed server processes were reported as `cancelled` by the next reconcile and the operations reconciled to `not_submitted`. |
+| 0.1 USDCx → ETH swap | Reserved one USDCx record, confirmed with a 939,822 microcredit fee, reported `claimable`. |
+| `claim_unclaimed_swaps` | Claimed 50,676,718,961,226 output base units; the claim entry joined the journal with no record inputs. |
+
+The same account ran the kit's Veil and Python concurrent-swap recipes the same day; those results are recorded in [docs/source-map.md](../docs/source-map.md).
 
 ## Mainnet validation
 
@@ -230,7 +246,7 @@ The USDC inputs were the smallest pair accepted by the SDK that could cover its 
 
 ## Development and verification
 
-Run `pnpm test`, `pnpm run typecheck`, and `pnpm run build`. Tests cover SDK quote retention, encrypted persistence, idempotency, delayed confirmations, submission uncertainty, concurrent recovery, OS lock release after a crash, terminal key import, provider identity matching, hosted EVM/Solana signing, and stdio restart. Inventory tests cover atomic reservations across two state handles, the SDK's release rules for rejected and cancelled entries, durable plans with bigint round trips, permission and fee-limit gating, prepared-transaction evidence after an interruption, reconciliation to `plan_again`, and plaintext-free reads. Onboarding tests cover missing/locked/configured accounts, guided profile reuse, public-only and insufficient private holdings, and scanner failures. They use temporary test wallets without submitting transactions. Launcher tests use a local stand-in for Claude to check intro loading, account reuse, credential isolation, two MCP connections, cleanup, and failed unlocks. These checks do not establish that a real model reproduces the intro verbatim.
+Run `pnpm test`, `pnpm run typecheck`, and `pnpm run build`. Tests cover SDK quote retention, encrypted persistence, idempotency, delayed confirmations, submission uncertainty, concurrent recovery, OS lock release after a crash, terminal key import, provider identity matching, hosted EVM/Solana signing, paused bridge routes, and stdio restart. Inventory tests cover atomic reservations across two state handles, the SDK's release rules for rejected and cancelled entries, durable plans with bigint round trips, permission and fee-limit gating, prepared-transaction evidence after an interruption, evidence withheld for a proof the SDK rejects, reconciliation to `plan_again`, chain lookup of an unjournaled ID, release of reservations orphaned before proving, and plaintext-free reads. Onboarding tests cover missing/locked/configured accounts, guided profile reuse, public-only and insufficient private holdings, and scanner failures. They use temporary test wallets without submitting transactions. Launcher tests use a local stand-in for Claude to check intro loading, account reuse, credential isolation, two MCP connections, cleanup, and failed unlocks. These checks do not establish that a real model reproduces the intro verbatim.
 
 After installing the tarball into an independent project, run:
 

@@ -6,7 +6,7 @@ Use an available MCP connection for capabilities it actually exposes when it fit
 
 ## AgentKit standalone server
 
-The draft server pins published Veil packages to 0.14.0 and runs over stdio on Node.js 22.13 or newer. `setup` reports structured account/funding checks and next-step guidance for the [canonical journeys](../getting-started.md); signing keys and execution permissions are configured only in the trusted terminal. Starting an unconfigured server does not create an account.
+The draft server pins published Veil packages to 0.16.0 and runs over stdio on Node.js 22.13 or newer. `setup` reports structured account/funding checks and next-step guidance for the [canonical journeys](../getting-started.md); signing keys and execution permissions are configured only in the trusted terminal. Starting an unconfigured server does not create an account.
 
 Its swap workflow is `quote` → `execute` → operation polling → `claim_unclaimed_swaps`. Executions consume durable quotes using idempotency keys. `swap_history` reads the encrypted identity store and reports recovery coverage. Record inventory follows the same shape: `get_record_inventory` → `plan_record_inventory` → `rebalance_record_inventory` → operation polling, with `reconcile_record_inventory` for the journal; see [UTXO management](../shield-swap-setup/swap-utxo-management.md#agentkit-mcp--inspect-plan-rebalance). The session enables the SDK's record management with a journal inside the encrypted state, so every swap, claim, and maintenance step reserves its inputs there. SDKs still own transaction construction, signing, and protocol logic; this server adds transport, operation IDs, encrypted storage, and local policy enforcement.
 

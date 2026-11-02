@@ -236,7 +236,12 @@ test("bridge status advances recovered Hyperlane receipts through the SDK destin
     let delivered = false, destinationReads = 0;
     const { encodeAbiParameters, parseAbiParameters, zeroAddress } = await import("viem");
     const sdk = createBridgeClient({ environment: "mainnet", clients: { aleo: {
-      family: "aleo", publicClient: { request: async () => { destinationReads++; return delivered ? "true" : null; } },
+      // SDK 0.16.0 also reads each route's pause mappings while quoting; only
+      // the Hyperlane mailbox delivery lookup is a destination check.
+      family: "aleo", publicClient: { request: async ({ params }: { params: { mapping: string } }) => {
+        if (params.mapping !== "deliveries") return null;
+        destinationReads++; return delivered ? "true" : null;
+      } },
     }, ethereum: { family: "evm", publicClient: { getChainId: async () => 1,
       call: async () => encodeAbiParameters(parseAbiParameters("(address token, uint256 amount)[]"), [[{ token: zeroAddress, amount: 2n }]]),
     } } } as unknown as NonNullable<Parameters<typeof createBridgeClient>[0]>["clients"] });
@@ -258,6 +263,51 @@ test("bridge status advances recovered Hyperlane receipts through the SDK destin
     assert.equal(result.status, "complete");
     assert.equal(result.result.bridgeStatus, "COMPLETED");
     assert.equal(destinationReads, 2);
+  } finally { f.close(); }
+});
+
+test("a paused route is reported on the quote and refused before submission or completion", async () => {
+  const f = fixture();
+  try {
+    const { loadNetwork } = await import("@provablehq/veil-aleo-sdk");
+    const recipient = (await loadNetwork("mainnet")).generateAccount().address;
+    const { encodeAbiParameters, parseAbiParameters, zeroAddress } = await import("viem");
+    let paused = false, wallet = 0;
+    const sdk = createBridgeClient({ environment: "mainnet", clients: { aleo: {
+      family: "aleo", publicClient: { request: async ({ params }: { params: { mapping: string } }) => params.mapping === "pause" && paused ? "true" : null },
+      walletClient: { request: async () => { wallet++; throw new Error("must not sign"); } },
+    }, ethereum: { family: "evm", publicClient: { getChainId: async () => 1,
+      call: async () => encodeAbiParameters(parseAbiParameters("(address token, uint256 amount)[]"), [[{ token: zeroAddress, amount: 2n }]]),
+    }, walletClient: { request: async () => { wallet++; throw new Error("must not sign"); } } } } as unknown as NonNullable<Parameters<typeof createBridgeClient>[0]>["clients"] });
+    const backend = new BridgeBackend(f.store, async () => sdk);
+    const input = { sourceChain: "ethereum", sourceAsset: "eth", destinationChain: "aleo", destinationAsset: "eth", amount: "0.000000000000000001" };
+    const active = (await backend.quote({ ...profile, address: recipient }, input)).summary as Record<string, unknown>;
+    assert.equal(active.paused, false);
+    paused = true;
+    const quoted = await backend.quote({ ...profile, address: recipient }, input);
+    const summary = quoted.summary as Record<string, unknown>;
+    assert.equal(summary.paused, true);
+    assert.ok((summary.routeStatus as { sources: { state: string }[] }).sources.some(source => source.state === "paused"));
+    const offer: SavedQuote = { id: "q", kind: "bridge", profile, scope: "", createdAt: 0, expiresAt: 0, summary: {}, plan: quoted.plan };
+    let checkpoint: unknown;
+    const executed = await backend.execute(offer, { operationId: "o", checkpoint: value => { checkpoint = value; } });
+    assert.equal(executed.status, "failed");
+    assert.equal((executed.result.error as { code: string }).code, "route_paused");
+    assert.match((executed.result.error as { message: string }).message, /hyp_warp_token_eth_v2\.aleo\/pause/);
+    assert.equal((checkpoint as { notSubmitted?: boolean }).notSubmitted, true);
+
+    const plan = quoted.plan.quote.plan;
+    const receipt: BridgeReceipt = { id: "0x" + "11".repeat(32), protocol: "hyperlane", status: "DELIVERY_PENDING",
+      sourceTxId: "0x" + "22".repeat(32), messageId: "0x" + "11".repeat(32), protocolState: { routeId: plan.route.id } };
+    const client = { ...sdk, recover: async () => ({ next: "complete" as const, plan, receipt }) } as BridgeClient;
+    const recovering = new BridgeBackend(f.store, async () => client);
+    const op: Operation = { id: "o2", kind: "bridge", profileId: profile.id, scope: "", quoteId: "q", requestKey: "r",
+      status: "pending", createdAt: 0, updatedAt: 0, result: {}, checkpoint: { version: 1, plan, started: true, checkpoint: createBridgeCheckpoint(plan, receipt) } };
+    const resumed = await recovering.resume(offer, op, { operationId: "o2", checkpoint: () => {} });
+    assert.equal(resumed.status, "pending", "a deposited transfer stays recoverable while its route is paused");
+    assert.equal(resumed.result.nextAction, "complete");
+    assert.equal((resumed.result.error as { code: string }).code, "route_paused");
+    assert.equal(wallet, 0, "no wallet was asked to sign");
   } finally { f.close(); }
 });
 

@@ -48,7 +48,7 @@ Load only the pages relevant to the task. The [Rust guide](context/toolchains/ru
 - A submission timeout is an unknown result. Inspect the original operation and persistent state before retrying; do not launch another swap to recover a missing response.
 - Preserve an executable quote's route, expiry, and minimum output. Distinguish human decimal quote inputs from base-unit transaction fields using the installed SDK's documentation.
 - Discover token metadata, pools, and liquidity. Do not invent identifiers or assume a public balance includes private records.
-- A swap spends one covering private record. Record management (SDK 0.14.0, Python 0.8.0, CLI 0.14.0, AgentKit MCP) can inspect, plan, and rebalance records and reserve inputs across participating writers that share one store; it is opt-in, and reshaping submits its own transactions.
+- A swap spends one covering private record. Record management (SDK 0.14.0 or newer, Python 0.8.0 or newer, CLI 0.14.0 or newer, AgentKit MCP) can inspect, plan, and rebalance records and reserve inputs across participating writers that share one store; it is opt-in, and reshaping submits its own transactions.
 - Public-chain confidentiality does not guarantee privacy from the chosen wallet, scanner, prover, or API operator. Use the documented service and custody boundaries when explaining privacy.
 
 The [Shield Swap documentation](https://shield.fi/docs) supplies the deeper product and protocol reference. Documentation retrieval does not itself execute an operation or authorize spending.

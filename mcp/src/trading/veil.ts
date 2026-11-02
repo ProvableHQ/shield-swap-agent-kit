@@ -1,5 +1,5 @@
 import type { BlindedIdentityRecord, SwapQuote } from "@provablehq/shield-swap-sdk";
-import { FinalizeRevertError, TransactionTimeoutError, getConfirmedTransaction, type InventoryPlan, type InventoryRecord, type InventoryTarget } from "@provablehq/veil-core";
+import { FinalizeRevertError, TransactionTimeoutError, getConfirmedTransaction, type InventoryPlan, type InventoryRecord, type InventoryTarget, type RecordSpend } from "@provablehq/veil-core";
 import { BridgeBackend } from "./bridge";
 import { TradingStore } from "./store";
 import { claimContext, createSessionFactory, inventoryContext, swapContext, walletScope, type AleoSession, type SessionFactory, type SwapSubmission } from "./session";
@@ -9,7 +9,7 @@ type Failure = { code: "not_submitted" | "transaction_rejected"; transactionId?:
 type ClaimItem = { swapId: string; status: "pending" | "preparing" | "submitting" | "claimed" | "uncertain"; transactionId?: string; amountOut?: string; amountRemaining?: string; lastFailure?: Failure };
 type ClaimPlan = { swapIds: string[] };
 type SwapCheckpoint = { submissionBoundary?: number; phase?: string; counter?: number; swapId?: string; transactionId?: string; feeTransactionId?: string };
-type InventoryCheckpoint = { phase?: string; transactionIds?: string[]; completedSteps?: number };
+type InventoryCheckpoint = { phase?: string; transactionIds?: string[]; completedSteps?: number; reasonCode?: string };
 const resolvedJournalStatuses = new Set(["confirmed", "rejected", "cancelled"]);
 
 function feeLimit(store: TradingStore, profileId: string): bigint {
@@ -39,6 +39,31 @@ function transactionEvidence(error: unknown): { transactionId?: string; feeTrans
   if (!(error instanceof TransactionTimeoutError) && !(error instanceof FinalizeRevertError)) return {};
   return { transactionId: transactionId(error.transactionId),
     ...(error instanceof FinalizeRevertError ? { feeTransactionId: transactionId(error.feeTransactionId) } : {}) };
+}
+// Settle the record journal: the SDK resolves broadcast transactions from the
+// chain, then this releases reservations whose writer never reached a proof.
+// Every writer of this journal runs under the wallet lock, as does this
+// reconcile, so a local reservation still without a transaction ID belongs to
+// a process that died before proving; nothing was broadcast for it. An opaque
+// wallet may have submitted without reporting, so rpc entries are kept.
+async function reconcileJournal(session: AleoSession, params?: { rebroadcast?: boolean }): Promise<RecordSpend[]> {
+  const journal = await session.client.reconcileRecordInventory?.(params) ?? [];
+  const store = session.client.recordManagement?.store;
+  const orphaned = journal.filter(entry => entry.status === "reserved" && !entry.transactionId && entry.accountType === "local");
+  if (!store || !orphaned.length) return journal;
+  for (const entry of orphaned) await store.update(entry.scope, entry.id, { status: "cancelled" });
+  return journal.map(entry => orphaned.includes(entry) ? { ...entry, status: "cancelled" } : entry);
+}
+// The SDK journals every proved transaction before broadcasting it, so an ID
+// the journal never recorded was never sent by this wallet unless the chain
+// shows otherwise. A transport failure resolves nothing.
+async function unjournaledStatus(session: AleoSession, id: string): Promise<string> {
+  try {
+    const confirmed = await getConfirmedTransaction(session.publicClient, { id });
+    return confirmed.status === "accepted" ? "confirmed" : confirmed.status === "rejected" ? "rejected" : "unknown";
+  } catch (error) {
+    return (error as { status?: number }).status === 404 ? "not_submitted" : "unknown";
+  }
 }
 async function confirmedRejection(session: AleoSession, id?: string): Promise<Failure | undefined> {
   if (!id) return;
@@ -128,6 +153,8 @@ export class VeilBackend implements TradingBackend {
       checkpoint("complete", { completedSteps: result.completedSteps });
       return { status: "complete", result: summary, checkpoint: { phase: "complete", transactionIds, completedSteps: result.completedSteps } };
     }
+    // Only the classified code is reported: the SDK's message can carry
+    // reservation and request details that stay out of tool results.
     const reasonCode = interruptionCode(result.reason);
     checkpoint("interrupted", { completedSteps: result.completedSteps, reasonCode });
     if (!transactionIds.length) return { status: "failed", result: { ...summary, reasonCode, nextAction: "plan_again",
@@ -139,18 +166,21 @@ export class VeilBackend implements TradingBackend {
   private async reconcileInventory(quote: SavedQuote, operation: Operation, session: AleoSession): Promise<Progress> {
     const checkpoint = operation.checkpoint as InventoryCheckpoint | undefined;
     const ids = checkpoint?.transactionIds ?? [];
-    const journal = await session.client.reconcileRecordInventory();
-    const transactions = Object.fromEntries(ids.map(id => [id, journal.find(entry => entry.transactionId === id)?.status ?? "unknown"]));
+    const journal = await reconcileJournal(session);
+    const transactions: Record<string, string> = {};
+    for (const id of ids) transactions[id] = journal.find(entry => entry.transactionId === id)?.status ?? await unjournaledStatus(session, id);
     const base = { transactionIds: ids, transactions, completedSteps: checkpoint?.completedSteps, plannedSteps: (quote.plan as InventoryPlan).steps.length,
+      // The interruption class recorded at execution time survives reconciliation.
+      ...(checkpoint?.reasonCode ? { reasonCode: checkpoint.reasonCode } : {}),
       unresolvedJournalEntries: journal.filter(entry => !resolvedJournalStatuses.has(entry.status)).length };
     if (checkpoint?.phase === "complete") return { status: "complete", result: base };
-    if (ids.some(id => !["confirmed", "rejected"].includes(transactions[id]))) {
+    if (ids.some(id => !["confirmed", "rejected", "not_submitted"].includes(transactions[id]))) {
       // A prepared or submitted transaction without a chain result keeps its
       // inputs reserved. A missing lookup never proves rejection.
       return { status: "uncertain", result: { ...base, nextAction: "reconcile", error: { code: "maintenance_uncertain",
         message: "Submitted inventory transactions have no confirmed outcome yet. Reconcile again; after inspection, reconcile_record_inventory with rebroadcast can resend a saved transaction." } } };
     }
-    if (!ids.length) return { status: "failed", result: { ...base, nextAction: "plan_again",
+    if (ids.every(id => transactions[id] === "not_submitted")) return { status: "failed", result: { ...base, nextAction: "plan_again",
       error: { code: "not_submitted", message: "Inventory maintenance did not submit a transaction. Read the inventory and plan again." } } };
     return { status: "failed", result: { ...base, nextAction: "plan_again", error: { code: "maintenance_incomplete",
       message: "The inventory plan did not finish. Accepted joins and splits remain on chain; read the inventory and plan again rather than repeating this plan." } } };
@@ -207,7 +237,7 @@ export class VeilBackend implements TradingBackend {
       case "reconcile_record_inventory": {
         const rebroadcast = input.rebroadcast === true;
         if (rebroadcast && !profile.policy.inventory) throw new TradingError("permission_required", "Rebroadcasting saved inventory transactions requires inventory permission in terminal setup.");
-        const journal = await client.reconcileRecordInventory({ rebroadcast });
+        const journal = await reconcileJournal(session, { rebroadcast });
         // The saved proved transaction stays in encrypted state; report only that it exists.
         const entries = journal.map(({ transaction, ...entry }) => ({ ...entry, savedTransaction: Boolean(transaction) }));
         return { network: profile.network, address: profile.address, rebroadcast, entries,
@@ -301,7 +331,7 @@ export class VeilBackend implements TradingBackend {
   private async reconcileHistory(session: AleoSession, profile: Profile) {
     // Managed swaps and claims journal their input records. Resolve those
     // entries first so settled inputs are released and consumed ones stay excluded.
-    await session.client.reconcileRecordInventory?.();
+    await reconcileJournal(session);
     // SDK 0.12 caches a negative result at the current history tip. Pending
     // transactions can land after that scan, so only concrete claims are final.
     const records = await session.identities.load();

@@ -25,7 +25,8 @@ export const claimContext = new AsyncLocalStorage<{
   submitted(transactionId: string): void;
 }>();
 // Inventory maintenance submits several transactions. Record each proved
-// transaction ID before its broadcast so a crash mid-plan leaves evidence.
+// transaction ID after the SDK journals it and before its broadcast, so a
+// crash mid-plan leaves evidence without recording a proof the SDK rejected.
 export const inventoryContext = new AsyncLocalStorage<{ prepared(transactionId: string): void }>();
 export function trackSwapSubmission(proving: ProvingConfig): void {
   const execute = proving.execute;
@@ -45,8 +46,10 @@ export function trackSwapSubmission(proving: ProvingConfig): void {
     // Managed writes always supply a progress handler; only observe an existing
     // one so the SDK's broadcast behavior for unmanaged calls stays unchanged.
     const result = await execute(inventory && onProgress ? { ...options, onProgress: async event => {
-      if (event.type === "transaction-prepared") inventory.prepared(event.transactionId);
+      // The SDK's handler enforces the fee ceiling and journals the proof. A
+      // proof it rejects is never broadcast, so it is not submission evidence.
       await onProgress(event);
+      if (event.type === "transaction-prepared") inventory.prepared(event.transactionId);
     } } : options);
     // Keep the confirmed ID even if later SDK bookkeeping or our result write fails.
     claim?.submitted(result.transactionId);
@@ -76,8 +79,12 @@ export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv
         // Shared record reservations use the same encrypted state as every
         // other document, so swaps, claims and inventory maintenance from any
         // process on this state directory see each other's held inputs.
+        // Every managed write waits for its confirmation inside the proving
+        // adapter; the SDK's 60s default turns ordinary block latency into an
+        // interrupted plan or an uncertain swap. Operations run in background
+        // workers, so match the inventory step timeout.
         const pair = network.createAleoClient({ privateKey: key, networkUrl: profile.networkUrl,
-          provingMode: "delegated", useFeeMaster: profile.useFeeMaster ?? false,
+          provingMode: "delegated", useFeeMaster: profile.useFeeMaster ?? false, confirmationTimeout: 600_000,
           recordManagement: { enabled: true, store: createRecordInventoryStore(store), chainId: "aleo:" + profile.network } });
         if (pair.account.address !== profile.address) throw new TradingError("wallet_mismatch", "Configured key does not match this profile's address.");
         if (!pair.walletClient.proving) throw new TradingError("proving_unavailable", "The configured SDK has no proving adapter.");

@@ -79,22 +79,27 @@ const plan = { scope: JSON.stringify(["aleo:testnet", "aleo1test"]), asset: { pr
   steps: [{ kind: "split", inputs: ["1group"], outputs: [{ id: "step1:0", amount: 300000n }, { id: "step1:1", amount: 300000n }], amount: 300000n, deduction: 0n }],
   deduction: 0n, maxTransactions: 24 };
 
-function inventoryFixture(rebalance: () => Promise<Record<string, unknown>>, journal: () => Record<string, unknown>[]) {
+function inventoryFixture(rebalance: () => Promise<Record<string, unknown>>, journal: () => Record<string, unknown>[] | Promise<Record<string, unknown>[]>,
+  chain: (id: string) => Promise<unknown> = async () => { throw Object.assign(new Error("not found"), { status: 404 }); }) {
   const root = mkdtempSync(join(tmpdir(), "shield-inventory-runtime-"));
   const store = new TradingStore(root, "test-password-long-enough", true);
   store.set("profile:alice", profile);
   const calls: Record<string, unknown>[] = [];
+  const inventoryStore = createRecordInventoryStore(store);
   const session = { client: {
     tokenData: async (symbol: string) => { assert.equal(symbol, "USDCx"); return token; },
     planInventory: async (params: Record<string, unknown>) => { calls.push(params); return plan; },
     rebalanceRecordInventory: async (params: { plan: unknown; maxFeeMicrocredits: bigint }) => { calls.push(params); return rebalance(); },
     reconcileRecordInventory: async () => journal(),
+    recordManagement: { enabled: true, store: inventoryStore, chainId: "aleo:testnet" },
     getRecordInventory: async () => ({ asset: plan.asset, balance: 600000n,
       available: [{ id: "1group", amount: 600000n, record: { recordPlaintext: "PRIVATE-RECORD-PLAINTEXT" } }],
       reserved: [{ id: "2group", amount: 1n, record: { recordPlaintext: "PRIVATE-RECORD-PLAINTEXT" } }] }),
-  }, identities: { load: async () => [], save: async () => {} } } as unknown as AleoSession;
+  }, identities: { load: async () => [], save: async () => {} },
+  publicClient: { request: async ({ method, params }: { method: string; params: { id: string } }) => { assert.equal(method, "getConfirmedTransaction"); return chain(params.id); } },
+  } as unknown as AleoSession;
   const runtime = new TradingRuntime(store, new VeilBackend(store, async () => session));
-  return { store, runtime, calls, close: async () => { await runtime.drain(); store.close(); rmSync(root, { recursive: true, force: true }); } };
+  return { store, runtime, calls, inventoryStore, close: async () => { await runtime.drain(); store.close(); rmSync(root, { recursive: true, force: true }); } };
 }
 
 test("inventory plans are durable and rebalancing needs terminal permission and a fee limit", async () => {
@@ -148,9 +153,52 @@ test("an interrupted rebalance keeps prepared transaction evidence and reconcile
     status = "confirmed";
     const settled = await f.runtime.status(String(op.operationId));
     assert.equal(settled.status, "failed");
+    assert.equal(settled.reasonCode, "confirmation_timeout", "reconciliation keeps the interruption class");
+    assert.doesNotMatch(JSON.stringify(settled), /PRIVATE-DETAIL/);
     assert.equal(settled.nextAction, "plan_again");
     assert.deepEqual(settled.transactions, { at1join: "confirmed" });
     assert.equal(f.calls.filter(call => "plan" in call).length, 1, "the plan was executed once");
+  } finally { await f.close(); }
+});
+
+test("a checkpointed transaction the journal never recorded resolves from chain evidence instead of blocking the wallet", async () => {
+  let chain: (id: string) => Promise<unknown> = async () => { throw Object.assign(new Error("gateway timeout"), { status: 504 }); };
+  const f = inventoryFixture(async () => {
+    inventoryContext.getStore()!.prepared("at1ghost");
+    return { status: "interrupted", transactionIds: [], completedSteps: 0, reason: "Proved transaction exceeds maxFeeMicrocredits" };
+  }, () => [], id => chain(id));
+  f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, inventory: true, inventoryFeeLimit: "1" } });
+  try {
+    const saved = await f.runtime.quote("inventory", "alice", { token: "USDCx", records: 2 });
+    const op = await f.runtime.execute(String(saved.quoteId), "run");
+    await f.runtime.drain();
+    assert.equal(f.runtime.operation(String(op.operationId)).status, "uncertain");
+    const unreachable = await f.runtime.status(String(op.operationId));
+    assert.equal(unreachable.status, "uncertain", "a transport failure never resolves an outcome");
+    assert.deepEqual(unreachable.transactions, { at1ghost: "unknown" });
+    chain = async () => { throw Object.assign(new Error("not found"), { status: 404 }); };
+    const absent = await f.runtime.status(String(op.operationId));
+    assert.equal(absent.status, "failed", "the SDK journals every proof before broadcasting it, so an unjournaled ID was never sent");
+    assert.equal(absent.nextAction, "plan_again");
+    assert.equal((absent.error as { code: string }).code, "not_submitted");
+    assert.deepEqual(absent.transactions, { at1ghost: "not_submitted" });
+  } finally { await f.close(); }
+});
+
+test("reconciling releases reservations whose local writer died before proving", async () => {
+  const f = inventoryFixture(async () => ({}), () => f.inventoryStore.list(plan.scope));
+  try {
+    const orphan = await f.inventoryStore.acquire(entry(["1group"], { scope: plan.scope }));
+    const wallet = await f.inventoryStore.acquire(entry(["3group"], { scope: plan.scope, accountType: "rpc" }));
+    const prepared = await f.inventoryStore.acquire(entry(["4group"], { scope: plan.scope }));
+    await f.inventoryStore.update(plan.scope, prepared!.id, { status: "prepared", transactionId: "at1prepared" });
+    const journal = await f.runtime.read("reconcile_record_inventory", "alice", {});
+    const statuses = Object.fromEntries((journal.entries as { id: string; status: string }[]).map(item => [item.id, item.status]));
+    assert.deepEqual(statuses, { [orphan!.id]: "cancelled", [wallet!.id]: "reserved", [prepared!.id]: "prepared" });
+    assert.equal(journal.unresolvedCount, 2, "an opaque wallet submission and a saved proof stay unresolved");
+    assert.ok(await f.inventoryStore.acquire(entry(["1group"], { scope: plan.scope })), "the orphaned input is available again");
+    assert.equal(await f.inventoryStore.acquire(entry(["3group"], { scope: plan.scope })), undefined);
+    assert.equal(await f.inventoryStore.acquire(entry(["4group"], { scope: plan.scope })), undefined);
   } finally { await f.close(); }
 });
 
