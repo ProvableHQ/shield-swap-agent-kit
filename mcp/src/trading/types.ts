@@ -87,6 +87,18 @@ export type Operation = {
   /** Swaps requested by execute; absent on operations recorded before batches existed. */
   count?: number;
 };
+/** One token the maintainer keeps at a floor of records that each cover a human decimal minimum. */
+export type MaintenanceTarget = { token: string; records: number; minRecordAmount: string };
+/** Stored as `maintenance:<profileId>`; written by the maintainer process, read by the status tool. */
+export type MaintenanceState = {
+  profileId: string;
+  pid: number;
+  startedAt: number;
+  intervalSeconds: number;
+  targets: MaintenanceTarget[];
+  running: boolean;
+  lastPass?: { at: number; ready: Record<string, number>; action: "none" | "rebalanced" | "skipped"; operationId?: string; error?: string };
+};
 export type Progress = { status: Status; result: Summary; checkpoint?: unknown };
 export interface ExecutionContext {
   checkpoint(value: unknown): void;
