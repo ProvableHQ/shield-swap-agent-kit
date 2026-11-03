@@ -12,23 +12,23 @@ importers:
         specifier: 1.32.1
         version: 1.32.1(zod@4.0.10)
       '@provablehq/aleo-bridge-sdk':
-        specifier: 0.16.0
-        version: 0.16.0(d62f1870d9dd18c37b82faf515cfedbc)
+        specifier: 0.16.1
+        version: 0.16.1(d62f1870d9dd18c37b82faf515cfedbc)
       '@provablehq/sdk':
         specifier: 0.13.0
         version: 0.13.0
       '@provablehq/shield-swap-sdk':
-        specifier: 0.16.0
-        version: 0.16.0(@provablehq/sdk@0.13.0)
+        specifier: 0.16.1
+        version: 0.16.1(@provablehq/sdk@0.13.0)
       '@provablehq/veil-aleo-devnode':
-        specifier: 0.16.0
-        version: 0.16.0(@provablehq/veil-core@0.16.0)
+        specifier: 0.16.1
+        version: 0.16.1(@provablehq/veil-core@0.16.1)
       '@provablehq/veil-aleo-sdk':
-        specifier: 0.16.0
-        version: 0.16.0(@provablehq/veil-aleo-devnode@0.16.0(@provablehq/veil-core@0.16.0))(@provablehq/veil-core@0.16.0)
+        specifier: 0.16.1
+        version: 0.16.1(@provablehq/veil-aleo-devnode@0.16.1(@provablehq/veil-core@0.16.1))(@provablehq/veil-core@0.16.1)
       '@provablehq/veil-core':
-        specifier: 0.16.0
-        version: 0.16.0
+        specifier: 0.16.1
+        version: 0.16.1
       '@solana/kit':
         specifier: 8.0.0
         version: 8.0.0(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
@@ -762,8 +762,8 @@ packages:
   '@protobufjs/utf8@1.1.2':
     resolution: {integrity: sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug==}
 
-  '@provablehq/aleo-bridge-sdk@0.16.0':
-    resolution: {integrity: sha512-reGTlKW7SMUWW4haD/VqU6qeVYvowjf72M6CU6MRJstpp0BbZaXyfr3Lbt2urq1+5EPVblx2b0GPcs6RZZHO7A==}
+  '@provablehq/aleo-bridge-sdk@0.16.1':
+    resolution: {integrity: sha512-HQumaJeUwCpDSIgiPXg6xRFV6r1+7DhYB1/SYNLQZJuTFz49TxPT1nTyg4du6dxMNyeAAd/s60idtz1yL8869Q==}
     engines: {node: '>=18'}
     peerDependencies:
       '@dynamic-labs-wallet/node-evm': ^1.1.24
@@ -786,8 +786,8 @@ packages:
   '@provablehq/sdk@0.13.0':
     resolution: {integrity: sha512-WMTSojrh7Sr4HGwxM/F/3zWDSceMwCBdXnHA3hdsp/kQ6VDGa2ARi3EHAmgnTr+lMKv7zR/Kl8O1NeqB/7xeag==}
 
-  '@provablehq/shield-swap-sdk@0.16.0':
-    resolution: {integrity: sha512-UbtyNN0Eq5A60UxGsqDFQAHF0FdQ/AkWsrsOZGRe2vqXhhGl6xGMgK3SrJZbHGeRklIzg3/3LooQygv69gq0Kg==}
+  '@provablehq/shield-swap-sdk@0.16.1':
+    resolution: {integrity: sha512-aGPofMZtEycyvIXnIBQiZRpdLoliy0vrWpn+VmywkY2FG55PRzMVFIBXbv1YnmyxuD9sB8QHeSG+C12FEkgR9w==}
     engines: {node: '>=18'}
     peerDependencies:
       '@provablehq/sdk': ^0.13.0
@@ -795,21 +795,21 @@ packages:
       '@provablehq/sdk':
         optional: true
 
-  '@provablehq/veil-aleo-devnode@0.16.0':
-    resolution: {integrity: sha512-HCJfg5OomnutG267y6b4mT1FJci4MpUs6Hti6v4gF9h7yl7nBwfCmLB9zghWMFcCg2rhcFEFqpxINyIXkAPGbA==}
+  '@provablehq/veil-aleo-devnode@0.16.1':
+    resolution: {integrity: sha512-95DCrOtcYb0r7JolR02ElUTPWuUc1tWVeahDEzsKepxQzKuO+a66jxHm1mitATuXcKviPRWZn2QZYzgI1mTDdw==}
     engines: {node: '>=18'}
     peerDependencies:
-      '@provablehq/veil-core': '>=0.16.0 <1.0.0'
+      '@provablehq/veil-core': '>=0.16.1 <1.0.0'
 
-  '@provablehq/veil-aleo-sdk@0.16.0':
-    resolution: {integrity: sha512-HZwXSw766nthNo8RJ/PetGJ00AFz1HONv/rKEgRwQKh8+L/zSuhuVjYgAmjIvtQSNUuwD5nkJh9sKVoMJGytiQ==}
+  '@provablehq/veil-aleo-sdk@0.16.1':
+    resolution: {integrity: sha512-JicfnzyTju5G6Hoh/ToxatG0/whFfYjTBgnMGi57OuxTzvz60tfO0uEuhHwSZ9R3A/1B9yU6Dc5kbUiDo1ltxg==}
     engines: {node: '>=18'}
     peerDependencies:
-      '@provablehq/veil-aleo-devnode': '>=0.16.0 <1.0.0'
-      '@provablehq/veil-core': '>=0.16.0 <1.0.0'
+      '@provablehq/veil-aleo-devnode': '>=0.16.1 <1.0.0'
+      '@provablehq/veil-core': '>=0.16.1 <1.0.0'
 
-  '@provablehq/veil-core@0.16.0':
-    resolution: {integrity: sha512-AMbpyMNY69QkpdGtPPmBtg6FCtpKMRyp6ljo8xndomGYVqVpD/Z5yNzJ4NZwLMxjHuB2RsQrshRNa5l/jnSa8A==}
+  '@provablehq/veil-core@0.16.1':
+    resolution: {integrity: sha512-zKZU7nUjtG9HebenQaYApLBFpnfNXRyMNEPWr5NBEVRm571DKcdMja8N9Cx4KGZilfHRifzi/ch4PgjiatzzRQ==}
     engines: {node: '>=18'}
 
   '@provablehq/wasm@0.13.0':
@@ -4029,9 +4029,9 @@ snapshots:
   '@protobufjs/utf8@1.1.2':
     optional: true
 
-  '@provablehq/aleo-bridge-sdk@0.16.0(d62f1870d9dd18c37b82faf515cfedbc)':
+  '@provablehq/aleo-bridge-sdk@0.16.1(d62f1870d9dd18c37b82faf515cfedbc)':
     dependencies:
-      '@provablehq/veil-core': 0.16.0
+      '@provablehq/veil-core': 0.16.1
       bs58: 6.0.0
       viem: 2.57.3(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.0.10)
     optionalDependencies:
@@ -4056,25 +4056,25 @@ snapshots:
       mime: 4.1.0
       xmlhttprequest-ssl: 4.0.0
 
-  '@provablehq/shield-swap-sdk@0.16.0(@provablehq/sdk@0.13.0)':
+  '@provablehq/shield-swap-sdk@0.16.1(@provablehq/sdk@0.13.0)':
     dependencies:
-      '@provablehq/veil-core': 0.16.0
+      '@provablehq/veil-core': 0.16.1
     optionalDependencies:
       '@provablehq/sdk': 0.13.0
 
-  '@provablehq/veil-aleo-devnode@0.16.0(@provablehq/veil-core@0.16.0)':
+  '@provablehq/veil-aleo-devnode@0.16.1(@provablehq/veil-core@0.16.1)':
     dependencies:
-      '@provablehq/veil-core': 0.16.0
+      '@provablehq/veil-core': 0.16.1
 
-  '@provablehq/veil-aleo-sdk@0.16.0(@provablehq/veil-aleo-devnode@0.16.0(@provablehq/veil-core@0.16.0))(@provablehq/veil-core@0.16.0)':
+  '@provablehq/veil-aleo-sdk@0.16.1(@provablehq/veil-aleo-devnode@0.16.1(@provablehq/veil-core@0.16.1))(@provablehq/veil-core@0.16.1)':
     dependencies:
       '@noble/hashes': 1.8.0
       '@provablehq/sdk': 0.13.0
-      '@provablehq/veil-aleo-devnode': 0.16.0(@provablehq/veil-core@0.16.0)
-      '@provablehq/veil-core': 0.16.0
+      '@provablehq/veil-aleo-devnode': 0.16.1(@provablehq/veil-core@0.16.1)
+      '@provablehq/veil-core': 0.16.1
       '@scure/bip39': 1.6.0
 
-  '@provablehq/veil-core@0.16.0': {}
+  '@provablehq/veil-core@0.16.1': {}
 
   '@provablehq/wasm@0.13.0': {}
 

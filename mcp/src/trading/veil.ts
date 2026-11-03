@@ -156,7 +156,7 @@ export class VeilBackend implements TradingBackend {
     return { plan, summary: {
       token: token.id, symbol: token.symbol, decimals: token.decimals, asset: plan.asset.program,
       target: { records: target.records, minRecordAmount: (target.minRecordAmount ?? 1n).toString(),
-        distribution: target.distribution ?? "preserve", toleranceBps: target.toleranceBps ?? 1000 },
+        distribution: target.distribution ?? "floor", toleranceBps: target.toleranceBps ?? 1000 },
       inputCount: plan.inputs.length, inputBalance: plan.inputs.reduce((sum, record) => sum + record.amount, 0n).toString(),
       steps: plan.steps.map(step => ({ kind: step.kind, inputs: step.inputs.length, outputs: step.outputs.map(output => output.amount.toString()),
         ...(step.amount !== undefined ? { amount: step.amount.toString() } : {}), deduction: step.deduction.toString(), helper: step.joinProgram?.program ?? "native" })),

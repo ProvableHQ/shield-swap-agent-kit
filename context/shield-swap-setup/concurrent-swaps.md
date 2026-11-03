@@ -12,7 +12,7 @@ The examples run **six 0.1 USDCx → ETH swaps on testnet with 50 basis points s
 - One quote can be shared by every swap in the batch; it fixes the same output floor for each. A quote reserves no pool liquidity, so later trades can execute at worse prices or fail on their floor while earlier ones succeed. Inspect every swap and every claim.
 - Blinded identities are allocated by the identity store. Veil's bundled stores coordinate counters within one process; Python's journal locks under the profile. Run one trader process per account unless each process supplies distinct explicit identities.
 - A timeout is an unknown result. Reopen the same stores, reconcile the record journal and unclaimed swaps, and resolve them before starting another batch. Never repeat a batch to recover one trade.
-- Count unreserved covering records before a batch and refuse on a shortfall; never reshape inside a trade. Reshape once with the [UTXO management](swap-utxo-management.md) recipes, or keep a floor with a maintainer, then rerun the batch. In SDK 0.16.0 and Python 0.8.0 both the `balanced` and `preserve` targets rewrite the whole balance (one join of every record, then one split per extra record); the Veil `floor` target merged in ProvableHQ/veil#215 splits only the shortfall. Several batches selling one token draw on the same records; add their counts before firing any of them.
+- Count unreserved covering records before a batch and refuse on a shortfall; never reshape inside a trade. Reshape once with the [UTXO management](swap-utxo-management.md) recipes, or keep a floor with a maintainer, then rerun the batch. In Python 0.8.0 both the `balanced` and `preserve` targets rewrite the whole balance (one join of every record, then one split per extra record); since Veil 0.16.1 the default `floor` target splits only the shortfall and never joins. Several batches selling one token draw on the same records; add their counts before firing any of them.
 
 ## AgentKit MCP
 
@@ -22,7 +22,7 @@ A swap is a batch of one: `execute` takes `count` (default 1) and submits that m
 {"name":"execute","arguments":{"quoteId":"QUOTE_ID","idempotencyKey":"batch-2026-11-02-1","count":6}}
 ```
 
-`maintain_inventory` keeps named tokens at a floor of covering records as a child process of the server; `get_maintenance_status` and `stop_maintenance` read and end it. The floor target needs the Veil release that contains the floor planner; until the kit pins it, a shortfall pass records `pass_failed`. Operators who want a maintainer that outlives the server run `node dist/cli.js maintain` themselves. See the [MCP README](../../mcp/README.md#record-inventory-and-reservations).
+`maintain_inventory` keeps named tokens at a floor of covering records as a child process of the server; `get_maintenance_status` and `stop_maintenance` read and end it. Operators who want a maintainer that outlives the server run `node dist/cli.js maintain` themselves. See the [MCP README](../../mcp/README.md#record-inventory-and-reservations).
 
 ## CLI
 
