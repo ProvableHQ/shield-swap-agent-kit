@@ -22,6 +22,8 @@ For example, quote `USDCx → ETH` for `0.1` and `USDCx → ALEO` for `0.2`, the
 
 Use the [inventory tools](swap-utxo-management.md#agentkit-mcp--inspect-plan-rebalance) for explicit preparation. For recurring preparation, enable inventory permission and a fee ceiling in the terminal, then call `start_inventory_maintenance` for each token with a record count and minimum covering amount. Starting maintenance schedules an immediate pass, and one worker services the jobs independently. `get_inventory_maintenance_status` reports saved observations without triggering a pass; `get_record_inventory` reads the current record snapshot. Stop one token with `stop_inventory_maintenance`; other token jobs continue.
 
+The worker stops with its launching MCP server by default. For maintenance that continues after that server exits, launch it with `serve --maintenance-mode detached` or set `SHIELD_SWAP_MCP_MAINTENANCE_MODE=detached`. Saved jobs and transaction evidence survive either mode; see [worker lifetime](../../mcp/README.md#per-token-maintenance) for shared-worker ownership and restart behavior.
+
 All MCP processes must share the same state directory and server version. Atomic record reservations, per-operation locks and process-safe identity updates prevent participating processes from choosing the same resources. An uncertain operation holds its own resources while unrelated managed trades proceed. Legacy ambiguity remains conservative. See the [MCP state and maintenance reference](../../mcp/README.md#independent-concurrent-trades).
 
 ## CLI

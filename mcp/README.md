@@ -231,7 +231,20 @@ A pass reconciles the existing operation first. If none is unresolved, it counts
 
 `get_inventory_maintenance_status` returns each job's `enabled`, `target`, `coveringRecords`, `checkedAt`, `activeOperationId`, `operationStatus` and `lastError`, plus `workerRunning`. Status reads only the saved observations and worker state; it never triggers a maintenance pass. Snapshot counts are not reservations. `stop_inventory_maintenance` disables new plans for that job; it leaves submitted work available for reconciliation and other tokens enabled. An uncertain operation retains its ID until resolved. A failed pass remains visible before a later pass prepares a fresh plan from current inventory.
 
-The worker uses an OS-held lock rather than persistent PID ownership. It stays idle when no targets are enabled. It drains on SIGINT/SIGTERM, releases its lock on a crash, and reopens durable jobs on restart. Run `shield-swap-mcp maintain` under a service manager if automatic process restart is required; the MCP start tool can also restart it. Credentials come from the same environment or encrypted state, never tool arguments.
+The worker uses an OS-held lock rather than persistent PID ownership. It stays idle when no targets are enabled. By default it is attached to the MCP server that launches it: closing that server's stdin, stopping the server, or losing the parent process stops the worker. Shutdown stops scheduling new checks and allows up to ten seconds to drain; a worker that cannot finish is terminated. Jobs, reservations, and transaction evidence stay saved for recovery, and submitted transactions are not undone. Starting a worker again reopens those jobs; opening an MCP connection alone does not restart maintenance.
+
+Choose the lifetime when launching the MCP server:
+
+```sh
+shield-swap-mcp serve --maintenance-mode attached  # default; stops with this server
+shield-swap-mcp serve --maintenance-mode detached  # continues after this server exits
+```
+
+`SHIELD_SWAP_MCP_MAINTENANCE_MODE=attached|detached` sets the same option for hosts that configure environment variables, including the Claude launcher; an explicit command flag takes precedence. The setting applies to workers this server launches. If a worker already owns the state directory, another MCP server reuses it without taking over its lifetime. Stopping that second server does not stop the owner's worker. To change an existing worker's lifetime, stop its owning server or service before starting a replacement.
+
+The lock reports worker activity, not a process ID or a remote shutdown endpoint. An owning MCP server can force-stop its child even if the worker is unresponsive. After the parent itself is killed, IPC-loss handling and the worker's own shutdown deadline require a responsive worker event loop; use OS service supervision if a strict process-tree cleanup guarantee is required.
+
+Run `shield-swap-mcp maintain` directly for an independent foreground worker, or under a service manager for automatic restart. Credentials come from the same environment or encrypted state, never tool arguments.
 
 
 ## Current limitations

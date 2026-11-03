@@ -72,8 +72,8 @@ try {
     assert.ok(!stderr.includes(key));
   }
   const workers = [];
-  const startWorker = async () => {
-    const worker = fork(entry, ["maintain", "--state-dir", root], { cwd: installRoot, env: { ...env }, stdio: ["ignore", "ignore", "pipe", "ipc"] });
+  const startWorker = async (attached = false) => {
+    const worker = fork(entry, ["maintain", "--state-dir", root, ...(attached ? ["--parent-attached"] : [])], { cwd: installRoot, env: { ...env }, stdio: ["ignore", "ignore", "pipe", "ipc"] });
     workers.push(worker);
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error("worker readiness timeout")), 15000);
@@ -81,10 +81,14 @@ try {
       worker.once("error", error => { clearTimeout(timer); reject(error); });
       worker.once("exit", code => { clearTimeout(timer); if (code) reject(new Error("worker exited before readiness")); });
     });
-    if (worker.connected) worker.disconnect();
+    if (!attached && worker.connected) worker.disconnect();
     return worker;
   };
   try {
+    const attached = await startWorker(true);
+    const disconnected = once(attached, "exit");
+    attached.disconnect();
+    assert.equal((await disconnected)[0], 0, "an attached worker exits when its parent IPC connection closes");
     const first = await startWorker();
     const duplicate = await startWorker();
     assert.equal((await once(duplicate, "exit"))[0], 0, "a second worker leaves the owner running");
@@ -94,6 +98,6 @@ try {
     const stopped = once(replacement, "exit"); replacement.kill("SIGTERM");
     assert.equal((await stopped)[0], 0, "a replacement drains and releases its worker lock");
   } finally { for (const worker of workers) if (worker.exitCode === null && worker.signalCode === null) worker.kill("SIGKILL"); }
-  process.stdout.write("Installed package: SDK key import, encrypted persistence, guided profile reuse, structured readiness, 27 stdio tools, testnet bridge discovery, two MCP restarts, worker exclusion, crash recovery and graceful worker shutdown passed. No network calls or transactions requested.\n");
+  process.stdout.write("Installed package: SDK key import, encrypted persistence, guided profile reuse, structured readiness, 27 stdio tools, testnet bridge discovery, two MCP restarts, attached-worker parent loss, worker exclusion, crash recovery and graceful worker shutdown passed. No network calls or transactions requested.\n");
 } finally { await rm(root, { recursive: true, force: true }); }
 }

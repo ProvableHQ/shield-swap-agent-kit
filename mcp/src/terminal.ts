@@ -56,8 +56,12 @@ configure changes trusted terminal permissions:
 
 New profiles have execution disabled. Setup/configure require a hidden
 passphrase prompt or SHIELD_SWAP_MCP_PASSWORD from your secret manager.
-maintain runs one worker for the saved per-token inventory targets. MCP start
-launches it automatically; use this command with a service manager for restarts.
+serve --maintenance-mode attached|detached (default attached) controls workers
+started by this MCP server. SHIELD_SWAP_MCP_MAINTENANCE_MODE sets the same default;
+the command flag takes precedence. Attached workers stop with their launching
+MCP server, with up to 10 seconds to drain. Detached workers survive its exit.
+maintain runs an independent worker for the saved per-token inventory targets;
+use this command with a service manager for restarts.
 Stopping a token prevents new work; Ctrl-C stops the foreground worker after drain.
 serve uses SHIELD_SWAP_MCP_PASSWORD and never prompts on MCP stdin.
 Never pass a key or passphrase as a command argument. Back up encrypted
@@ -68,6 +72,7 @@ export function argumentsFor(argv: string[]) {
   try {
     const parsed = parseArgs({ args: argv, allowPositionals: true, strict: true, options: {
       help: { type: "boolean", short: "h" },
+      "maintenance-mode": { type: "string" }, "parent-attached": { type: "boolean" },
       "state-dir": { type: "string" }, profile: { type: "string" }, network: { type: "string" },
       "key-env": { type: "string" }, "store-key": { type: "boolean" }, generate: { type: "boolean" }, guided: { type: "boolean" },
       "network-url": { type: "string" }, "api-url": { type: "string" }, "fee-master": { type: "boolean" }, "no-fee-master": { type: "boolean" },
@@ -85,8 +90,10 @@ export function argumentsFor(argv: string[]) {
     if (parsed.positionals.length > 1 || !["setup", "configure", "serve", "maintain"].includes(command)) throw new Error();
     const allowed = command === "setup" ? new Set(["help", "state-dir", "profile", "network", "guided", "key-env", "store-key", "generate", "network-url", "api-url", "fee-master"])
       : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "allow-inventory", "deny-inventory", "swap-limit", "bridge-limit", "inventory-fee-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
-      : new Set(["help", "state-dir"]);
+      : command === "serve" ? new Set(["help", "state-dir", "maintenance-mode"])
+      : new Set(["help", "state-dir", "parent-attached"]);
     if (Object.keys(parsed.values).some(key => !allowed.has(key))) throw new Error();
+    if (parsed.values["maintenance-mode"] !== undefined && !["attached", "detached"].includes(parsed.values["maintenance-mode"])) throw new Error();
     return { command, values: parsed.values };
   } catch {
     throw new TradingError("invalid_arguments", "Invalid command arguments. Use --help; keys and passphrases must never be passed as arguments.");
