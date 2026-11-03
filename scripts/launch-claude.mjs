@@ -29,10 +29,10 @@ async function main() {
   const [major, minor] = process.versions.node.split('.').map(Number);
   if (major < 22 || (major === 22 && minor < 13)) throw new Error('Shield Swap requires Node.js 22.13 or newer.');
   try {
-    parseArgs({ args, strict: true, options: { help: { type: 'boolean', short: 'h' }, project: { type: 'string' }, 'state-dir': { type: 'string' }, profile: { type: 'string' }, network: { type: 'string' }, 'key-env': { type: 'string' }, generate: { type: 'boolean' } } });
+    parseArgs({ args, strict: true, options: { help: { type: 'boolean', short: 'h' }, connect: { type: 'boolean' }, project: { type: 'string' }, 'state-dir': { type: 'string' }, profile: { type: 'string' }, network: { type: 'string' }, 'key-env': { type: 'string' }, generate: { type: 'boolean' } } });
   } catch { throw new Error('Invalid launcher arguments. Use --help; never pass keys or passphrases as arguments.'); }
   if (args.includes('--help') || args.includes('-h')) {
-    process.stdout.write('Shield Swap for Claude Code\nUsage: node scripts/launch-claude.mjs [--project PATH] [--state-dir PATH] [--profile NAME]\nAdvanced account options: --network mainnet|testnet, --key-env NAME, --generate\nInstalls MCP dependencies, builds, shows the intro, guides protected local account setup, and starts Claude with its MCP connection.\n');
+    process.stdout.write('Shield Swap for Claude Code\nUsage: node scripts/launch-claude.mjs [--connect] [--project PATH] [--state-dir PATH] [--profile NAME]\nAdvanced account options: --network mainnet|testnet, --key-env NAME, --generate\nInstalls MCP dependencies, builds, and starts Claude with MCP without account access or passphrase prompts.\nUse --connect for guided local account setup and unlock. Explicit --generate or --key-env also opts into account setup.\n');
     return;
   }
   if (process.platform === 'win32') throw new Error('The launcher currently supports macOS and Linux.');
@@ -42,7 +42,7 @@ async function main() {
   if (!runner) throw new Error('Install pnpm 10.33.2 or npm (with npx), then rerun this launcher.');
   const prefix = pnpm ? [] : ['--yes', 'pnpm@10.33.2'];
   // Build tools receive system/package-manager settings, never wallet variables.
-  const buildEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => /^(PATH|HOME|USER|LOGNAME|SHELL|TMPDIR|TEMP|TMP|TERM|LANG|CI|HTTP_PROXY|HTTPS_PROXY|NO_PROXY|LC_.*|XDG_.*|PNPM_.*|NPM_.*|npm_config_.*|COREPACK_.*)$/.test(name)));
+  const buildEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => /^(PATH|HOME|USER|LOGNAME|SHELL|TMPDIR|TEMP|TMP|TERM|LANG|CI|HTTP_PROXY|HTTPS_PROXY|NO_PROXY|LC_ALL|LC_CTYPE|LC_MESSAGES|LC_COLLATE|LC_NUMERIC|LC_TIME|LC_MONETARY|XDG_.*|PNPM_.*|NPM_.*|npm_config_.*|COREPACK_.*)$/.test(name)));
   process.stderr.write('Preparing Shield Swap tools…\n');
   try {
     await run(runner, [...prefix, 'install', '--frozen-lockfile', '--prefer-offline'], { cwd: mcp, env: buildEnv, stdio: ['ignore', 'ignore', 'inherit'] });

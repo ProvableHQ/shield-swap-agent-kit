@@ -33,7 +33,8 @@ export function secretReferences(profile: Profile): string[] {
 export function claudeEnvironment(environment: NodeJS.ProcessEnv, refs: string[]): NodeJS.ProcessEnv {
   // Only terminal settings cross into Claude. Use its existing interactive
   // login; wallet and provider credentials remain in the MCP environment.
-  const allowed = /^(PATH|HOME|USER|LOGNAME|SHELL|TMPDIR|TEMP|TMP|TERM|COLORTERM|TERM_PROGRAM|TERM_PROGRAM_VERSION|LANG|LC_.*)$/;
+  // Use actual locale names, not LC_*, which could also name wallet credentials.
+  const allowed = /^(PATH|HOME|USER|LOGNAME|SHELL|TMPDIR|TEMP|TMP|TERM|COLORTERM|TERM_PROGRAM|TERM_PROGRAM_VERSION|LANG|LC_ALL|LC_CTYPE|LC_MESSAGES|LC_COLLATE|LC_NUMERIC|LC_TIME|LC_MONETARY)$/;
   const result = Object.fromEntries(Object.entries(environment).filter(([name]) => allowed.test(name)));
   delete result.SHIELD_SWAP_MCP_PASSWORD;
   for (const name of refs) delete result[name];
@@ -62,12 +63,12 @@ export async function launchClaude(argv = process.argv.slice(2)): Promise<number
   let options;
   try {
     options = parseArgs({ args: argv, strict: true, options: {
-      help: { type: "boolean", short: "h" }, project: { type: "string" }, "state-dir": { type: "string" },
+      help: { type: "boolean", short: "h" }, connect: { type: "boolean" }, project: { type: "string" }, "state-dir": { type: "string" },
       profile: { type: "string" }, network: { type: "string" }, "key-env": { type: "string" }, generate: { type: "boolean" },
     } }).values;
   } catch { throw new TradingError("invalid_arguments", "Invalid launcher arguments. Use --help; never pass keys or passphrases as arguments."); }
   if (options.help) {
-    process.stdout.write("Shield Swap for Claude Code\nRun from your trading project, or use --project PATH.\nOptions: --state-dir PATH, --profile NAME, --network mainnet|testnet, --key-env NAME, --generate\nLocal account prompts run before Claude starts. Existing profiles are reused.\n");
+    process.stdout.write("Shield Swap for Claude Code\nRun from your trading project, or use --project PATH.\nOptions: --connect, --state-dir PATH, --profile NAME, --network mainnet|testnet, --key-env NAME, --generate\nStarts without account access or passphrase prompts. Use --connect for local account setup and unlock.\nExplicit --generate or --key-env also opts into account setup. Existing profiles are reused.\n");
     return 0;
   }
   if (process.platform === "win32") throw new TradingError("unsupported_platform", "The one-command launcher currently supports macOS and Linux local sockets.");
@@ -78,31 +79,36 @@ export async function launchClaude(argv = process.argv.slice(2)): Promise<number
   if (insideKit(project)) throw new TradingError("invalid_project", "Choose a trading project outside the AgentKit checkout.");
   await mkdir(project, { recursive: true });
   const directory = stateDirectory(options);
+  // Ambient credentials and profile/network selections alone never opt into access.
+  const connect = options.connect || options.generate || Boolean(options["key-env"]);
   let sessionDirectory: string | undefined;
   let stopBroker: (() => Promise<void>) | undefined;
   try {
     process.stderr.write(renderWelcome({ checks: {
       tools: { status: "preparing" }, account: { status: existsSync(join(directory, "state.sqlite")) ? "locked" : "missing" }, funding: { status: "not_checked" },
     } }, { width: process.stderr.columns ?? 100 }) + "\n\n");
-    const passphrase = await password(directory);
-    const configured = await setup({ ...options, guided: true }, passphrase);
-    const mcpEnv: NodeJS.ProcessEnv = { ...process.env, SHIELD_SWAP_MCP_PASSWORD: passphrase };
-    const store = new TradingStore(directory, passphrase);
-    let profile: Profile;
-    let key: string | undefined;
-    try {
-      profile = store.get<Profile>("profile:" + String(configured.profileId))!;
-      if (profile.key.type === "env") {
-        if (!mcpEnv[profile.key.name]) mcpEnv[profile.key.name] = await hiddenInput("Existing Aleo account key (hidden): ");
-        key = mcpEnv[profile.key.name];
-      } else key = store.get<string>("secret:" + profile.key.id);
-      const { loadNetwork } = await import("@provablehq/veil-aleo-sdk");
-      const sdk = await loadNetwork(profile.network);
+    let profile: Profile | undefined;
+    let mcpEnv: NodeJS.ProcessEnv = claudeEnvironment(process.env, []);
+    if (connect) {
+      const passphrase = await password(directory);
+      const configured = await setup({ ...options, guided: true }, passphrase);
+      mcpEnv = { ...process.env, SHIELD_SWAP_MCP_PASSWORD: passphrase };
+      const store = new TradingStore(directory, passphrase);
+      let key: string | undefined;
       try {
-        if (!key || sdk.privateKeyToAccount(key).address !== profile.address) throw new Error();
-      } catch { throw new TradingError("invalid_key", "The supplied key does not match the selected Aleo account. Its configuration was preserved."); }
-    } finally { store.close(); }
-    const refs = secretReferences(profile);
+        profile = store.get<Profile>("profile:" + String(configured.profileId))!;
+        if (profile.key.type === "env") {
+          if (!mcpEnv[profile.key.name]) mcpEnv[profile.key.name] = await hiddenInput("Existing Aleo account key (hidden): ");
+          key = mcpEnv[profile.key.name];
+        } else key = store.get<string>("secret:" + profile.key.id);
+        const { loadNetwork } = await import("@provablehq/veil-aleo-sdk");
+        const sdk = await loadNetwork(profile.network);
+        try {
+          if (!key || sdk.privateKeyToAccount(key).address !== profile.address) throw new Error();
+        } catch { throw new TradingError("invalid_key", "The supplied key does not match the selected Aleo account. Its configuration was preserved."); }
+      } finally { store.close(); }
+    }
+    const refs = profile ? secretReferences(profile) : [];
     const claudeEnv = claudeEnvironment(process.env, refs);
     sessionDirectory = await mkdtemp(join(tmpdir(), "ss-"));
     await chmod(sessionDirectory, 0o700);
@@ -115,16 +121,23 @@ export async function launchClaude(argv = process.argv.slice(2)): Promise<number
     transport.stderr?.on("data", () => {});
     try {
       await client.connect(transport);
-      const result = await client.callTool({ name: "setup", arguments: { profileId: profile.id } });
+      const result = await client.callTool({ name: "setup", arguments: { ...(profile ? { profileId: profile.id } : options.profile ? { profileId: options.profile } : {}) } });
       if (result.isError) throw new Error();
-      const report = result.structuredContent as { checks?: { account?: { status?: string; address?: string } } };
-      if (report.checks?.account?.status !== "configured" || report.checks.account.address !== profile.address) throw new Error();
+      const report = result.structuredContent as { unlocked?: boolean; checks?: { account?: { status?: string; address?: string } } };
+      if (profile) {
+        if (!report.unlocked || report.checks?.account?.status !== "configured" || report.checks.account.address !== profile.address) throw new Error();
+      } else if (report.unlocked !== false || !["missing", "locked"].includes(report.checks?.account?.status ?? "")) throw new Error();
     } catch { throw new TradingError("mcp_unavailable", "Shield Swap MCP did not pass its local connection check. No funds were moved. Check the build and account configuration, then rerun the launcher."); }
     finally { await client.close(); }
     const config = join(sessionDirectory, "mcp.json");
     await writeFile(config, JSON.stringify(claudeMcpConfiguration(proxy, endpoint)), { mode: 0o600 });
-    process.stderr.write("Account configured. Starting Claude with Shield Swap connected.\n\n");
-    const prompt = `Read ${JSON.stringify(join(kit, "SKILL.md"))} and follow its onboarding. Use the Shield Swap MCP connection and profile ${JSON.stringify(profile.id)} throughout this session. Account setup has completed locally. Begin by calling setup for that profile and showing its welcome text, including the Shield Swap heading and Private asset trading tagline. Ask which journey I want; check current funding when relevant. Never infer funds from old session notes.`;
+    process.stderr.write(profile ? "Account configured. Starting Claude with Shield Swap connected.\n\n" : "Starting Claude without account access. Choose a journey to continue setup.\n\n");
+    const connectArgs = [process.execPath, join(kit, "scripts/launch-claude.mjs"), "--connect", "--project", project, "--state-dir", directory];
+    if (options.profile) connectArgs.push("--profile", options.profile);
+    if (options.network) connectArgs.push("--network", options.network);
+    const connectCommand = connectArgs.map(value => "'" + value.replaceAll("'", "'\"'\"'") + "'").join(" ");
+    const prompt = profile ? `Read ${JSON.stringify(join(kit, "SKILL.md"))} and follow its onboarding. Use the Shield Swap MCP connection and profile ${JSON.stringify(profile.id)} throughout this session. Account setup has completed locally. Begin by calling setup for that profile and showing its welcome text, including the Shield Swap heading and Private asset trading tagline. Ask which journey I want; check current funding when relevant. Never infer funds from old session notes.`
+      : `Read ${JSON.stringify(join(kit, "SKILL.md"))} and follow its onboarding. This Shield Swap MCP session has no account access. Begin by calling setup${options.profile ? ` with profileId ${JSON.stringify(options.profile)}` : ""} and showing its welcome text, including the Shield Swap heading and Private asset trading tagline. Ask which journey I want before account setup. Code-only work can proceed without an account; account-backed tools including market reads and quotes require connecting first. Do not provision or unlock an account automatically. When I choose account setup, explain that I should exit this Claude session and run the following command in my own trusted terminal to reuse or configure the selected account and open a connected session:\n${connectCommand}\nExplain that this opens a new chat without automatic conversation transfer. Give me a short non-secret summary of my selected task to paste into the new session. Never collect keys or passphrases in chat or captured tools. Existing state must be reused, not replaced. New profiles keep execution disabled; funding and permission approval follow account setup.`;
     return await runClaude(process.env.SHIELD_SWAP_CLAUDE_COMMAND ?? "claude", ["--mcp-config", config, "--add-dir", kit, "--", prompt], project, claudeEnv);
   } finally {
     if (stopBroker) await stopBroker();
