@@ -5,6 +5,7 @@ import { once } from "node:events";
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -85,6 +86,33 @@ test("the default attached worker shares concurrent starts and releases ownershi
     await assert.rejects(worker.start(), /closing/);
   } finally {
     await worker.stop(); await secondServer.stop(); f.close();
+    if (previous === undefined) delete process.env.SHIELD_SWAP_MCP_PASSWORD; else process.env.SHIELD_SWAP_MCP_PASSWORD = previous;
+  }
+});
+
+test("the live MCP supervisor replaces an exited worker without overlapping ownership", { timeout: 20000 }, async () => {
+  const f = fixture();
+  const previous = process.env.SHIELD_SWAP_MCP_PASSWORD;
+  process.env.SHIELD_SWAP_MCP_PASSWORD = password;
+  const pidFile = join(f.root, "worker.pid"), entry = join(f.root, "worker.mjs");
+  // A test wrapper records only its own PID; production ownership still uses
+  // the SQLite lock and the actual ChildProcess handle, never this file.
+  writeFileSync(entry, `import { writeFileSync } from 'node:fs';
+    writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));
+    await import(${JSON.stringify(pathToFileURL(cli).href)});`);
+  const worker = new workerModule.MaintainerProcess(f.runtime, entry);
+  try {
+    await worker.start();
+    const first = Number(readFileSync(pidFile, "utf8"));
+    process.kill(first, "SIGKILL");
+    await until(async () => Number(readFileSync(pidFile, "utf8")) !== first && await f.jobs.running(), 9000);
+    assert.equal(await f.jobs.running(), true);
+    assert.deepEqual(f.store.get("maintenance-token:saved"), f.saved);
+    await worker.stop();
+    assert.equal(await f.jobs.running(), false);
+    await assert.rejects(worker.start(), /closing/);
+  } finally {
+    await worker.stop(); f.close();
     if (previous === undefined) delete process.env.SHIELD_SWAP_MCP_PASSWORD; else process.env.SHIELD_SWAP_MCP_PASSWORD = previous;
   }
 });

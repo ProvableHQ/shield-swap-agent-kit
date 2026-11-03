@@ -1,5 +1,6 @@
 import { reconcileSwapHistory as reconcileSdkHistory, type BlindedIdentityRecord, type SwapQuote } from "@provablehq/shield-swap-sdk";
-import { FinalizeRevertError, TransactionTimeoutError, getConfirmedTransaction, type InventoryPlan, type InventoryRecord, type InventoryTarget, type RecordSpend } from "@provablehq/veil-core";
+import { FinalizeRevertError, RecordReservationConflictError, TransactionTimeoutError, getConfirmedTransaction, type InventoryPlan, type InventoryRecord, type InventoryTarget, type RecordSpend } from "@provablehq/veil-core";
+import { recordInventoryShortage } from "./inventory";
 import { BridgeBackend } from "./bridge";
 import { TradingStore } from "./store";
 import { claimContext, createSessionFactory, inventoryContext, swapContext, walletScope, type AleoSession, type SessionFactory, type SwapSubmission } from "./session";
@@ -214,6 +215,17 @@ export class VeilBackend implements TradingBackend {
           result: { ...evidence, error: { code: rejected ? "transaction_rejected" : "submission_uncertain",
             message: rejected ? "The swap transaction was rejected. Inspect its fee effects before a newly authorized attempt."
               : "The submission result is uncertain. Reconcile this operation before any retry." } } };
+      }
+      // SDK 0.16.1 exposes a typed reservation conflict, but covering-record
+      // selection still throws plain errors. Match only its specific shortage
+      // diagnostics, and only before the tracked submission boundary.
+      const shortage = error instanceof RecordReservationConflictError || error instanceof Error &&
+        (/^No unspent [a-zA-Z0-9_]+\.aleo record covers \d+(?: for token \S+)? — balance too low, or funds are public rather than in records\.$/.test(error.message) ||
+         error.message === "No available credits record covers the private fee separately from the transaction inputs; refresh records or fund private credits");
+      if (shortage) {
+        recordInventoryShortage(this.store, quote.profile);
+        return { status: "failed", checkpoint: state.checkpoint, result: { error: { code: "insufficient_records",
+          message: "No suitable unreserved record is available. No transaction was submitted. Replenish or fund inventory before a new attempt." } } };
       }
       return { status: "failed", result: { error: { code: "not_submitted",
         message: "Swap preparation failed before proving or submission. Check balances and request a fresh quote." } },

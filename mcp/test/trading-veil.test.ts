@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { executeContract, FinalizeRevertError, TransactionTimeoutError, type Client, type ProvingConfig } from "@provablehq/veil-core";
+import { executeContract, FinalizeRevertError, RecordReservationConflictError, TransactionTimeoutError, type Client, type ProvingConfig } from "@provablehq/veil-core";
+import { inventoryActivity, inventoryScope } from "../src/trading/inventory";
 import { TradingStore } from "../src/trading/store";
 import { TradingRuntime } from "../src/trading/runtime";
 import { VeilBackend } from "../src/trading/veil";
@@ -17,6 +18,33 @@ const offer = { version: 1 as const, network: "testnet", program: "shield_swap.a
   amountIn: 1000000n, expectedOut: 900000000000000n, minOut: 895500000000000n,
   slippageBps: 50, hops: [{ poolKey: "3field", tokenInId: "1field", tokenOutId: "2field" }],
   quotedAt: Date.now(), expiresAt: Date.now() + 60_000, protocolRevision: 1 };
+
+for (const [label, error, submitted, code] of [
+  ["no covering token record", new Error("No unspent usdcx_stablecoin.aleo record covers 1000000 for token 1field — balance too low, or funds are public rather than in records."), false, "insufficient_records"],
+  ["contended inputs", new RecordReservationConflictError(["1group"]), false, "insufficient_records"],
+  ["no private fee record", new Error("No available credits record covers the private fee separately from the transaction inputs; refresh records or fund private credits"), false, "insufficient_records"],
+  ["an unrelated preparation failure", new Error("RPC unavailable PRIVATE-DETAIL"), false, "not_submitted"],
+  ["a conflict after the submission boundary", new RecordReservationConflictError(["1group"]), true, "submission_uncertain"],
+] as const) {
+  test(`swap reports ${label} without waiting for inventory or replacing a submission`, async () => {
+    const root = mkdtempSync(join(tmpdir(), "shield-inventory-shortage-"));
+    const store = new TradingStore(root, "test-password-long-enough", true);
+    let attempts = 0;
+    const session = { submissionTracked: true, identities: { load: async () => [] }, client: {
+      swap: async () => { attempts++; swapContext.getStore()!.submissionStarted = submitted; throw error; },
+    } } as unknown as AleoSession;
+    try {
+      const backend = new VeilBackend(store, async () => session);
+      const quote: SavedQuote = { id: "q", kind: "swap", profile, scope: "", createdAt: 0, expiresAt: 1, plan: offer, summary: {} };
+      const result = await backend.execute(quote, { operationId: "o", checkpoint: () => {} });
+      assert.equal((result.result.error as { code: string }).code, code);
+      assert.equal(result.status, submitted ? "uncertain" : "failed");
+      assert.equal(attempts, 1);
+      assert.equal(inventoryActivity(store, inventoryScope(profile)).shortages, code === "insufficient_records" ? 1 : 0);
+      assert.doesNotMatch(JSON.stringify(result), /PRIVATE-DETAIL/);
+    } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+  });
+}
 
 test("Veil adapter retains the exact SDK quote through execution and hides claim secrets", async () => {
   const root = mkdtempSync(join(tmpdir(), "shield-veil-"));

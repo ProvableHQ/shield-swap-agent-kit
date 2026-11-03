@@ -17,12 +17,23 @@ export class MaintainerProcess {
   private child?: { process: ChildProcess; exited: Promise<void> };
   private starting?: Promise<void>;
   private stopping?: Promise<void>;
+  private healthCheck?: ReturnType<typeof setInterval>;
   private closing = false;
   constructor(private readonly runtime: TradingRuntime, private readonly entry: string, private readonly mode: MaintenanceMode = "attached") {}
 
   start(): Promise<void> {
     if (this.closing) return Promise.reject(new TradingError("maintainer_unavailable", "The MCP server is closing."));
-    return this.starting ??= this.launch().finally(() => { this.starting = undefined; });
+    return this.starting ??= this.launch().then(() => {
+      // Keep the explicitly started service available while this MCP is alive.
+      // The worker's inventory threshold still decides whether to rebalance.
+      // Starting a new MCP connection alone does not enable this supervisor.
+      if (!this.closing && !this.healthCheck) {
+        this.healthCheck = setInterval(() => {
+          if (!this.closing && new InventoryMaintenance(this.runtime).list().some(job => job.enabled))
+            void this.start().catch(() => {});
+        }, 5000).unref();
+      }
+    }).finally(() => { this.starting = undefined; });
   }
 
   private async launch(): Promise<void> {
@@ -65,6 +76,7 @@ export class MaintainerProcess {
 
   stop(): Promise<void> {
     this.closing = true;
+    clearInterval(this.healthCheck);
     return this.stopping ??= (async () => {
       const child = this.child;
       if (child) {

@@ -14,6 +14,7 @@ const executeArgs = { quoteId: id, idempotencyKey: id };
 const operation = { operationId: id };
 const decimal = z.string().regex(/^(0|[1-9][0-9]*)(\.[0-9]+)?$/).max(100);
 const maintenanceTarget = { ...profile, token: id, records: z.number().int().min(1).max(1000), minRecordAmount: decimal,
+  replenishThreshold: z.number().int().min(0).max(999).optional().describe("Start refilling at or below this available covering-record count. Must be less than records; defaults to records minus one."),
   intervalSeconds: z.number().int().min(10).max(86400).default(120) };
 const tools = {
   setup: { description: "Report account, funding and execution checks for the selected journey. Optional access/balance checks may authenticate and initialize scanner state but never move funds. Never accepts keys or passwords.", schema: setupSchema, read: true },
@@ -36,7 +37,7 @@ const tools = {
   get_operation_status: { description: "Inspect and reconcile a saved operation. An uncertain result must never be treated as a failed submission.", schema: z.object(operation).strict(), read: true },
   list_operations: { description: "List persisted operations, optionally for one profile.", schema: z.object({ profileId: id.optional(), limit: z.number().int().min(1).max(100).default(25) }).strict(), read: true },
   resume_operation: { description: "Reconcile and resume a claim or bridge only when the SDK identifies a safe next step. Never repeats a swap deposit.", schema: z.object(operation).strict(), read: false },
-  start_inventory_maintenance: { description: "Enable recurring inventory replenishment for one token and start the shared worker. Each floor plan can spend up to the terminal-configured inventory fee limit. Requires inventory permission.", schema: z.object(maintenanceTarget).strict(), read: false },
+  start_inventory_maintenance: { description: "Enable inventory replenishment when available covering records reach replenishThreshold, refilling toward records. Start the shared worker; reservation activity wakes checks. Each floor plan can spend up to the terminal-configured inventory fee limit. Requires inventory permission.", schema: z.object(maintenanceTarget).strict(), read: false },
   stop_inventory_maintenance: { description: "Disable new replenishment for one token. Already submitted work remains reserved and reconciled.", schema: z.object({ maintenanceId: id }).strict(), read: false },
   get_inventory_maintenance_status: { description: "Read saved per-token targets, observations, active operations and errors, plus whether the worker is running. Does not run maintenance or submit transactions.", schema: z.object({ maintenanceId: id.optional() }).strict(), read: true },
   get_record_inventory: { description: "Read one token's spendable private records: available and reserved records with base-unit amounts. Reserves and spends nothing.", schema: z.object({ ...profile, token: id }).strict(), read: true },
@@ -105,7 +106,8 @@ async function call(runtime: TradingRuntime, name: ToolName, args: Summary, star
     }
     case "start_inventory_maintenance": {
       const jobs = new InventoryMaintenance(runtime);
-      const job = await jobs.start(profileId, { token: String(args.token), records: Number(args.records), minRecordAmount: String(args.minRecordAmount), intervalSeconds: Number(args.intervalSeconds) });
+      const job = await jobs.start(profileId, { token: String(args.token), records: Number(args.records), minRecordAmount: String(args.minRecordAmount), intervalSeconds: Number(args.intervalSeconds),
+        ...(args.replenishThreshold !== undefined ? { replenishThreshold: Number(args.replenishThreshold) } : {}) });
       await startMaintainer?.();
       return { ...job, workerRunning: await jobs.running() };
     }
