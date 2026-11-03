@@ -14,7 +14,9 @@ Read only the section for the selected interface. The SDK recipes continue the `
 
 Reuse the selected profile from [configure account](configure-account.md#agentkit-mcp). `get_wallet_status` checks signing readiness through the configured session, which authenticates with Shield Swap and may initialize scanner access; it does not submit a trade. Confirm the returned address, network, and policy against the requested account. No invite code is needed.
 
-Execution permissions and token caps are set in the [trusted terminal](../../mcp/README.md#configure-an-existing-wallet); MCP `update_config` cannot grant them. Keep execution disabled for inspection-only tasks. When setup is the task, continue to [funding](bridge-funds.md) without selecting or submitting a trade.
+Explain the selected profile's execution access from `setup.checks.execution` or `get_config`. New profiles can inspect and quote with execution disabled. For a concrete action, guide the user through [execution access](../safety/permissions.md#agentkit-mcp-execution-access): propose only the missing permissions and exact per-operation limits with `request_permissions`, then let the user review the account and persistent scope in the client's confirmation form. For a full swap this normally means swaps, claims, and an input-token cap; funding through a bridge needs bridge access; inventory reshaping needs separate inventory access. Do not ask for every permission as a setup prerequisite.
+
+If the client lacks confirmation forms, present the tool's [trusted-terminal fallback](../../mcp/README.md#approve-execution-access). `update_config` still cannot grant access. A grant does not submit a trade or start maintenance. When setup is the task, continue to [funding](bridge-funds.md) without selecting or submitting a trade; request bridge access only if the user chooses that funding method.
 
 ## CLI
 

@@ -78,6 +78,8 @@ async function inspectOnboarding(
     status: profile.policy.swaps && profile.policy.claims && Object.values(profile.policy.swapLimits).some(value => BigInt(value) > 0n) ? "bounded" : "disabled",
     policy: profile.policy,
     scope: "per_operation_only",
+    permissionTool: "request_permissions",
+    guidance: "Inspect the policy and explain only the access needed by the selected task. Read-only inspection and quotes need no execution permissions. In guided mode, propose missing permissions and per-operation limits with request_permissions for explicit client approval; grants persist until revoked. In unattended mode, report missing access to the caller. Terminal configure remains available if the client cannot show confirmation forms. Approval does not start a transaction or maintenance job.",
     note: "Token caps, slippage, fees, records and the executable quote still need checking for each trade. Unattended total budgets require a worker policy.",
   };
   report.completedCheckpoints.push("account_configured");

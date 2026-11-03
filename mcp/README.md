@@ -70,14 +70,14 @@ By default, `--key-env` stores only the environment variable name. Supply the sa
 
 State defaults to `~/.shield-swap-mcp`; override it with `--state-dir` or `SHIELD_SWAP_MCP_STATE_DIR`. Back up the entire state directory and keep its passphrase separately. Losing either can lose access to stored keys and pending recovery material.
 
-Enable only the intended actions from the trusted terminal. Quote responses identify the exact token ID and base-unit amount used by limits:
+Enable only the intended actions through [client confirmation](#approve-execution-access) or the trusted terminal. Quote responses identify the exact token ID and base-unit amount used by limits:
 
 ```sh
 node dist/cli.js configure --profile default --allow-claims
 node dist/cli.js configure --profile default --allow-swaps --swap-limit TOKEN_ID=RAW_AMOUNT --max-slippage-bps 100
 ```
 
-Replace `TOKEN_ID` and `RAW_AMOUNT` with a discovered token ID and the desired integer cap. Limits apply **per operation**, not per day or across a strategy. An absent or zero cap prevents execution for that token. Use `--deny-swaps`, `--deny-claims`, `--deny-bridges`, or `--deny-inventory` to revoke permissions. The MCP configuration tool cannot grant permissions, change signers, or set spending limits. Tools use the configured default profile when `profileId` is omitted; an explicit profile overrides it.
+Replace `TOKEN_ID` and `RAW_AMOUNT` with a discovered token ID and the desired integer cap. Limits apply **per operation**, not per day or across a strategy. An absent or zero cap prevents execution for that token. Use `--deny-swaps`, `--deny-claims`, `--deny-bridges`, or `--deny-inventory` to revoke permissions. `update_config` cannot grant permissions, change signers, or set spending limits; `request_permissions` proposes policy changes for explicit client approval. Tools use the configured default profile when `profileId` is omitted; an explicit profile overrides it.
 
 Record inventory maintenance (joins and splits) requires a separate permission:
 
@@ -86,6 +86,28 @@ node dist/cli.js configure --profile default --allow-inventory
 ```
 
 This permission also gates `recover_record_inventory` with `rebroadcast: true`. Inventory execution has no separate fee limit. Native credits splits deduct 10,000 microcredits each in addition to network fees. Profiles written before this permission existed report `inventory: false`.
+
+## Approve execution access
+
+For an existing profile, `setup` reports its policy and access guidance under `checks.execution`; `get_config` reads the saved permissions. All four execution flags remain disabled for new profiles. Reads, quotes, and inventory plans require no grant. The [setup flow](../context/shield-swap-setup/configure-shield-swap.md#agentkit-mcp) guides access when the selected task needs it.
+
+`request_permissions` is an additive tool for proposing a persistent policy change. For example, an authorized swap flow may need swaps, claims, an input-token cap, and maximum slippage:
+
+```json
+{"name":"request_permissions","arguments":{"profileId":"SELECTED_PROFILE","permissions":{"swaps":true,"claims":true},"swapLimits":[{"token":"DISCOVERED_INPUT_TOKEN_ID","amount":"1500000"}],"maxSlippageBps":50}}
+```
+
+The amount is illustrative, not authorization. Use the exact token ID and base-unit amount from discovery/quotes and the user's chosen cap. For bridges use `permissions: { bridges: true }` with `bridgeLimits: [{ asset: "ethereum/usdc", amount: "2000000" }]`, substituting the actual quoted source asset and authorized cap. For inventory use `permissions: { inventory: true }` only after explaining joins, splits, fees, and ongoing maintenance authority. Supply only changed fields; omitted permissions and caps are preserved. Caps merge by asset ID, and zero disables that asset. Slippage must be 0–1000 basis points.
+
+The server sends an MCP **form elicitation** request showing the selected account/network, current policy, and proposed policy. A trusted client must show it to the user and return their explicit approval. Ordinary tool arguments cannot confirm it; `approved: true`, keys, and signer changes are rejected. Elicitation relies on the client's honesty about user approval, so do not configure the host to let the model answer these forms. Client-level approval of tool invocation and this persistent server policy are separate controls.
+
+Grants persist for that profile across restarts until revoked. Caps apply **per operation**, not per day or strategy. Claims and inventory have no separate amount or fee cap. Inventory access permits enabled jobs to keep submitting joins/splits and permits recovery rebroadcast; restoring access can allow previously enabled jobs to continue. Permission approval itself submits nothing and starts no job. Review and start the intended maintenance target separately, and use `stop_inventory_maintenance` to disable it.
+
+Results report `approved`, `unchanged`, `declined`, `cancelled`, or `requires_terminal`. Clients without form elicitation receive a shell-quoted `command` for the exact state directory and profile. Have the user review and run it in their trusted terminal; from a repository build, replace `shield-swap-mcp` with `node dist/cli.js`. Keep the passphrase in the terminal or secret manager. The agent must not run this fallback automatically to bypass confirmation.
+
+No locks are held while the form is open. A concurrent profile change invalidates the approval; queued/running/submitted operations also block the update, as they do for terminal configuration. Cancellation, disconnect, malformed approval, and form errors leave the request unapplied. If a response is lost after approval, read `get_config` to determine the saved policy. After approval, recheck quote expiry and any original operation before continuing. No operation is automatically retried.
+
+To revoke through the form, request the relevant flag as `false`, for example `permissions: { inventory: false }`; setting a token cap to `"0"` disables that token. The existing terminal `configure --deny-*` commands still work. For unattended execution, configure access beforehand and return missing requirements to the operator rather than requesting interactive approval. See [permissions](../context/safety/permissions.md#agentkit-mcp-execution-access) for the task-to-access mapping.
 
 ## Configure local bridge wallets
 
@@ -169,7 +191,7 @@ The server uses stdio and does not open a listening port. It can start locked or
 
 | Workflow | Tools |
 | --- | --- |
-| Setup and configuration | `setup`, `get_config`, `update_config`, `list_wallets`, `get_wallet_status` |
+| Setup and configuration | `setup`, `get_config`, `update_config`, `request_permissions`, `list_wallets`, `get_wallet_status` |
 | Markets and balances | `get_balances`, `list_tokens`, `list_pools` |
 | Swaps | `quote`, `execute`, `swap_history`, `claim_unclaimed_swaps` |
 | Bridges | `list_bridge_routes`, `quote_bridge`, `execute_bridge`, `bridge_status`, `recover_bridge_transactions` |
@@ -312,8 +334,11 @@ After installing the tarball into an independent project, run:
 ```sh
 node scripts/smoke-installed.mjs /absolute/path/to/independent-project
 node scripts/smoke-installed-recovery.mjs /absolute/path/to/independent-project
+node scripts/smoke-installed-permissions.mjs /absolute/path/to/independent-project
 ```
 
 The recovery smoke requires Node 22.15 or newer for module hooks. It runs the installed CLI over MCP with simulated SDK outcomes, checking preparation failure, partial batches, uncertain submission, confirmed rejection, and explicit resume across three process restarts. It uses disposable test wallets and makes no network calls or transactions.
 
-This checks the installed SDK/WASM files, local key import, encrypted state, guided profile reuse, structured readiness, all 24 tool schemas over stdio, and restart. No real wallet material belongs in this repository.
+The permissions smoke exercises form approval and decline, unsupported-client fallback, persisted grants across three MCP sessions, and form/terminal revocation. It uses a disposable account without network calls or transactions; the client simulates form responses, so this does not verify any particular host's confirmation UI.
+
+This checks the installed SDK/WASM files, local key import, encrypted state, guided profile reuse, structured readiness, all 28 tool schemas over stdio, and restart. No real wallet material belongs in this repository.
