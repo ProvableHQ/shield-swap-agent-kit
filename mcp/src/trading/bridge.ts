@@ -1,3 +1,4 @@
+import { recoverySignal } from "./recovery-context";
 import {
   BridgeRoutePausedError, createBridgeCheckpoint, DEFAULT_BRIDGE_REGISTRY, parseDecimalAmount,
   type BridgeCheckpoint, type BridgeClient, type BridgeProgress, type BridgeQuote, type BridgeReceipt,
@@ -143,12 +144,12 @@ export class BridgeBackend {
   }
 
   private async recover(client: BridgeClient, state: BridgeState): Promise<BridgeProgress> {
-    const progress = await client.recover({ checkpoint: state.checkpoint! });
+    const progress = await client.recover({ checkpoint: state.checkpoint!, signal: recoverySignal() });
     // Native recovery reconstructs some routes only through source confirmation.
     // Refresh the recovered delivery receipt so destination acceptance can finish
     // the operation instead of restarting at DELIVERY_PENDING on every poll.
     if (progress.next !== "wait" || progress.receipt.status !== "DELIVERY_PENDING") return progress;
-    const receipt = await client.getStatus({ plan: progress.plan, receipt: progress.receipt });
+    const receipt = await client.getStatus({ plan: progress.plan, receipt: progress.receipt, signal: recoverySignal() });
     if (receipt.status === "COMPLETED") return { next: "done", plan: progress.plan, receipt };
     if (receipt.status === "FAILED" || receipt.status === "EXPIRED") return {
       next: "failed", plan: progress.plan, receipt, error: "Bridge delivery failed.",

@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { argumentsFor, configure, help, setup, stateDirectory } from "./terminal";
-import { InventoryMaintenance, recoverOperations } from "./trading/maintenance";
+import { InventoryMaintenance } from "./trading/maintenance";
+import { OperationRecovery } from "./trading/recovery";
 import { ensureMaintainer } from "./trading/maintenance-process";
 import { LockBusyError } from "./trading/store";
 import { TradingError } from "./trading/types";
@@ -41,18 +42,17 @@ async function main(): Promise<void> {
     return;
   }
   const server = createTradingServer(runtime, { stateExists, startMaintainer: runtime ? () => ensureMaintainer(runtime, process.argv[1]) : undefined });
-  let recovering: Promise<void> | undefined;
-  const recoveryTimer = runtime ? setInterval(() => {
-    if (!recovering) recovering = recoverOperations(runtime).catch(() => {}).finally(() => { recovering = undefined; });
-  }, 15_000) : undefined;
+  const recovery = runtime ? new OperationRecovery(runtime) : undefined;
+  const recoveryTimer = recovery ? setInterval(() => recovery.tick(), 15_000) : undefined;
   recoveryTimer?.unref();
   let closing = false;
   const close = async () => {
     if (closing) return;
     closing = true;
     clearInterval(recoveryTimer);
+    const stopped = recovery?.stop();
     await server.close();
-    await recovering;
+    await stopped;
     await runtime?.drain();
     store?.close();
   };

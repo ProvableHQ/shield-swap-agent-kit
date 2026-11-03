@@ -90,7 +90,7 @@ test("the worker advances another token while a check is blocked and stop wins b
   } finally { releaseA(); controller.abort(); await running; await runtime.drain(); store.close(); rmSync(root, { recursive: true, force: true }); }
 });
 
-import { recoverOperations } from "../src/trading/maintenance";
+import { OperationRecovery } from "../src/trading/recovery";
 test("failed recovery lookups cannot starve later operations", async () => {
   const root = mkdtempSync(join(tmpdir(), "recovery-fairness-"));
   const store = new TradingStore(root, "test-password-long-enough", true);
@@ -99,7 +99,10 @@ test("failed recovery lookups cannot starve later operations", async () => {
     const runtime = new TradingRuntime(store, {} as TradingBackend);
     const visited = new Set<string>();
     runtime.status = async id => { visited.add(id); if (Number(id) < 8) throw Error("RPC unavailable"); return { status: "complete" }; };
-    await recoverOperations(runtime); await recoverOperations(runtime);
+    const recovery = new OperationRecovery(runtime);
+    recovery.tick();
+    await new Promise(resolve => setImmediate(resolve));
+    await recovery.stop();
     assert.equal(visited.size, 10);
   } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
 });
@@ -125,4 +128,45 @@ test("stop is rechecked atomically when a maintenance operation is registered", 
     assert.equal(jobs.get(job.id)!.enabled, false);
     assert.equal(jobs.get(job.id)!.activeOperationId, undefined);
   } finally { await runtime.drain(); store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a stalled lookup cannot block recovery for another account", async () => {
+  const root = mkdtempSync(join(tmpdir(), "recovery-stall-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  let release!: () => void;
+  const stalled = new Promise<void>(resolve => release = resolve);
+  let recovery: OperationRecovery | undefined;
+  try {
+    for (let id = 0; id < 10; id++) store.set("operation:" + id, { id: String(id), profileId: id < 8 ? "alice" : "bob", status: "uncertain", updatedAt: id });
+    const runtime = new TradingRuntime(store, {} as TradingBackend);
+    const visited = new Set<string>();
+    runtime.status = async id => { visited.add(id); if (id === "0") await stalled; return { status: "pending" }; };
+    recovery = new OperationRecovery(runtime);
+    for (let tick = 0; tick < 6; tick++) {
+      recovery.tick();
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.ok(visited.has("8") && visited.has("9"), "Bob must progress while Alice's lookup is still stalled");
+  } finally { release(); await recovery?.stop(); store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("refilling recovery slots does not repeatedly decrypt the full operation history", async () => {
+  const root = mkdtempSync(join(tmpdir(), "recovery-history-cost-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  const runtime = new TradingRuntime(store, {} as TradingBackend);
+  const recovery = new OperationRecovery(runtime);
+  try {
+    store.transaction(() => {
+      for (let id = 0; id < 1000; id++) store.set("operation:old" + id, { id: "old" + id, status: "complete", updatedAt: id });
+      for (let id = 0; id < 10; id++) store.set("operation:" + id, { id: String(id), status: "uncertain", updatedAt: id });
+    });
+    let visited = 0, scans = 0;
+    const list = store.list.bind(store);
+    store.list = <T>(prefix: string): T[] => { if (prefix === "operation:") scans++; return list<T>(prefix); };
+    runtime.status = async () => { visited++; return { status: "pending" }; };
+    recovery.tick();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(visited, 10);
+    assert.equal(scans, 1, "discover the queue once per tick, not once per completed lookup");
+  } finally { await recovery.stop(); store.close(); rmSync(root, { recursive: true, force: true }); }
 });

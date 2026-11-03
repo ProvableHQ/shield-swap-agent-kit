@@ -124,16 +124,3 @@ export class InventoryMaintenance {
     });
   }
 }
-
-/** Polling is read-only recovery. It never creates a trade or resumes a claim. */
-const recoveryAttempts = new WeakMap<TradingRuntime, Map<string, number>>();
-export async function recoverOperations(runtime: TradingRuntime): Promise<void> {
-  const pending = runtime.store.list<Operation>("operation:").filter(op => !terminal.has(op.status));
-  const attempts = recoveryAttempts.get(runtime) ?? new Map<string, number>();
-  recoveryAttempts.set(runtime, attempts);
-  const ids = new Set(pending.map(op => op.id));
-  for (const id of attempts.keys()) if (!ids.has(id)) attempts.delete(id);
-  const selected = pending.sort((a, b) => (attempts.get(a.id) ?? 0) - (attempts.get(b.id) ?? 0) || a.updatedAt - b.updatedAt).slice(0, 8);
-  for (const op of selected) attempts.set(op.id, Date.now());
-  await Promise.allSettled(selected.map(op => runtime.status(op.id)));
-}

@@ -1,3 +1,5 @@
+import { setTimeout as sleep } from "node:timers/promises";
+import { checkRecovery, recoverySignal } from "./recovery-context";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { RecordSpend } from "@provablehq/veil-core";
 import type { AleoSession } from "./session";
@@ -16,6 +18,7 @@ export async function withIdentityLock<T>(store: TradingStore, profile: Profile,
   if (held.getStore()?.has(key)) return fn();
   const deadline = Date.now() + 120_000;
   for (;;) {
+    checkRecovery();
     let entered = false;
     try {
       return await store.withLock(scope, () => {
@@ -24,7 +27,7 @@ export async function withIdentityLock<T>(store: TradingStore, profile: Profile,
       });
     } catch (error) {
       if (entered || !(error instanceof LockBusyError) || Date.now() >= deadline) throw error;
-      await new Promise(resolve => setTimeout(resolve, 25));
+      await sleep(25, undefined, { signal: recoverySignal() });
     }
   }
 }

@@ -1,3 +1,5 @@
+import { createPublicClient, createWalletClient, http } from "@provablehq/veil-core";
+import { recoveryFetch, recoverySignal } from "./recovery-context";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { LocalAccount, PublicClient, WalletClient, ProvingConfig } from "@provablehq/veil-core";
 import type { BlindedIdentityRecord, BlindedIdentityStore, ShieldSwapActions } from "@provablehq/shield-swap-sdk";
@@ -79,11 +81,12 @@ export function resolveSecret(ref: SecretRef | undefined, store: TradingStore, e
 export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv = process.env, authenticate = true): SessionFactory {
   const sessions = new Map<string, Promise<AleoSession>>();
   return async profile => {
-    const cacheKey = JSON.stringify({ ...profile, policy: undefined });
+    const recovery = Boolean(recoverySignal());
+    const cacheKey = JSON.stringify({ ...profile, policy: undefined, recovery });
     let pending = sessions.get(cacheKey);
     if (!pending) {
       pending = (async () => {
-        const [{ loadNetwork }, { shieldSwapActions }] = await Promise.all([
+        const [{ loadNetwork, DEFAULT_NETWORK_URL }, { shieldSwapActions }] = await Promise.all([
           import("@provablehq/veil-aleo-sdk"), import("@provablehq/shield-swap-sdk"),
         ]);
         const network = await loadNetwork(profile.network);
@@ -95,12 +98,22 @@ export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv
         // adapter; the SDK's 60s default turns ordinary block latency into an
         // interrupted plan or an uncertain swap. Operations run in background
         // workers, so match the inventory step timeout.
-        const pair = network.createAleoClient({ privateKey: key, networkUrl: profile.networkUrl,
-          provingMode: "delegated", useFeeMaster: profile.useFeeMaster ?? false, confirmationTimeout: 600_000,
-          recordManagement: { enabled: true, store: createRecordInventoryStore(store), chainId: "aleo:" + profile.network } });
+        const recordManagement = { enabled: true, store: createRecordInventoryStore(store), chainId: "aleo:" + profile.network };
+        // Recovery only needs local identity derivation and chain reads. Keep it
+        // independent of writer authentication and scanner registration. Its
+        // required proving config has no execution or transaction-building adapter.
+        const pair = recovery ? (() => {
+          const account = network.privateKeyToAccount(key);
+          const transport = http(profile.networkUrl ?? DEFAULT_NETWORK_URL, { network: profile.network, fetchFn: recoveryFetch });
+          return { account, publicClient: createPublicClient({ transport }),
+            walletClient: createWalletClient({ account, transport, recordManagement, proving: { mode: "local" } }) };
+        })() : network.createAleoClient({ privateKey: key, networkUrl: profile.networkUrl,
+          provingMode: "delegated", useFeeMaster: profile.useFeeMaster ?? false, confirmationTimeout: 600_000, recordManagement });
         if (pair.account.address !== profile.address) throw new TradingError("wallet_mismatch", "Configured key does not match this profile's address.");
-        if (!pair.walletClient.proving) throw new TradingError("proving_unavailable", "The configured SDK has no proving adapter.");
-        trackSwapSubmission(pair.walletClient.proving);
+        if (!recovery) {
+          if (!pair.walletClient.proving) throw new TradingError("proving_unavailable", "The configured SDK has no proving adapter.");
+          trackSwapSubmission(pair.walletClient.proving);
+        }
         const recordId = "identities:" + walletScope(profile);
         const identities: BlindedIdentityStore = {
           load: async () => store.get<BlindedIdentityRecord[]>(recordId) ?? [],
@@ -122,8 +135,8 @@ export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv
             });
           },
         };
-        const client = pair.walletClient.extend(shieldSwapActions({ program: profile.program, api: { baseUrl: profile.apiUrl }, blindedIdentities: identities }));
-        if (authenticate) await client.authenticateShieldSwap();
+        const client = pair.walletClient.extend(shieldSwapActions({ program: profile.program, api: { baseUrl: profile.apiUrl, ...(recovery ? { fetch: recoveryFetch } : {}) }, blindedIdentities: identities }));
+        if (authenticate && !recovery) await client.authenticateShieldSwap();
         return coordinateSession(store, profile, { client, publicClient: pair.publicClient, account: pair.account, identities, submissionTracked: true });
       })();
       sessions.set(cacheKey, pending);
