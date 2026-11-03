@@ -6,6 +6,9 @@ import { join } from "node:path";
 import { TradingStore } from "../src/trading/store";
 import { TradingRuntime } from "../src/trading/runtime";
 import { Maintainer } from "../src/trading/maintainer";
+import { createTradingServer } from "../src/trading/server";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { MaintenanceState, Operation, Profile, TradingBackend } from "../src/trading/types";
 
 const profile: Profile = { id: "alice", network: "testnet", address: "aleo1test", key: { type: "env", name: "TEST_KEY" },
@@ -84,8 +87,11 @@ test("a pass skips while the wallet has an active operation", async () => {
 test("a second maintainer refuses to start while the recorded pid is alive", async () => {
   const f = fixture(["100000"]);
   try {
-    f.store.set(Maintainer.stateKey("alice"), { profileId: "alice", pid: process.pid, startedAt: 1, intervalSeconds: 120, targets: [], running: true });
+    f.store.set(Maintainer.stateKey("alice"), { profileId: "alice", pid: process.ppid, startedAt: 1, intervalSeconds: 120, targets: [], running: true });
     await assert.rejects(f.maintainer.start(), (error: { code: string }) => error.code === "maintainer_running");
+    // A state naming this process is the launcher's own record of us; it does not block.
+    f.store.set(Maintainer.stateKey("alice"), { profileId: "alice", pid: process.pid, startedAt: 1, intervalSeconds: 120, targets: [], running: true });
+    await f.maintainer.start();
     f.store.set(Maintainer.stateKey("alice"), { profileId: "alice", pid: 2 ** 22 + 7, startedAt: 1, intervalSeconds: 120, targets: [], running: true });
     await f.maintainer.start();
     const state = f.store.get<MaintenanceState>(Maintainer.stateKey("alice"));
@@ -94,4 +100,36 @@ test("a second maintainer refuses to start while the recorded pid is alive", asy
     await f.maintainer.stop();
     assert.equal(f.store.get<MaintenanceState>(Maintainer.stateKey("alice"))?.running, false);
   } finally { await f.close(); }
+});
+
+test("maintain_inventory needs inventory permission, launches once, and status and stop follow the launcher", async () => {
+  const f = fixture(["100000"]);
+  const launches: Record<string, unknown>[] = [];
+  const stopped: number[] = [];
+  const launcher = { launch: (options: Record<string, unknown>) => { launches.push(options); return { pid: 2 ** 22 + 11 }; }, stop: (pid: number) => { stopped.push(pid); } };
+  const server = createTradingServer(f.runtime, { stateExists: true, launcher });
+  const client = new Client({ name: "test", version: "1" });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  const call = async (name: string, args: Record<string, unknown>) => (await client.callTool({ name, arguments: args })).structuredContent as Record<string, unknown>;
+  try {
+    await Promise.all([server.connect(a), client.connect(b)]);
+    f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, inventory: false } });
+    const denied = await call("maintain_inventory", { profileId: "alice", targets: [{ token: "USDCx", records: 3, minRecordAmount: "0.1" }] });
+    assert.equal((denied.error as { code: string }).code, "permission_required");
+    assert.equal(launches.length, 0);
+    f.store.set("profile:alice", profile);
+    const started = await call("maintain_inventory", { profileId: "alice", targets: [{ token: "USDCx", records: 3, minRecordAmount: "0.1" }], intervalSeconds: 45 });
+    assert.equal(started.running, true);
+    assert.equal(started.pid, 2 ** 22 + 11);
+    assert.deepEqual(launches, [{ profileId: "alice", targets: [{ token: "USDCx", records: 3, minRecordAmount: "0.1" }], intervalSeconds: 45 }]);
+    const status = await call("get_maintenance_status", { profileId: "alice" });
+    assert.equal(status.running, true);
+    assert.equal(status.alive, false, "the stub pid is not a live process");
+    assert.deepEqual(status.targets, [{ token: "USDCx", records: 3, minRecordAmount: "0.1" }]);
+    const halted = await call("stop_maintenance", { profileId: "alice" });
+    assert.equal(halted.running, false);
+    assert.deepEqual(stopped, [2 ** 22 + 11]);
+    const idle = await call("get_maintenance_status", { profileId: "alice" });
+    assert.equal(idle.running, false);
+  } finally { await client.close(); await server.close(); await f.close(); }
 });

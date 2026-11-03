@@ -4,7 +4,9 @@ import { z } from "zod";
 import { createHash } from "node:crypto";
 import { TradingRuntime } from "./runtime";
 import { onboardingStatus, setupSchema } from "./onboarding";
-import { TradingError, type Kind, type Summary } from "./types";
+import { TradingError, type Kind, type MaintenanceState, type MaintenanceTarget, type Summary } from "./types";
+import { Maintainer, processAlive } from "./maintainer";
+import type { MaintenanceLauncher } from "./maintenance-launcher";
 
 const id = z.string().min(1).max(128);
 const profile = { profileId: id.optional().describe("Defaults to the configured default profile.") };
@@ -37,13 +39,16 @@ const tools = {
   plan_record_inventory: { description: "Plan the joins and splits that reshape one token's private records into the requested count. Saves a reviewable plan ID; submits nothing. minRecordAmount is a human decimal amount.", schema: z.object({ ...profile, token: id, records: z.number().int().min(1).max(1000), minRecordAmount: decimal.optional(), distribution: z.enum(["preserve", "balanced"]).optional(), toleranceBps: z.number().int().min(0).max(10000).optional(), maxTransactions: z.number().int().min(1).max(10000).optional() }).strict(), read: true },
   rebalance_record_inventory: { description: "Execute a saved inventory plan once under the terminal-configured inventory permission and fee limit. Returns an operation ID; poll its status. Accepted joins and splits are never repeated.", schema: z.object({ planId: id, idempotencyKey: id }).strict(), read: false },
   reconcile_record_inventory: { description: "Reconcile this account's record journal against the chain. With rebroadcast, resends saved proved transactions unchanged; that requires inventory permission.", schema: z.object({ ...profile, rebroadcast: z.boolean().default(false) }).strict(), read: false },
+  maintain_inventory: { description: "Start a maintainer process that keeps each listed token at a floor of unreserved records covering minRecordAmount (human decimal). It plans only on a shortfall and runs each plan as an inventory operation under the terminal inventory permission and fee limit. The process exits with this server; operators run the maintain command themselves for one that outlives it.", schema: z.object({ ...profile, targets: z.array(z.object({ token: id, records: z.number().int().min(1).max(1000), minRecordAmount: decimal }).strict()).min(1).max(10), intervalSeconds: z.number().int().min(30).max(3600).default(120) }).strict(), read: false },
+  stop_maintenance: { description: "Stop the profile's maintainer process. A pass already executing a plan finishes that operation's checkpointed steps through normal reconciliation.", schema: z.object(profile).strict(), read: false },
+  get_maintenance_status: { description: "Read the profile's maintainer state: targets, interval, whether its process is alive, and the last pass's ready counts, action and error.", schema: z.object(profile).strict(), read: true },
 } as const;
 type ToolName = keyof typeof tools;
 
 function json(value: unknown): Summary {
   return JSON.parse(JSON.stringify(value, (_key, item) => typeof item === "bigint" ? item.toString() : item)) as Summary;
 }
-export function createTradingServer(runtime?: TradingRuntime, options: { stateExists?: boolean } = {}): Server {
+export function createTradingServer(runtime?: TradingRuntime, options: { stateExists?: boolean; launcher?: MaintenanceLauncher } = {}): Server {
   const server = new Server({ name: "shield-swap-mcp", version: "0.1.0" }, {
     capabilities: { tools: {} },
     instructions: "Trade through saved quotes and durable operations. setup reports required terminal configuration. Never request keys/passwords in chat. execute returns an operation ID. After uncertainty, inspect that operation; do not create a new swap as a retry. A swap's proceeds require a later claim. Record inventory tools inspect, plan and rebalance private records; one operation runs per wallet at a time.",
@@ -68,7 +73,7 @@ export function createTradingServer(runtime?: TradingRuntime, options: { stateEx
         output = await onboardingStatus(runtime, setupSchema.parse(args), options.stateExists);
       } else {
         if (!runtime) throw new TradingError("setup_required", "Wallet state is not unlocked. Run terminal setup and configure the process passphrase.");
-        output = await call(runtime, name, args);
+        output = await call(runtime, name, args, options.launcher);
       }
     } catch (error) {
       isError = true;
@@ -80,7 +85,7 @@ export function createTradingServer(runtime?: TradingRuntime, options: { stateEx
   return server;
 }
 
-async function call(runtime: TradingRuntime, name: ToolName, args: Summary): Promise<Summary> {
+async function call(runtime: TradingRuntime, name: ToolName, args: Summary, launcher?: MaintenanceLauncher): Promise<Summary> {
   const profileId = String(args.profileId ?? runtime.store.get<Summary>("settings")?.defaultProfile ?? "default");
   switch (name) {
     case "get_config": return { profiles: runtime.profiles(), defaults: runtime.store.get("settings") ?? {} };
@@ -133,6 +138,32 @@ async function call(runtime: TradingRuntime, name: ToolName, args: Summary): Pro
         if (!existing) runtime.store.set(key, { intent, quoteId });
         return runtime.execute(quoteId, String(args.idempotencyKey));
       });
+    }
+    case "maintain_inventory": {
+      const profile = runtime.profile(profileId);
+      if (!profile.policy.inventory) throw new TradingError("permission_required", "Inventory maintenance permission must be enabled in terminal setup.");
+      if (!launcher) throw new TradingError("unavailable", "This server cannot launch a maintainer process.");
+      const existing = runtime.store.get<MaintenanceState>(Maintainer.stateKey(profileId));
+      if (existing?.running && processAlive(existing.pid)) throw new TradingError("maintainer_running", `A maintainer for this profile is already running as pid ${existing.pid}; stop it first.`);
+      const targets = (args.targets as MaintenanceTarget[]).map(target => ({ token: String(target.token), records: Number(target.records), minRecordAmount: String(target.minRecordAmount) }));
+      const intervalSeconds = Number(args.intervalSeconds ?? 120);
+      const { pid } = launcher.launch({ profileId, targets, intervalSeconds });
+      const state: MaintenanceState = { profileId, pid, startedAt: Date.now(), intervalSeconds, targets, running: true, ...(existing?.lastPass ? { lastPass: existing.lastPass } : {}) };
+      runtime.store.set(Maintainer.stateKey(profileId), state);
+      return { ...state, alive: processAlive(pid) };
+    }
+    case "stop_maintenance": {
+      const state = runtime.store.get<MaintenanceState>(Maintainer.stateKey(profileId));
+      if (!state) throw new TradingError("maintenance_missing", "No maintainer has been started for this profile.");
+      if (state.running) launcher?.stop(state.pid);
+      const stopped = { ...state, running: false };
+      runtime.store.set(Maintainer.stateKey(profileId), stopped);
+      return { ...stopped, alive: processAlive(state.pid) };
+    }
+    case "get_maintenance_status": {
+      const state = runtime.store.get<MaintenanceState>(Maintainer.stateKey(profileId));
+      if (!state) return { profileId, running: false, alive: false, targets: [] };
+      return { ...state, alive: state.running && processAlive(state.pid) };
     }
     default: return runtime.read(name, profileId, args);
   }

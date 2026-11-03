@@ -54,6 +54,14 @@ configure changes trusted terminal permissions:
   --evm-wallet-env NAME / --solana-wallet-env NAME
                           Hosted wallet descriptor JSON with credential references
 
+maintain keeps each token at a floor of covering records as a process:
+  node dist/cli.js maintain --profile NAME --target TOKEN=RECORDS:MIN [--target …]
+  --interval SECONDS       Seconds between passes (30–3600, default 120)
+  --once                   Run one pass and exit
+  --parent PID             Exit when that process is gone (set by the server)
+A pass plans only on a shortfall and runs the plan as an inventory
+operation under the profile's inventory permission and fee limit.
+
 New profiles have execution disabled. Setup/configure require a hidden
 passphrase prompt or SHIELD_SWAP_MCP_PASSWORD from your secret manager.
 serve uses SHIELD_SWAP_MCP_PASSWORD and never prompts on MCP stdin.
@@ -77,11 +85,13 @@ export function argumentsFor(argv: string[]) {
       "evm-key-env": { type: "string" }, "evm-rpc-url": { type: "string" },
       "solana-key-env": { type: "string" }, "solana-rpc-url": { type: "string" },
       "evm-wallet-env": { type: "string" }, "solana-wallet-env": { type: "string" },
+      target: { type: "string", multiple: true }, interval: { type: "string" }, once: { type: "boolean" }, parent: { type: "string" },
     } });
     const command = parsed.positionals[0] ?? "serve";
-    if (parsed.positionals.length > 1 || !["setup", "configure", "serve"].includes(command)) throw new Error();
+    if (parsed.positionals.length > 1 || !["setup", "configure", "serve", "maintain"].includes(command)) throw new Error();
     const allowed = command === "setup" ? new Set(["help", "state-dir", "profile", "network", "guided", "key-env", "store-key", "generate", "network-url", "api-url", "fee-master"])
       : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "allow-inventory", "deny-inventory", "swap-limit", "bridge-limit", "inventory-fee-limit", "max-slippage-bps", "max-batch-swaps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
+      : command === "maintain" ? new Set(["help", "state-dir", "profile", "target", "interval", "once", "parent"])
       : new Set(["help", "state-dir"]);
     if (Object.keys(parsed.values).some(key => !allowed.has(key))) throw new Error();
     return { command, values: parsed.values };

@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { argumentsFor } from "../src/terminal";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { resolve } from "node:path";
@@ -78,7 +79,7 @@ test("terminal setup encrypts an imported key and stdio survives process restart
       transport.stderr?.on("data", chunk => { diagnostics += chunk.toString(); });
       try {
         await client.connect(transport);
-        assert.equal((await client.listTools()).tools.length, 24);
+        assert.equal((await client.listTools()).tools.length, 27);
         const setup = await client.callTool({ name: "setup", arguments: {} });
         assert.equal((setup.structuredContent as { checks: { account: { status: string } } }).checks.account.status, "configured");
         const wallets = await client.callTool({ name: "list_wallets", arguments: {} });
@@ -171,4 +172,15 @@ test("guided creation without a supplied choice fails without a TTY instead of g
     try { assert.equal(store.list("profile:").length, 0); assert.equal(store.list("secret:").length, 0); }
     finally { store.close(); }
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("maintain parses repeatable targets, an interval, a once flag and a parent pid", () => {
+  const { command, values } = argumentsFor(["maintain", "--profile", "p", "--target", "USDCx=8:0.1", "--target", "ETH=4:0.0001", "--interval", "60", "--once", "--parent", "1234"]);
+  assert.equal(command, "maintain");
+  assert.deepEqual(values.target, ["USDCx=8:0.1", "ETH=4:0.0001"]);
+  assert.equal(values.interval, "60");
+  assert.equal(values.once, true);
+  assert.equal(values.parent, "1234");
+  assert.throws(() => argumentsFor(["maintain", "--allow-swaps"]), "configure flags are not maintain flags");
+  assert.throws(() => argumentsFor(["serve", "--target", "USDCx=8:0.1"]), "maintain flags are not serve flags");
 });

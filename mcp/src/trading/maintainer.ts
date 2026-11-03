@@ -4,7 +4,7 @@ import { TradingError, type MaintenanceState, type MaintenanceTarget, type Summa
 const TARGET = /^([^=\s:]{1,128})=([1-9][0-9]{0,3}):((?:0|[1-9][0-9]*)(?:\.[0-9]+)?)$/;
 const finalStatuses = new Set(["complete", "failed", "uncertain"]);
 
-function processAlive(pid: number): boolean {
+export function processAlive(pid: number): boolean {
   try { process.kill(pid, 0); return true; }
   catch (error) { return (error as { code?: string }).code === "EPERM"; }
 }
@@ -44,7 +44,9 @@ export class Maintainer {
   async start(): Promise<void> {
     this.runtime.profile(this.profileId);
     const existing = this.state();
-    if (existing?.running && processAlive(existing.pid)) {
+    // The launcher records the child's pid before the child starts, so a
+    // state naming this process is ours to take over.
+    if (existing?.running && existing.pid !== process.pid && processAlive(existing.pid)) {
       throw new TradingError("maintainer_running", `A maintainer for this profile is already running as pid ${existing.pid}; stop it first.`);
     }
     this.save({ pid: process.pid, startedAt: this.now(), intervalSeconds: this.intervalSeconds, targets: this.targets, running: true });
