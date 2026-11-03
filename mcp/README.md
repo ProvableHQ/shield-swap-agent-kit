@@ -85,7 +85,7 @@ Record inventory maintenance (joins and splits) is a separate permission with it
 node dist/cli.js configure --profile default --allow-inventory --inventory-fee-limit 5000000
 ```
 
-The limit is the total network fee in microcredits that one `rebalance_record_inventory` operation may spend; absent or zero prevents execution, and native credits splits deduct 10,000 microcredits each in addition to fees. It also gates `reconcile_record_inventory` with `rebroadcast: true`. Profiles written before this permission existed report `inventory: false`.
+The limit is the total network fee in microcredits that one `rebalance_record_inventory` operation may spend; absent or zero prevents execution, and native credits splits deduct 10,000 microcredits each in addition to fees. It also gates `recover_record_inventory` with `rebroadcast: true`. Profiles written before this permission existed report `inventory: false`.
 
 ## Configure local bridge wallets
 
@@ -173,8 +173,8 @@ The server uses stdio and does not open a listening port. It can start locked or
 | Markets and balances | `get_balances`, `list_tokens`, `list_pools` |
 | Swaps | `quote`, `execute`, `swap_history`, `claim_unclaimed_swaps` |
 | Bridges | `list_bridge_routes`, `quote_bridge`, `execute_bridge`, `bridge_status`, `recover_bridge_transactions` |
-| Maintenance | `start_inventory_maintenance`, `stop_inventory_maintenance`, `get_inventory_maintenance`, `check_inventory_maintenance` |
-| Record inventory | `get_record_inventory`, `plan_record_inventory`, `rebalance_record_inventory`, `reconcile_record_inventory` |
+| Maintenance | `start_inventory_maintenance`, `stop_inventory_maintenance`, `get_inventory_maintenance_status` |
+| Record inventory | `get_record_inventory`, `plan_record_inventory`, `rebalance_record_inventory`, `recover_record_inventory` |
 | Durable operations | `get_operation_status`, `list_operations`, `resume_operation` |
 
 `get_balances` includes public AMM tokens, underlying public bridge tokens, and native Aleo fee credits. Its `publicByProgram` breakdown identifies where those balances live; private records remain separate. A total balance does not imply that every operation can spend every balance type.
@@ -201,7 +201,9 @@ The session creates its Veil wallet client with `recordManagement` enabled, usin
 
 Each proved transaction ID is checkpointed once the SDK has journaled it and before its broadcast; a proof the SDK rejects, such as one over the fee limit, is never recorded as evidence. The wallet client waits up to ten minutes for each managed write to confirm, matching the per-step inventory timeout. A `complete` operation lists `transactionIds` and `completedSteps`. An interruption with no submitted transaction fails as `not_submitted`. An interruption after submission is `uncertain` with `reasonCode` (`confirmation_timeout`, `inventory_changed`, `transaction_rejected`, `fee_limit`, `cancelled`, or `interrupted`); `get_operation_status` reconciles the journal until every listed transaction is confirmed or rejected, then reports `failed` with `nextAction: "plan_again"`. A checkpointed ID the journal never recorded is looked up on chain; because the SDK journals every proof before broadcasting it, an ID absent from both resolves as `not_submitted` rather than blocking the wallet. Accepted joins and splits remain on chain, and `resume_operation` never re-executes a plan.
 
-`reconcile_record_inventory` returns sanitized journal metadata without saved transaction payloads or raw SDK errors. With `rebroadcast: true` it resends saved proved transactions unchanged and reports `rebroadcastAttempts` and `rebroadcastFailed`; broadcast acceptance is not confirmation. Reconciliation first obtains each operation's OS lock. It skips live writers and cancels an abandoned local reservation only if no transaction was prepared. A missing chain response or failed rebroadcast never frees a prepared input. Confirmed inputs remain excluded while the scanner catches up.
+`recover_record_inventory` returns sanitized journal metadata without saved transaction payloads or raw SDK errors. With `rebroadcast: true` it resends saved proved transactions unchanged and reports `rebroadcastAttempts` and `rebroadcastFailed`; broadcast acceptance is not confirmation. Reconciliation first obtains each operation's OS lock. It skips live writers and cancels an abandoned local reservation only if no transaction was prepared. A missing chain response or failed rebroadcast never frees a prepared input. Confirmed inputs remain excluded while the scanner catches up.
+
+The former MCP names `reconcile_record_inventory` and `get_inventory_maintenance` remain callable compatibility aliases, omitted from tool discovery. Use `recover_record_inventory` and `get_inventory_maintenance_status` for new integrations. `check_inventory_maintenance` is no longer an MCP tool; the worker runs checks internally. SDK method names are unchanged.
 
 ### Independent concurrent trades
 
@@ -223,11 +225,11 @@ The SDK journal separately uses `reserved`, `prepared`, `submitted`, `confirmed`
 
 ### Per-token maintenance
 
-After terminal authorization, call `start_inventory_maintenance` with `token`, `records`, `minRecordAmount` (human decimal), and optional `intervalSeconds` (default 120). This authorizes recurring replenishment under the inventory fee limit **per plan**, not a daily budget. It saves a job scoped to network, account and the canonical underlying token program, then starts one worker for the state directory. For example, a USDCx job targeting eight records covering 0.1 USDCx is independent of an ALEO job targeting four records covering 1 ALEO.
+After terminal authorization, call `start_inventory_maintenance` with `token`, `records`, `minRecordAmount` (human decimal), and optional `intervalSeconds` (default 120). This authorizes recurring replenishment under the inventory fee limit **per plan**, not a daily budget. It saves a job scoped to network, account and the canonical underlying token program, schedules an immediate pass, then starts one worker for the state directory. For example, a USDCx job targeting eight records covering 0.1 USDCx is independent of an ALEO job targeting four records covering 1 ALEO.
 
-A pass reconciles the existing operation first. If none is unresolved, it counts unreserved covering records and plans a `floor` target only on a shortfall. Veil 0.16.1 floor planning splits available records without joining already suitable records. The worker records the operation ID and moves on; confirmation for one token does not block checks for another. Manual `check_inventory_maintenance` uses the same token lock. A directly submitted inventory plan participates in the same atomic operation registration. `get_record_inventory` remains an immediate, non-reserving snapshot.
+A pass reconciles the existing operation first. If none is unresolved, it counts unreserved covering records and plans a `floor` target only on a shortfall. Veil 0.16.1 floor planning splits available records without joining already suitable records. The worker records the operation ID and moves on; confirmation for one token does not block checks for another. A directly submitted inventory plan participates in the same atomic operation registration. `get_record_inventory` remains an immediate, non-reserving snapshot.
 
-`get_inventory_maintenance` returns each job's `enabled`, `target`, `coveringRecords`, `checkedAt`, `activeOperationId`, `operationStatus` and `lastError`, plus `workerRunning`. Snapshot counts are not reservations. `stop_inventory_maintenance` disables new plans for that job; it leaves submitted work available for reconciliation and other tokens enabled. An uncertain operation retains its ID until resolved. A failed pass remains visible before a later pass prepares a fresh plan from current inventory.
+`get_inventory_maintenance_status` returns each job's `enabled`, `target`, `coveringRecords`, `checkedAt`, `activeOperationId`, `operationStatus` and `lastError`, plus `workerRunning`. Status reads only the saved observations and worker state; it never triggers a maintenance pass. Snapshot counts are not reservations. `stop_inventory_maintenance` disables new plans for that job; it leaves submitted work available for reconciliation and other tokens enabled. An uncertain operation retains its ID until resolved. A failed pass remains visible before a later pass prepares a fresh plan from current inventory.
 
 The worker uses an OS-held lock rather than persistent PID ownership. It stays idle when no targets are enabled. It drains on SIGINT/SIGTERM, releases its lock on a crash, and reopens durable jobs on restart. Run `shield-swap-mcp maintain` under a service manager if automatic process restart is required; the MCP start tool can also restart it. Credentials come from the same environment or encrypted state, never tool arguments.
 

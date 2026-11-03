@@ -193,7 +193,7 @@ test("reconciling releases reservations whose local writer died before proving",
     const wallet = await f.inventoryStore.acquire(entry(["3group"], { scope: plan.scope, accountType: "rpc" }));
     const prepared = await f.inventoryStore.acquire(entry(["4group"], { scope: plan.scope }));
     await f.inventoryStore.update(plan.scope, prepared!.id, { status: "prepared", transactionId: "at1prepared" });
-    const journal = await f.runtime.read("reconcile_record_inventory", "alice", {});
+    const journal = await f.runtime.read("recover_record_inventory", "alice", {});
     const statuses = Object.fromEntries((journal.entries as { id: string; status: string }[]).map(item => [item.id, item.status]));
     assert.deepEqual(statuses, { [orphan!.id]: "cancelled", [wallet!.id]: "reserved", [prepared!.id]: "prepared" });
     assert.equal(journal.unresolvedCount, 2, "an opaque wallet submission and a saved proof stay unresolved");
@@ -213,11 +213,11 @@ test("inventory reads report counts and amounts without plaintext, and rebroadca
     assert.equal(inventory.reservedCount, 1);
     assert.deepEqual(inventory.available, [{ id: "1group", amount: "600000" }]);
     assert.doesNotMatch(JSON.stringify(inventory), /PRIVATE-RECORD-PLAINTEXT/);
-    const journal = await f.runtime.read("reconcile_record_inventory", "alice", {});
+    const journal = await f.runtime.read("recover_record_inventory", "alice", {});
     assert.equal(journal.unresolvedCount, 1);
     assert.deepEqual((journal.entries as { savedTransaction: boolean; status: string }[]).map(entry => [entry.status, entry.savedTransaction]), [["prepared", true]]);
     assert.doesNotMatch(JSON.stringify(journal), /PRIVATE-PROOF/);
-    await assert.rejects(f.runtime.read("reconcile_record_inventory", "alice", { rebroadcast: true }), /permission/);
+    await assert.rejects(f.runtime.read("recover_record_inventory", "alice", { rebroadcast: true }), /permission/);
   } finally { await f.close(); }
 });
 

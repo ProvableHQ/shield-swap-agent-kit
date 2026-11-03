@@ -38,14 +38,18 @@ const tools = {
   resume_operation: { description: "Reconcile and resume a claim or bridge only when the SDK identifies a safe next step. Never repeats a swap deposit.", schema: z.object(operation).strict(), read: false },
   start_inventory_maintenance: { description: "Enable recurring inventory replenishment for one token and start the shared worker. Each floor plan can spend up to the terminal-configured inventory fee limit. Requires inventory permission.", schema: z.object(maintenanceTarget).strict(), read: false },
   stop_inventory_maintenance: { description: "Disable new replenishment for one token. Already submitted work remains reserved and reconciled.", schema: z.object({ maintenanceId: id }).strict(), read: false },
-  get_inventory_maintenance: { description: "Read per-token targets, observations, active operations and errors, plus whether the worker is running.", schema: z.object({ maintenanceId: id.optional() }).strict(), read: true },
-  check_inventory_maintenance: { description: "Run one check of a saved token job using the same coordination as the timer. Enabled jobs may replenish; disabled jobs only inspect and reconcile. A concurrent check returns the current snapshot.", schema: z.object({ maintenanceId: id }).strict(), read: false },
+  get_inventory_maintenance_status: { description: "Read saved per-token targets, observations, active operations and errors, plus whether the worker is running. Does not run maintenance or submit transactions.", schema: z.object({ maintenanceId: id.optional() }).strict(), read: true },
   get_record_inventory: { description: "Read one token's spendable private records: available and reserved records with base-unit amounts. Reserves and spends nothing.", schema: z.object({ ...profile, token: id }).strict(), read: true },
   plan_record_inventory: { description: "Plan the joins and splits that reshape one token's private records into the requested count. Saves a reviewable plan ID; submits nothing. minRecordAmount is a human decimal amount.", schema: z.object({ ...profile, token: id, records: z.number().int().min(1).max(1000), minRecordAmount: decimal.optional(), distribution: z.enum(["floor", "preserve", "balanced"]).optional(), toleranceBps: z.number().int().min(0).max(10000).optional(), maxTransactions: z.number().int().min(1).max(10000).optional() }).strict(), read: true },
   rebalance_record_inventory: { description: "Execute a saved inventory plan once under the terminal-configured inventory permission and fee limit. Returns an operation ID; poll its status. Accepted joins and splits are never repeated.", schema: z.object({ planId: id, idempotencyKey: id }).strict(), read: false },
-  reconcile_record_inventory: { description: "Reconcile this account's record journal against the chain. With rebroadcast, resends saved proved transactions unchanged; that requires inventory permission.", schema: z.object({ ...profile, rebroadcast: z.boolean().default(false) }).strict(), read: false },
+  recover_record_inventory: { description: "Recover pending record spends by checking their original transactions and releasing reservations only when safe. With rebroadcast, resends saved proved transactions unchanged; that requires inventory permission.", schema: z.object({ ...profile, rebroadcast: z.boolean().default(false) }).strict(), read: false },
 } as const;
 type ToolName = keyof typeof tools;
+// Existing callers can migrate without adding duplicate names to tool discovery.
+const legacyToolNames = {
+  reconcile_record_inventory: "recover_record_inventory",
+  get_inventory_maintenance: "get_inventory_maintenance_status",
+} as const satisfies Record<string, ToolName>;
 
 function json(value: unknown): Summary {
   return JSON.parse(JSON.stringify(value, (_key, item) => typeof item === "bigint" ? item.toString() : item)) as Summary;
@@ -66,7 +70,9 @@ export function createTradingServer(runtime?: TradingRuntime, options: { stateEx
     let output: Summary;
     let isError = false;
     try {
-      const name = request.params.name as ToolName;
+      const requested = request.params.name;
+      const name = (Object.hasOwn(legacyToolNames, requested)
+        ? legacyToolNames[requested as keyof typeof legacyToolNames] : requested) as ToolName;
       if (!Object.hasOwn(tools, name)) throw new TradingError("unknown_tool", "Unknown tool.");
       const parsed = tools[name].schema.safeParse(request.params.arguments ?? {});
       if (!parsed.success) throw new TradingError("invalid_arguments", "Invalid tool arguments. Check the tool schema; keys and permission grants are never accepted.");
@@ -104,8 +110,7 @@ async function call(runtime: TradingRuntime, name: ToolName, args: Summary, star
       return { ...job, workerRunning: await jobs.running() };
     }
     case "stop_inventory_maintenance": return { ...new InventoryMaintenance(runtime).stop(String(args.maintenanceId)) };
-    case "check_inventory_maintenance": return { ...await new InventoryMaintenance(runtime).check(String(args.maintenanceId)) };
-    case "get_inventory_maintenance": {
+    case "get_inventory_maintenance_status": {
       const jobs = new InventoryMaintenance(runtime);
       return { jobs: args.maintenanceId ? [jobs.get(String(args.maintenanceId))].filter(Boolean) : jobs.list(), workerRunning: await jobs.running() };
     }

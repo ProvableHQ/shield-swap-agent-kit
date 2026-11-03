@@ -184,7 +184,7 @@ export class VeilBackend implements TradingBackend {
       // A prepared or submitted transaction without a chain result keeps its
       // inputs reserved. A missing lookup never proves rejection.
       return { status: "uncertain", result: { ...base, nextAction: "reconcile", error: { code: "maintenance_uncertain",
-        message: "Submitted inventory transactions have no confirmed outcome yet. Reconcile again; after inspection, reconcile_record_inventory with rebroadcast can resend a saved transaction." } } };
+        message: "Submitted inventory transactions have no confirmed outcome yet. Reconcile again; after inspection, recover_record_inventory with rebroadcast can resend a saved transaction." } } };
     }
     if (ids.every(id => transactions[id] === "not_submitted")) return { status: "failed", result: { ...base, nextAction: "plan_again",
       error: { code: "not_submitted", message: "Inventory maintenance did not submit a transaction. Read the inventory and plan again." } } };
@@ -240,7 +240,7 @@ export class VeilBackend implements TradingBackend {
           asset: inventory.asset, balance: inventory.balance.toString(), availableCount: inventory.available.length, reservedCount: inventory.reserved.length,
           available: inventory.available.map(recordRow), reserved: inventory.reserved.map(recordRow) };
       }
-      case "reconcile_record_inventory": {
+      case "recover_record_inventory": {
         const rebroadcast = input.rebroadcast === true;
         if (rebroadcast && !profile.policy.inventory) throw new TradingError("permission_required", "Rebroadcasting saved inventory transactions requires inventory permission in terminal setup.");
         const journal = await reconcileJournal(session, { rebroadcast });

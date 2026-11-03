@@ -30,7 +30,7 @@ The standalone server enables record management on its session and keeps the jou
 
 A `complete` operation lists its `transactionIds` and `completedSteps`. A `failed` operation with `not_submitted` sent nothing. An `uncertain` operation stopped after submitting; reconcile it until every listed transaction is confirmed or rejected, then it reports `failed` with `nextAction: "plan_again"`. `resume_operation` never re-executes a plan. Permission changes are refused while an operation is queued or running.
 
-`reconcile_record_inventory` returns the journal without saved transaction payloads and an `unresolvedCount`. With `rebroadcast: true`, it resends saved proved transactions unchanged; that requires the inventory permission and is a decision taken after inspecting the entries, not a routine poll.
+`recover_record_inventory` returns the journal without saved transaction payloads and an `unresolvedCount`. With `rebroadcast: true`, it resends saved proved transactions unchanged; that requires the inventory permission and is a decision taken after inspecting the entries, not a routine poll.
 
 The MCP supports independent concurrent swaps using distinct reserved inputs. Prepare enough covering records for the intended amounts, or configure recurring per-token maintenance. See [concurrent swaps](concurrent-swaps.md#agentkit-mcp) for execution and recovery.
 

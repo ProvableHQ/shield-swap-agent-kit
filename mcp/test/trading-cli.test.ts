@@ -78,7 +78,7 @@ test("terminal setup encrypts an imported key and stdio survives process restart
       transport.stderr?.on("data", chunk => { diagnostics += chunk.toString(); });
       try {
         await client.connect(transport);
-        assert.equal((await client.listTools()).tools.length, 28);
+        assert.equal((await client.listTools()).tools.length, 27);
         const setup = await client.callTool({ name: "setup", arguments: {} });
         assert.equal((setup.structuredContent as { checks: { account: { status: string } } }).checks.account.status, "configured");
         const wallets = await client.callTool({ name: "list_wallets", arguments: {} });
