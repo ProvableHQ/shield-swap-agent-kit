@@ -90,7 +90,7 @@ function inventoryFixture(rebalance: () => Promise<Record<string, unknown>>, jou
   const session = { client: {
     tokenData: async (symbol: string) => { assert.equal(symbol, "USDCx"); return token; },
     planInventory: async (params: Record<string, unknown>) => { calls.push(params); return plan; },
-    rebalanceRecordInventory: async (params: { plan: unknown; maxFeeMicrocredits: bigint }) => { calls.push(params); return rebalance(); },
+    rebalanceRecordInventory: async (params: Record<string, unknown>) => { calls.push(params); return rebalance(); },
     reconcileRecordInventory: async () => journal(),
     recordManagement: { enabled: true, store: inventoryStore, chainId: "aleo:testnet" },
     getRecordInventory: async () => ({ asset: plan.asset, balance: 600000n,
@@ -103,7 +103,7 @@ function inventoryFixture(rebalance: () => Promise<Record<string, unknown>>, jou
   return { store, runtime, calls, inventoryStore, close: async () => { await runtime.drain(); store.close(); rmSync(root, { recursive: true, force: true }); } };
 }
 
-test("inventory plans are durable and rebalancing needs terminal permission and a fee limit", async () => {
+test("inventory plans are durable and terminal permission permits execution without a fee limit", async () => {
   const f = inventoryFixture(async () => ({ status: "complete", transactionIds: ["at1split"], completedSteps: 1 }), () => []);
   try {
     const saved = await f.runtime.quote("inventory", "alice", { token: "USDCx", records: 2, minRecordAmount: "0.1", distribution: "balanced", toleranceBps: 0, maxTransactions: 24 });
@@ -114,20 +114,31 @@ test("inventory plans are durable and rebalancing needs terminal permission and 
     assert.ok(Number(saved.expiresAt) > Date.now() + 120_000, "a plan may be reviewed longer than a swap quote");
     await assert.rejects(f.runtime.execute(String(saved.quoteId), "run-1"), /permission/);
     f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, inventory: true } });
-    await assert.rejects(f.runtime.execute(String(saved.quoteId), "run-1"), /fee limit/);
-    f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, inventory: true, inventoryFeeLimit: "5000000" } });
     const op = await f.runtime.execute(String(saved.quoteId), "run-1");
     const duplicate = await f.runtime.execute(String(saved.quoteId), "run-1");
     assert.equal(duplicate.operationId, op.operationId);
     await f.runtime.drain();
-    const executed = f.calls[1] as { plan: unknown; maxFeeMicrocredits: bigint };
+    const executed = f.calls[1];
     assert.deepEqual(executed.plan, plan, "the stored plan round-trips its bigint amounts unchanged");
-    assert.equal(executed.maxFeeMicrocredits, 5000000n);
+    assert.equal("maxFeeMicrocredits" in executed, false);
     const done = f.runtime.operation(String(op.operationId));
     assert.equal(done.status, "complete");
     assert.deepEqual(done.transactionIds, ["at1split"]);
     assert.equal(done.completedSteps, 1);
+    assert.equal("maxFeeMicrocredits" in done, false);
     await assert.rejects(f.runtime.execute(String(saved.quoteId), "run-2"), /consumed/);
+  } finally { await f.close(); }
+});
+
+test("legacy saved inventory fee limits do not block execution or reach the SDK", async () => {
+  const f = inventoryFixture(async () => ({ status: "complete", transactionIds: [], completedSteps: 0 }), () => []);
+  f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, inventory: true, inventoryFeeLimit: "0" } });
+  try {
+    const quote = await f.runtime.quote("inventory", "alice", { token: "USDCx", records: 2 });
+    const op = await f.runtime.execute(String(quote.quoteId), "legacy");
+    await f.runtime.drain();
+    assert.equal(f.runtime.operation(String(op.operationId)).status, "complete");
+    assert.equal("maxFeeMicrocredits" in f.calls[1], false);
   } finally { await f.close(); }
 });
 
@@ -137,7 +148,7 @@ test("an interrupted rebalance keeps prepared transaction evidence and reconcile
     inventoryContext.getStore()!.prepared("at1join");
     return { status: "interrupted", transactionIds: [], completedSteps: 0, reason: "Timed out confirming at1join; reservation retained PRIVATE-DETAIL" };
   }, () => [{ id: "1", scope: plan.scope, records: ["1group"], program: "usdcx_stablecoin.aleo", function: "join", status, createdAt: 1, accountType: "local", transactionId: "at1join" }]);
-  f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, inventory: true, inventoryFeeLimit: "1" } });
+  f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, inventory: true } });
   try {
     const saved = await f.runtime.quote("inventory", "alice", { token: "USDCx", records: 2 });
     const op = await f.runtime.execute(String(saved.quoteId), "run");
@@ -166,9 +177,9 @@ test("a checkpointed transaction the journal never recorded resolves from chain 
   let chain: (id: string) => Promise<unknown> = async () => { throw Object.assign(new Error("gateway timeout"), { status: 504 }); };
   const f = inventoryFixture(async () => {
     inventoryContext.getStore()!.prepared("at1ghost");
-    return { status: "interrupted", transactionIds: [], completedSteps: 0, reason: "Proved transaction exceeds maxFeeMicrocredits" };
+    return { status: "interrupted", transactionIds: [], completedSteps: 0, reason: "Transaction checkpoint failed" };
   }, () => [], id => chain(id));
-  f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, inventory: true, inventoryFeeLimit: "1" } });
+  f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, inventory: true } });
   try {
     const saved = await f.runtime.quote("inventory", "alice", { token: "USDCx", records: 2 });
     const op = await f.runtime.execute(String(saved.quoteId), "run");
@@ -223,7 +234,7 @@ test("inventory reads report counts and amounts without plaintext, and rebroadca
 
 test("a plan rejected by the SDK before any submission fails definitively", async () => {
   const f = inventoryFixture(async () => { throw new Error("Inventory plan belongs to another account or chain PRIVATE-DETAIL"); }, () => []);
-  f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, inventory: true, inventoryFeeLimit: "1" } });
+  f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, inventory: true } });
   try {
     const saved = await f.runtime.quote("inventory", "alice", { token: "USDCx", records: 2 });
     const op = await f.runtime.execute(String(saved.quoteId), "run");

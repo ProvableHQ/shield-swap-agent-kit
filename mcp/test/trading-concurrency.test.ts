@@ -8,7 +8,7 @@ import { TradingRuntime } from "../src/trading/runtime";
 import { TradingError, type TradingBackend, type Profile, type SavedQuote, type Operation } from "../src/trading/types";
 
 const profile: Profile = { id: "alice", network: "testnet", address: "aleo1test", key: { type: "env", name: "TEST_KEY" },
-  policy: { swaps: true, claims: true, bridges: true, inventory: true, inventoryFeeLimit: "1000", maxSlippageBps: 100,
+  policy: { swaps: true, claims: true, bridges: true, inventory: true, maxSlippageBps: 100,
     swapLimits: { A: "100", B: "100" }, bridgeLimits: { A: "100" } } };
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "concurrent-trades-"));

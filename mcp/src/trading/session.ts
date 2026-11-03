@@ -53,7 +53,7 @@ export function trackSwapSubmission(proving: ProvingConfig): void {
     // Managed writes always supply a progress handler; only observe an existing
     // one so the SDK's broadcast behavior for unmanaged calls stays unchanged.
     const result = await execute(onProgress ? { ...options, onProgress: async event => {
-      // The SDK's handler enforces the fee ceiling and journals the proof. A
+      // The SDK's handler validates the transaction and journals its proof. A
       // proof it rejects is never broadcast, so it is not submission evidence.
       await onProgress(event);
       if (event.type === "transaction-prepared") {
@@ -109,7 +109,7 @@ export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv
           return { account, publicClient: createPublicClient({ transport }),
             walletClient: createWalletClient({ account, transport, recordManagement, proving: { mode: "local" } }) };
         })() : network.createAleoClient({ privateKey: key, networkUrl: profile.networkUrl,
-          provingMode: "delegated", useFeeMaster: profile.useFeeMaster ?? false, confirmationTimeout: 600_000, recordManagement });
+          provingMode: "delegated", useFeeMaster: profile.useFeeMaster ?? true, confirmationTimeout: 600_000, recordManagement });
         if (pair.account.address !== profile.address) throw new TradingError("wallet_mismatch", "Configured key does not match this profile's address.");
         if (!recovery) {
           if (!pair.walletClient.proving) throw new TradingError("proving_unavailable", "The configured SDK has no proving adapter.");

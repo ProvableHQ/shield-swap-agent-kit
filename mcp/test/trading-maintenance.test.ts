@@ -12,7 +12,7 @@ test("token jobs share manual/timer coordination, preserve uncertainty, and stop
   const root = mkdtempSync(join(tmpdir(), "maintain-"));
   const store = new TradingStore(root, "test-password-long-enough", true);
   const profile = { id: "alice", network: "testnet", address: "aleo1test", key: { type: "env", name: "KEY" },
-    policy: { inventory: true, inventoryFeeLimit: "100", swaps: false, bridges: false, claims: false, swapLimits: {}, bridgeLimits: {}, maxSlippageBps: 100 } } as Profile;
+    policy: { inventory: true, swaps: false, bridges: false, claims: false, swapLimits: {}, bridgeLimits: {}, maxSlippageBps: 100 } } as Profile;
   store.set("profile:alice", profile);
   let submissions = 0;
   let recovered = false;
@@ -56,7 +56,7 @@ test("the worker advances another token while a check is blocked and stop wins b
   const root = mkdtempSync(join(tmpdir(), "maintain-independent-"));
   const store = new TradingStore(root, "test-password-long-enough", true);
   const profile = { id: "alice", network: "testnet", address: "aleo1test", key: { type: "env", name: "KEY" },
-    policy: { inventory: true, inventoryFeeLimit: "100", swaps: false, bridges: false, claims: false, swapLimits: {}, bridgeLimits: {}, maxSlippageBps: 100 } } as Profile;
+    policy: { inventory: true, swaps: false, bridges: false, claims: false, swapLimits: {}, bridgeLimits: {}, maxSlippageBps: 100 } } as Profile;
   store.set("profile:alice", profile);
   let blockA = false, releaseA!: () => void, startedA!: () => void, submittedB!: () => void;
   const blocked = new Promise<void>(resolve => releaseA = resolve);
@@ -111,7 +111,7 @@ test("stop is rechecked atomically when a maintenance operation is registered", 
   const root = mkdtempSync(join(tmpdir(), "maintain-register-stop-"));
   const store = new TradingStore(root, "test-password-long-enough", true);
   store.set("profile:alice", { id: "alice", network: "testnet", address: "aleo1test", key: { type: "env", name: "KEY" },
-    policy: { inventory: true, inventoryFeeLimit: "100" } });
+    policy: { inventory: true } });
   let writes = 0;
   const backend = { concurrentRecords: true,
     read: async () => ({ token: { id: "A", decimals: 6 }, asset: { program: "A.aleo" }, available: [] }),

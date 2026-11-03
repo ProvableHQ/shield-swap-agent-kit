@@ -191,7 +191,7 @@ test("closing MCP stdin or killing the MCP server stops its attached worker", { 
   for (const crash of [false, true]) {
     const f = fixture();
     f.store.set("profile:alice", { id: "alice", address: "aleo1test", network: "testnet", key: { type: "env", name: "UNUSED_KEY" },
-      policy: { swaps: false, claims: false, bridges: false, inventory: true, inventoryFeeLimit: "100", swapLimits: {}, bridgeLimits: {}, maxSlippageBps: 100 } });
+      policy: { swaps: false, claims: false, bridges: false, inventory: true, swapLimits: {}, bridgeLimits: {}, maxSlippageBps: 100 } });
     const client = new Client({ name: "lifetime-test", version: "1" });
     const transport = new StdioClientTransport({ command: process.execPath,
       args: [offlineCli, "serve", "--state-dir", f.root, ...(crash ? ["--maintenance-mode", "attached"] : [])],

@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { operationContext } from "./ownership";
-import { TradingStore } from "./store";
+import { LockBusyError, TradingStore } from "./store";
 import { sharesAccount, withWalletLocks } from "./coordination";
 import { TradingError, type Kind, type Operation, type Profile, type SavedQuote, type Summary, type TradingBackend, type Progress } from "./types";
 
@@ -20,7 +20,7 @@ export class TradingRuntime {
       wallets: [{ chain: "aleo", provider: "local", address: p.address },
         ...(p.evm ? [{ chain: "ethereum", provider: p.evm.provider, address: p.evm.address }] : []),
         ...(p.solana ? [{ chain: "solana", provider: p.solana.provider, address: p.solana.address }] : [])],
-      policy: p.policy, useFeeMaster: p.useFeeMaster ?? false,
+      policy: p.policy, useFeeMaster: p.useFeeMaster ?? true,
     }));
   }
   scope(profile: Profile): string { return [profile.network, profile.address, profile.program ?? "shield_swap.aleo"].join(":"); }
@@ -84,8 +84,6 @@ export class TradingRuntime {
     }
     if (quote.kind === "inventory") {
       if (!p.inventory) throw new TradingError("permission_required", "Inventory maintenance permission must be enabled in terminal setup.");
-      const limit = p.inventoryFeeLimit;
-      if (!limit || !/^\d+$/.test(limit) || BigInt(limit) <= 0n) throw new TradingError("spend_limit", "A positive inventory fee limit must be configured in terminal setup.");
       return;
     }
     const bridge = quote.kind === "bridge";
@@ -138,54 +136,58 @@ export class TradingRuntime {
 
   private launch(id: string, quote: SavedQuote, resuming: boolean, ready?: { resolve(value: Summary): void; reject(error: unknown): void }): void {
     const worker = (async () => {
-      let entered = false;
       try {
         await this.withOperation(this.store.get<Operation>("operation:" + id)!, quote, async () => {
           let op = this.store.get<Operation>("operation:" + id)!;
-          // A different process may reconcile a queued operation before this
-          // worker acquires the lock. Never resurrect an operation it resolved.
-          if (!resuming && op.status !== "queued") return;
-          if (resuming) {
-            if (op.status !== "complete" && op.status !== "failed") {
-              op = this.save(op, await this.backend.reconcile(quote, op));
+          let entered = false;
+          try {
+            // A different process may reconcile a queued operation before this
+            // worker acquires the lock. Never resurrect an operation it resolved.
+            if (!resuming && op.status !== "queued") return;
+            if (resuming) {
+              if (op.status !== "complete" && op.status !== "failed") {
+                op = this.save(op, await this.backend.reconcile(quote, op));
+              }
+              // Reconcile and start the next step under the same operation lock.
+              if (op.status === "complete" || op.status === "failed" || op.kind === "swap" ||
+                  !["resume", "complete", "claim"].includes(String(op.result.nextAction))) {
+                ready?.resolve(this.publicOperation(op));
+                return;
+              }
             }
-            // Reconcile and start the next step under the same wallet lock.
-            // Another caller must never queue work based on a stale status.
-            if (op.status === "complete" || op.status === "failed" || op.kind === "swap" ||
-                !["resume", "complete", "claim"].includes(String(op.result.nextAction))) {
-              ready?.resolve(this.publicOperation(op));
-              return;
-            }
-          }
-          // Registration in another process must observe this start atomically.
-          // The operation lock alone does not exclude a different operation ID.
-          op = this.store.transaction(() => {
+            // Registration in another process must observe this start atomically.
+            // The operation lock alone does not exclude a different operation ID.
+            op = this.store.transaction(() => {
+              const current = this.store.get<Operation>("operation:" + id)!;
+              this.assertWalletAvailable(quote, current.id);
+              this.authorize(quote);
+              if (!resuming && quote.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired before execution began.");
+              return this.save(current, { status: "running", result: current.result });
+            });
+            entered = true;
+            ready?.resolve(this.publicOperation(op));
+            operationContext.getStore()!.submitted = () => { op = this.save(op, { status: "submitted", result: op.result }); };
+            const context = { operationId: id, checkpoint: (checkpoint: unknown) => {
+              op = { ...op, checkpoint, updatedAt: Date.now() };
+              this.store.set("operation:" + id, op);
+            } };
+            const result = resuming ? await this.backend.resume(quote, op, context) : await this.backend.execute(quote, context);
+            this.save(op, result);
+          } catch (error) {
+            if (resuming && !entered) throw error;
+            // Persist failures while ownership is still held. A successor must
+            // never observe or overwrite a half-finished execution checkpoint.
             const current = this.store.get<Operation>("operation:" + id)!;
-            this.assertWalletAvailable(quote, current.id);
-            this.authorize(quote);
-            if (!resuming && quote.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired before execution began.");
-            return this.save(current, { status: "running", result: current.result });
-          });
-          entered = true;
-          ready?.resolve(this.publicOperation(op));
-          operationContext.getStore()!.submitted = () => { op = this.save(op, { status: "submitted", result: op.result }); };
-          const context = { operationId: id, checkpoint: (checkpoint: unknown) => {
-            op = { ...op, checkpoint, updatedAt: Date.now() };
-            this.store.set("operation:" + id, op);
-          } };
-          const result = resuming ? await this.backend.resume(quote, op, context) : await this.backend.execute(quote, context);
-          this.save(op, result);
+            this.save(current, { status: entered ? "uncertain" : "failed",
+              result: { error: { code: entered ? "submission_uncertain" : error instanceof TradingError ? error.code : "wallet_busy",
+                message: entered ? "The submission result is uncertain. Reconcile this operation before any retry." : "Execution did not start. Check the wallet permissions, quote expiry, and active operations." } } });
+          }
         });
       } catch (error) {
-        const op = this.store.get<Operation>("operation:" + id)!;
-        if (resuming && !entered) {
-          if (error instanceof Error && /busy/.test(error.message)) ready?.resolve(this.publicOperation(op));
-          else ready?.reject(error);
-          return;
-        }
-        this.save(op, { status: entered ? "uncertain" : "failed",
-          result: { error: { code: entered ? "submission_uncertain" : error instanceof TradingError ? error.code : "wallet_busy",
-            message: entered ? "The submission result is uncertain. Reconcile this operation before any retry." : "Execution did not start. Check the wallet permissions, quote expiry, and active operations." } } });
+        // Lock contention belongs to the current owner. Neither initial launch
+        // nor resume may change shared operation state without owning the lock.
+        if (error instanceof LockBusyError) ready?.resolve(this.operation(id));
+        else ready?.reject(error);
       }
     })();
     this.workers.add(worker);

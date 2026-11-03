@@ -26,7 +26,7 @@ The standalone server enables record management on its session and keeps the jou
 {"name":"plan_record_inventory","arguments":{"profileId":"SELECTED_PROFILE","token":"TOKEN_ID","records":4,"minRecordAmount":"1.5","distribution":"balanced","toleranceBps":0,"maxTransactions":24}}
 ```
 
-3. Execution needs `shield-swap-mcp configure --profile NAME --allow-inventory --inventory-fee-limit MICROCREDITS` from the trusted terminal. The fee limit caps the total network fee of one rebalance operation; absent or zero prevents execution. Then call `rebalance_record_inventory` with the `planId` and a stable `idempotencyKey`; it returns an operation ID. Poll `get_operation_status`.
+3. Execution needs `shield-swap-mcp configure --profile NAME --allow-inventory` from the trusted terminal. Delegated proving requests FeeMaster sponsorship by default; inventory execution has no separate fee limit. Then call `rebalance_record_inventory` with the `planId` and a stable `idempotencyKey`; it returns an operation ID. Poll `get_operation_status`.
 
 A `complete` operation lists its `transactionIds` and `completedSteps`. A `failed` operation with `not_submitted` sent nothing. An `uncertain` operation stopped after submitting; reconcile it until every listed transaction is confirmed or rejected, then it reports `failed` with `nextAction: "plan_again"`. `resume_operation` never re-executes a plan. Permission changes are refused while an operation is queued or running.
 
@@ -142,7 +142,7 @@ inventory.close()
 Planning reserves nothing. The example target (four records of at least 1.5 USDCx, balanced) is illustrative; use the user's trade size and concurrency. For an authorized rebalance, continue in the **same script/process**, retaining `plan`, before closing the store:
 
 ```ts
-const result = await client.rebalanceRecordInventory({ plan, timeoutMs: 600_000, pollIntervalMs: 3_000, maxFeeMicrocredits: 5_000_000n })
+const result = await client.rebalanceRecordInventory({ plan, timeoutMs: 600_000, pollIntervalMs: 3_000 })
 console.log({ status: result.status, transactions: result.transactionIds, completedSteps: result.completedSteps })
 if (result.status === 'interrupted') {
   await client.reconcileRecordInventory()
@@ -150,7 +150,7 @@ if (result.status === 'interrupted') {
 }
 ```
 
-`maxFeeMicrocredits` caps the run's total network fees; `plan.deduction` is charged separately on native credits splits. Execution rechecks every input and stops if another operation consumed or reserved one. `client.rebalanceInventory({ token, target })` plans and executes in one call; use it only when a separate review of the plan is not required.
+`plan.deduction` is charged on native credits splits, separately from network fees. Execution rechecks every input and stops if another operation consumed or reserved one. `client.rebalanceInventory({ token, target })` plans and executes in one call; use it only when a separate review of the plan is not required.
 
 After an interruption or restart, save as `reconcile-inventory.mts` and run `npx tsx reconcile-inventory.mts`:
 

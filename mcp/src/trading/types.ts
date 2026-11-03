@@ -21,8 +21,6 @@ export type Policy = {
   bridges: boolean;
   /** Record inventory maintenance (joins and splits). Absent in profiles written before 0.14.0; treated as false. */
   inventory?: boolean;
-  /** Total network-fee ceiling in microcredits for one inventory rebalance operation; absent or zero prevents execution. */
-  inventoryFeeLimit?: string;
   maxSlippageBps: number;
   swapLimits: Record<string, string>;
   bridgeLimits: Record<string, string>;

@@ -33,8 +33,8 @@ export class InventoryMaintenance {
   }
   async start(profileId: string, target: MaintenanceTarget): Promise<MaintenanceState> {
     const profile = this.runtime.profile(profileId);
-    if (!profile.policy.inventory || !/^\d+$/.test(profile.policy.inventoryFeeLimit ?? "") || BigInt(profile.policy.inventoryFeeLimit!) <= 0n)
-      throw new TradingError("permission_required", "Configure inventory permission and a positive per-operation fee limit in the terminal first.");
+    if (!profile.policy.inventory)
+      throw new TradingError("permission_required", "Configure inventory permission in the terminal first.");
     const intervalSeconds = target.intervalSeconds ?? 120;
     if (!Number.isInteger(target.records) || target.records < 1 || target.records > 1000 || !Number.isInteger(intervalSeconds) || intervalSeconds < 10 || intervalSeconds > 86400)
       throw new TradingError("invalid_target", "Use 1 to 1000 records and an interval of 10 to 86400 seconds.");

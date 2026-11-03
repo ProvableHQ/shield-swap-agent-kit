@@ -33,7 +33,7 @@ test("maintenance status only observes saved jobs and renamed tools accept legac
   const { TradingRuntime } = await import("../src/trading/runtime");
   const root = mkdtempSync(join(tmpdir(), "shield-tool-names-"));
   const store = new TradingStore(root, "test-passphrase-long-enough", true);
-  const policy = { swaps: false, claims: false, bridges: false, inventory: true, inventoryFeeLimit: "1000", maxSlippageBps: 100, swapLimits: {}, bridgeLimits: {} };
+  const policy = { swaps: false, claims: false, bridges: false, inventory: true, maxSlippageBps: 100, swapLimits: {}, bridgeLimits: {} };
   store.set("profile:alice", { id: "alice", network: "testnet", address: "aleo1alice", key: { type: "env", name: "TEST_KEY" }, policy });
   store.set("settings", { defaultProfile: "alice" });
   const job = { id: "job", profileId: "alice", network: "testnet", address: "aleo1alice", asset: "token.aleo", token: "TOKEN",

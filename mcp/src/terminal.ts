@@ -35,7 +35,7 @@ Common options:
   --generate               Create a new wallet instead of importing
   --network-url URL        Aleo RPC override (setup only)
   --api-url URL            Shield Swap API override (setup only)
-  --fee-master             Request the delegated prover's fee sponsorship
+  --fee-master             Request delegated fee sponsorship (enabled by default)
   --no-fee-master          Pay Aleo fees from the wallet (configure only)
 
 configure changes trusted terminal permissions:
@@ -46,7 +46,6 @@ configure changes trusted terminal permissions:
                           Record inventory joins and splits (rebalance, rebroadcast)
   --swap-limit TOKEN=RAW   Per-operation base-unit input cap (repeatable)
   --bridge-limit ASSET=RAW Per-operation base-unit input cap (repeatable)
-  --inventory-fee-limit N  Total network fee in microcredits per rebalance; 0 disables
   --max-slippage-bps N     Maximum swap slippage (0–1000)
   --evm-key-env NAME --evm-rpc-url URL
   --solana-key-env NAME --solana-rpc-url URL
@@ -81,7 +80,7 @@ export function argumentsFor(argv: string[]) {
       "allow-bridges": { type: "boolean" }, "deny-bridges": { type: "boolean" },
       "allow-inventory": { type: "boolean" }, "deny-inventory": { type: "boolean" },
       "swap-limit": { type: "string", multiple: true }, "bridge-limit": { type: "string", multiple: true },
-      "inventory-fee-limit": { type: "string" }, "max-slippage-bps": { type: "string" },
+      "max-slippage-bps": { type: "string" },
       "evm-key-env": { type: "string" }, "evm-rpc-url": { type: "string" },
       "solana-key-env": { type: "string" }, "solana-rpc-url": { type: "string" },
       "evm-wallet-env": { type: "string" }, "solana-wallet-env": { type: "string" },
@@ -89,7 +88,7 @@ export function argumentsFor(argv: string[]) {
     const command = parsed.positionals[0] ?? "serve";
     if (parsed.positionals.length > 1 || !["setup", "configure", "serve", "maintain"].includes(command)) throw new Error();
     const allowed = command === "setup" ? new Set(["help", "state-dir", "profile", "network", "guided", "key-env", "store-key", "generate", "network-url", "api-url", "fee-master"])
-      : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "allow-inventory", "deny-inventory", "swap-limit", "bridge-limit", "inventory-fee-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
+      : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "allow-inventory", "deny-inventory", "swap-limit", "bridge-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
       : command === "serve" ? new Set(["help", "state-dir", "maintenance-mode"])
       : new Set(["help", "state-dir", "parent-attached"]);
     if (Object.keys(parsed.values).some(key => !allowed.has(key))) throw new Error();
@@ -185,7 +184,7 @@ export async function setup(options: Options, suppliedPassword?: string): Promis
     const secretId = "aleo:" + id;
     const profile: Profile = { id, network, address: account.address,
       key: persistKey ? { type: "stored", id: secretId } : { type: "env", name: keyEnv! },
-      networkUrl, apiUrl, useFeeMaster: Boolean(options["fee-master"]), policy: readOnlyPolicy() };
+      networkUrl, apiUrl, useFeeMaster: true, policy: readOnlyPolicy() };
     store.transaction(() => {
       // SDK loading or a hidden prompt can yield while another process sets up.
       // Recheck under the SQLite write transaction before storing either key.
@@ -242,10 +241,6 @@ export async function configure(options: Options): Promise<Record<string, unknow
       if (allow && deny) throw new TradingError("invalid_arguments", "Cannot both allow and deny the same permission.");
       if (allow || deny) policy[permission] = Boolean(allow);
     }
-    if (options["inventory-fee-limit"] !== undefined) {
-      if (!/^(0|[1-9][0-9]{0,19})$/.test(options["inventory-fee-limit"])) throw new TradingError("invalid_limit", "The inventory fee limit must be a nonnegative integer in microcredits; zero disables rebalancing.");
-      policy.inventoryFeeLimit = options["inventory-fee-limit"];
-    }
     for (const [option, target] of [["swap-limit", policy.swapLimits], ["bridge-limit", policy.bridgeLimits]] as const) {
       for (const entry of options[option] ?? []) {
         const match = /^([^=\s]{1,128})=(0|[1-9][0-9]{0,77})$/.exec(entry);
@@ -259,7 +254,7 @@ export async function configure(options: Options): Promise<Record<string, unknow
       policy.maxSlippageBps = value;
     }
     if (options["fee-master"] && options["no-fee-master"]) throw new TradingError("invalid_arguments", "Choose either sponsored or wallet-funded Aleo fees.");
-    const useFeeMaster = options["fee-master"] ? true : options["no-fee-master"] ? false : profile.useFeeMaster ?? false;
+    const useFeeMaster = options["fee-master"] ? true : options["no-fee-master"] ? false : profile.useFeeMaster ?? true;
     const updated = { ...profile, useFeeMaster, ...(evm ? { evm } : {}), ...(solana ? { solana } : {}), policy };
     await withWalletLocks(store, [profile, updated], async () => store.transaction(() => {
       if (store.list<{ profileId: string; status: string }>("operation:").some(op => op.profileId === id && ["queued", "running", "submitted"].includes(op.status))) {

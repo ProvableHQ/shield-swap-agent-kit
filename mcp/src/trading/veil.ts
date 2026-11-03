@@ -13,11 +13,6 @@ type SwapCheckpoint = { submissionBoundary?: number; phase?: string; counter?: n
 type InventoryCheckpoint = { phase?: string; transactionIds?: string[]; completedSteps?: number; reasonCode?: string };
 const resolvedJournalStatuses = new Set(["confirmed", "rejected", "cancelled"]);
 
-function feeLimit(store: TradingStore, profileId: string): bigint {
-  const limit = store.get<Profile>("profile:" + profileId)?.policy.inventoryFeeLimit;
-  if (!limit || !/^\d+$/.test(limit) || BigInt(limit) <= 0n) throw new TradingError("spend_limit", "A positive inventory fee limit must be configured in terminal setup.");
-  return BigInt(limit);
-}
 // The SDK's interruption reason is a message. Classify it into stable codes
 // instead of forwarding arbitrary text across the operation boundary.
 function interruptionCode(reason: string | undefined): string {
@@ -25,7 +20,6 @@ function interruptionCode(reason: string | undefined): string {
   if (/Timed out confirming|has not indexed/.test(reason)) return "confirmation_timeout";
   if (/Inventory changed|missing its reservation/.test(reason)) return "inventory_changed";
   if (/was not accepted/.test(reason)) return "transaction_rejected";
-  if (/maxFeeMicrocredits|Fee budget|fee/.test(reason)) return "fee_limit";
   if (/abort/i.test(reason)) return "cancelled";
   return "interrupted";
 }
@@ -132,7 +126,6 @@ export class VeilBackend implements TradingBackend {
   private async rebalance(quote: SavedQuote, context: ExecutionContext): Promise<Progress> {
     const session = await this.session(quote.profile);
     const plan = quote.plan as InventoryPlan;
-    const maxFeeMicrocredits = feeLimit(this.store, quote.profile.id);
     const transactionIds: string[] = [];
     const checkpoint = (phase: string, extra: Summary = {}) => context.checkpoint({ phase, transactionIds: [...transactionIds], ...extra } satisfies InventoryCheckpoint & Summary);
     checkpoint("rebalancing");
@@ -141,9 +134,9 @@ export class VeilBackend implements TradingBackend {
     let result;
     try {
       result = await inventoryContext.run({ prepared: id => { if (!transactionIds.includes(id)) { transactionIds.push(id); checkpoint("rebalancing"); } } },
-        () => session.client.rebalanceRecordInventory({ plan, timeoutMs: 600_000, pollIntervalMs: 3_000, maxFeeMicrocredits }));
+        () => session.client.rebalanceRecordInventory({ plan, timeoutMs: 600_000, pollIntervalMs: 3_000 }));
     } catch (error) {
-      // The SDK validates the plan, scope and fee ceiling before its first
+      // The SDK validates the plan and scope before its first
       // submission and reports later failures as an interrupted result.
       if (transactionIds.length) throw error;
       checkpoint("interrupted", { reasonCode: "invalid_plan" });
@@ -151,7 +144,7 @@ export class VeilBackend implements TradingBackend {
         error: { code: "not_submitted", message: "The inventory plan could not be executed before any submission. Read the inventory and plan again." } } };
     }
     for (const id of result.transactionIds) if (!transactionIds.includes(id)) transactionIds.push(id);
-    const summary = { transactionIds, completedSteps: result.completedSteps, plannedSteps: plan.steps.length, maxFeeMicrocredits: maxFeeMicrocredits.toString() };
+    const summary = { transactionIds, completedSteps: result.completedSteps, plannedSteps: plan.steps.length };
     if (result.status === "complete") {
       checkpoint("complete", { completedSteps: result.completedSteps });
       return { status: "complete", result: summary, checkpoint: { phase: "complete", transactionIds, completedSteps: result.completedSteps } };

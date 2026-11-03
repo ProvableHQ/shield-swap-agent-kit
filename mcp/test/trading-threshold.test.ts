@@ -20,7 +20,7 @@ function fixture() {
   const store = new TradingStore(root, "test-password-long-enough", true);
   const writer = new TradingStore(root, "test-password-long-enough");
   store.set("profile:alice", { id: "alice", network: "testnet", address: "aleo1test", key: { type: "env", name: "KEY" },
-    policy: { inventory: true, inventoryFeeLimit: "100" } } as Profile);
+    policy: { inventory: true } } as Profile);
   const state = { count: 10, reads: 0, plans: [] as number[], reserved: [] as { id: string; amount: string }[],
     execute: undefined as undefined | (() => Promise<void>), fail: false, read: undefined as undefined | (() => Promise<void>) };
   const backend: TradingBackend = {
