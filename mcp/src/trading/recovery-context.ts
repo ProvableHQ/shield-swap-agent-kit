@@ -48,3 +48,13 @@ export const recoveryFetch: typeof fetch = async (input, init) => {
   scope.requests.add(request);
   try { return await request; } finally { scope.requests.delete(request); }
 };
+
+/** Direct chain evidence must not reuse a cached negative spent-record lookup. */
+export const freshChainFetch: typeof fetch = async (input, init) => {
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+  headers.set("Cache-Control", "no-cache, no-store");
+  const response = await recoveryFetch(input, { ...init, headers, cache: "no-store" });
+  const age = response.headers.get("Age");
+  if (age !== null && (!/^\d+$/.test(age) || Number(age) > 0)) throw new Error("Cached chain evidence cannot release a record");
+  return response;
+};

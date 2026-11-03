@@ -1,5 +1,5 @@
 import { createPublicClient, createWalletClient, http } from "@provablehq/veil-core";
-import { recoveryFetch, recoverySignal } from "./recovery-context";
+import { freshChainFetch, recoveryFetch, recoverySignal } from "./recovery-context";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { LocalAccount, PublicClient, WalletClient, ProvingConfig } from "@provablehq/veil-core";
 import type { BlindedIdentityRecord, BlindedIdentityStore, ShieldSwapActions } from "@provablehq/shield-swap-sdk";
@@ -13,6 +13,7 @@ import { TradingError, type ExecutionContext, type Profile, type SecretRef } fro
 export type AleoSession = {
   client: WalletClient & ShieldSwapActions;
   publicClient: PublicClient;
+  expiryClient?: PublicClient;
   account: LocalAccount;
   identities: BlindedIdentityStore;
   submissionTracked?: boolean;
@@ -137,7 +138,10 @@ export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv
         };
         const client = pair.walletClient.extend(shieldSwapActions({ program: profile.program, api: { baseUrl: profile.apiUrl, ...(recovery ? { fetch: recoveryFetch } : {}) }, blindedIdentities: identities }));
         if (authenticate && !recovery) await client.authenticateShieldSwap();
-        return coordinateSession(store, profile, { client, publicClient: pair.publicClient, account: pair.account, identities, submissionTracked: true });
+        return coordinateSession(store, profile, { client, publicClient: pair.publicClient,
+          expiryClient: createPublicClient({ transport: http(profile.networkUrl ?? DEFAULT_NETWORK_URL,
+            { network: profile.network, fetchFn: freshChainFetch }) }),
+          account: pair.account, identities, submissionTracked: true });
       })();
       sessions.set(cacheKey, pending);
       void pending.catch(() => sessions.delete(cacheKey));

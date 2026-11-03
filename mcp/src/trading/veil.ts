@@ -1,6 +1,6 @@
 import { reconcileSwapHistory as reconcileSdkHistory, type BlindedIdentityRecord, type SwapQuote } from "@provablehq/shield-swap-sdk";
 import { FinalizeRevertError, RecordReservationConflictError, TransactionTimeoutError, getConfirmedTransaction, type InventoryPlan, type InventoryRecord, type InventoryTarget, type RecordSpend } from "@provablehq/veil-core";
-import { recordInventoryShortage } from "./inventory";
+import { expiredSwapProgress, recordInventoryShortage, type OwnedRecordSpend } from "./inventory";
 import { BridgeBackend } from "./bridge";
 import { TradingStore } from "./store";
 import { claimContext, createSessionFactory, inventoryContext, swapContext, walletScope, type AleoSession, type SessionFactory, type SwapSubmission } from "./session";
@@ -260,7 +260,8 @@ export class VeilBackend implements TradingBackend {
         const entries = journal.map(entry => ({ id: entry.id, scope: entry.scope, records: entry.records, status: entry.status,
           program: entry.program, function: entry.function, transactionId: entry.transactionId, feeRecordId: entry.feeRecordId,
           feeMicrocredits: entry.feeMicrocredits, savedTransaction: Boolean(entry.transaction),
-          rebroadcastAttempts: entry.rebroadcastAttempts, rebroadcastFailed: Boolean(entry.lastRebroadcastError) }));
+          rebroadcastAttempts: entry.rebroadcastAttempts, rebroadcastFailed: Boolean(entry.lastRebroadcastError),
+          ...((entry as OwnedRecordSpend).expiryRelease ? { expiryRelease: (entry as OwnedRecordSpend).expiryRelease } : {}) }));
         return { network: profile.network, address: profile.address, rebroadcast, entries,
           unresolvedCount: entries.filter(entry => !resolvedJournalStatuses.has(entry.status)).length };
       }
@@ -393,6 +394,8 @@ export class VeilBackend implements TradingBackend {
     if (quote.kind === "claim") return this.reconcileClaims(quote, operation, session);
     const checkpoint = operation.checkpoint as SwapCheckpoint | undefined;
     const owned = operation.managedRecords ? await reconcileJournal(session) : [];
+    const expired = expiredSwapProgress(owned as OwnedRecordSpend[]);
+    if (expired) return expired;
     // With the operation lock held, cancelled local reservations prove this
     // writer stopped before producing a transaction. Missing chain lookups do not.
     if (owned.length && owned.every(entry => entry.status === "cancelled") && !checkpoint?.transactionId && checkpoint?.phase !== "submitted")

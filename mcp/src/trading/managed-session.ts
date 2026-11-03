@@ -5,6 +5,7 @@ import type { RecordSpend } from "@provablehq/veil-core";
 import type { AleoSession } from "./session";
 import { walletScope } from "./session";
 import { withWalletLocks } from "./coordination";
+import { recoverExpiredSwap } from "./swap-expiry";
 import type { OwnedRecordSpend } from "./inventory";
 import { operationContext, journalContext } from "./ownership";
 import { TradingStore, LockBusyError } from "./store";
@@ -40,7 +41,12 @@ export async function reconcileOwnedRecords(store: TradingStore, profile: Profil
   const current = operationContext.getStore()?.operationId;
   const owners = current ? [current] : [...new Set(read().map(entry => entry.operationId))];
   const reconcile = async (owner?: string) => journalContext.run({ owner }, async () => {
-    const entries = await session.client.reconcileRecordInventory(params);
+    const entries = await session.client.reconcileRecordInventory();
+    let expired = false;
+    for (const entry of entries) expired = await recoverExpiredSwap(store, session, entry as OwnedRecordSpend) || expired;
+    // Inspect expiry before any optional resend. A settled expiry permanently
+    // removes the proof from the SDK view, including after a process restart.
+    if (params?.rebroadcast && !expired) await session.client.reconcileRecordInventory(params);
     for (const entry of entries) {
       if (entry.status === "reserved" && !entry.transactionId && entry.accountType === "local")
         await session.client.recordManagement!.store!.update(entry.scope, entry.id, { status: "cancelled" });

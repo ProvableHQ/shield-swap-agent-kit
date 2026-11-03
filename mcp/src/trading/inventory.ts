@@ -2,13 +2,15 @@ import { createHash } from "node:crypto";
 import type { RecordInventoryStore, RecordSpend } from "@provablehq/veil-core";
 import { inventoryContext, operationContext, journalContext } from "./ownership";
 import { TradingStore } from "./store";
-import type { Profile } from "./types";
+import type { Operation, Profile, Progress } from "./types";
 
 // Journal entries hold record nonces, lifecycle status and the proved
 // transaction while it is pending; never plaintext records or keys. They are
 // encrypted like every other document and share the state file's SQLite
 // write lock, so acquisition is atomic across MCP processes.
-export type OwnedRecordSpend = RecordSpend & { operationId?: string };
+export type ExpiryRelease = { deadlineHeight: number; checkedHeight: number; checkedAt: number;
+  program: string; function: string; releasedRecords: string[] };
+export type OwnedRecordSpend = RecordSpend & { operationId?: string; expiryRelease?: ExpiryRelease };
 const key = (scope: string) => "inventory:" + createHash("sha256").update(scope).digest("hex") + ":";
 const sequence = (scope: string) => "inventory-seq:" + createHash("sha256").update(scope).digest("hex");
 const activityKey = (scope: string) => "inventory-activity:" + createHash("sha256").update(scope).digest("hex");
@@ -35,19 +37,20 @@ export function heldInventoryRecords(store: TradingStore, scope: string): Set<st
 }
 
 /** Mirrors the SDK's release rules: rejected executions keep only a charged fee record; cancelled entries hold nothing. */
-function heldRecordIds(entry: RecordSpend): string[] {
+function heldRecordIds(entry: OwnedRecordSpend): string[] {
   if (entry.status === "cancelled") return [];
   if (entry.status === "rejected") return entry.feeRecordId ? [entry.feeRecordId] : [];
-  return entry.records;
+  return entry.records.filter(id => !entry.expiryRelease?.releasedRecords.includes(id));
 }
 
 export function createRecordInventoryStore(store: TradingStore): RecordInventoryStore {
-  const read = (scope: string): RecordSpend[] =>
-    store.list<RecordSpend>(key(scope)).sort((a, b) => Number(a.id) - Number(b.id));
+  const read = (scope: string): OwnedRecordSpend[] =>
+    store.list<OwnedRecordSpend>(key(scope)).sort((a, b) => Number(a.id) - Number(b.id));
   return {
     list: async scope => {
       const filter = journalContext.getStore();
-      return read(scope).filter(entry => !filter || (entry as OwnedRecordSpend).operationId === filter.owner);
+      return read(scope).filter(entry => !filter || entry.operationId === filter.owner)
+        .map(entry => entry.expiryRelease ? { ...entry, records: heldRecordIds(entry), transaction: undefined } : entry);
     },
     acquire: async entry => store.transaction(() => {
       if (new Set(entry.records).size !== entry.records.length) throw new Error("Duplicate record inputs");
@@ -84,4 +87,35 @@ export function createRecordInventoryStore(store: TradingStore): RecordInventory
       }
     },
   };
+}
+
+/** Operation outcome and record ownership are distinct while a private fee is unresolved. */
+export function expiredSwapProgress(entries: OwnedRecordSpend[]): Progress | undefined {
+  const expired = entries.filter(entry => entry.expiryRelease);
+  if (!expired.length || entries.some(entry => !entry.expiryRelease && !["cancelled", "rejected"].includes(entry.status))) return;
+  const feePending = expired.some(entry => entry.feeRecordId && !["confirmed", "rejected", "cancelled"].includes(entry.status));
+  return { status: feePending ? "uncertain" : "failed", result: {
+    transactionId: expired[0].transactionId, deadlineHeight: expired[0].expiryRelease!.deadlineHeight,
+    checkedHeight: expired[0].expiryRelease!.checkedHeight, inputRecordsReleased: true, feePending,
+    nextAction: feePending ? "reconcile" : "new_quote",
+    error: { code: "swap_expired", message: "The swap's on-chain deadline passed and its unspent execution inputs were released. The original swap will not be rebroadcast." },
+  } };
+}
+
+/** Caller holds the operation lock; release, retry suppression and wakeup commit together. */
+export function releaseExpiredSwap(store: TradingStore, expected: OwnedRecordSpend, evidence: ExpiryRelease): void {
+  store.transaction(() => {
+    const storageKey = key(expected.scope) + expected.id;
+    const current = store.get<OwnedRecordSpend>(storageKey);
+    const operation = store.get<Operation>("operation:" + expected.operationId);
+    if (!current || !operation || current.expiryRelease || current.operationId !== expected.operationId ||
+        current.transactionId !== expected.transactionId || !["prepared", "submitted"].includes(current.status)) return;
+    const updated = { ...current, expiryRelease: evidence, status: current.feeRecordId ? current.status : "cancelled" as const };
+    delete updated.transaction;
+    store.set(storageKey, updated);
+    const entries = store.list<OwnedRecordSpend>(key(expected.scope)).filter(entry => entry.operationId === operation.id);
+    const progress = expiredSwapProgress(entries);
+    if (progress) store.set("operation:" + operation.id, { ...operation, ...progress, updatedAt: Date.now() });
+    recordActivity(store, expected.scope);
+  });
 }
