@@ -3,7 +3,7 @@ import { FinalizeRevertError, TransactionTimeoutError, getConfirmedTransaction, 
 import { BridgeBackend } from "./bridge";
 import { TradingStore } from "./store";
 import { claimContext, createSessionFactory, inventoryContext, swapContext, walletScope, type AleoSession, type SessionFactory, type SwapSubmission } from "./session";
-import { TradingError, type ExecutionContext, type Kind, type Operation, type Profile, type Progress, type SavedQuote, type Summary, type TradingBackend } from "./types";
+import { TradingError, type ExecutionContext, type Kind, type Operation, type Profile, type Progress, type SavedQuote, type Status, type Summary, type SwapItem, type TradingBackend } from "./types";
 
 type Failure = { code: "not_submitted" | "transaction_rejected"; transactionId?: string; feeTransactionId?: string };
 type ClaimItem = { swapId: string; status: "pending" | "preparing" | "submitting" | "claimed" | "uncertain"; transactionId?: string; amountOut?: string; amountRemaining?: string; lastFailure?: Failure };
@@ -75,6 +75,29 @@ async function coveringRecordCount(session: AleoSession, quote: SwapQuote): Prom
   if (!token.underlyingProgram) return 0;
   const inventory = await client.getRecordInventory({ asset: { program: token.underlyingProgram } });
   return inventory.available.filter(record => record.amount >= quote.amountIn).length;
+}
+// A batch's status is the worst of its items: an uncertain item blocks the
+// wallet, all-failed is failed, an awaited output is pending, and otherwise
+// the batch is complete once nothing is left to claim, or submitted.
+function aggregateSwaps(items: SwapItem[]): Status {
+  if (items.some(item => item.status === "uncertain")) return "uncertain";
+  if (items.every(item => item.status === "failed")) return "failed";
+  if (items.some(item => item.status === "pending")) return "pending";
+  if (items.every(item => item.status === "complete" || item.status === "failed")) return "complete";
+  return "submitted";
+}
+function publicSwapItem(item: SwapItem): Summary {
+  const { phase: _phase, submissionBoundary: _boundary, counter: _counter, ...rest } = item;
+  return JSON.parse(JSON.stringify(rest)) as Summary;
+}
+function batchProgress(items: SwapItem[], extra: Summary = {}): Progress {
+  const status = aggregateSwaps(items);
+  const nextAction = status === "submitted" ? "claim_when_ready" : status === "pending" || status === "uncertain" ? "wait" : undefined;
+  // A batch of one keeps today's top-level fields so single-swap callers see no change.
+  const mirror: Summary = items.length === 1 ? (({ index: _index, status: _status, ...fields }) => fields)(publicSwapItem(items[0]!)) : {};
+  const submittedCount = items.filter(item => item.status === "submitted").length;
+  return { status, checkpoint: { swaps: items.map(item => ({ ...item })) },
+    result: { ...extra, ...mirror, swaps: items.map(publicSwapItem), submittedCount, ...(nextAction ? { nextAction } : {}) } };
 }
 async function confirmedRejection(session: AleoSession, id?: string): Promise<Failure | undefined> {
   if (!id) return;
@@ -201,44 +224,50 @@ export class VeilBackend implements TradingBackend {
       message: "The inventory plan did not finish. Accepted joins and splits remain on chain; read the inventory and plan again rather than repeating this plan." } } };
   }
 
-  async execute(quote: SavedQuote, context: ExecutionContext): Promise<Progress> {
+  async execute(quote: SavedQuote, context: ExecutionContext, count = 1): Promise<Progress> {
     if (quote.kind === "bridge") return this.bridge.execute(quote, context);
     if (quote.kind === "claim") return this.claim(quote, context);
     if (quote.kind === "inventory") return this.rebalance(quote, context);
     const session = await this.session(quote.profile);
     // Refuse before reserving anything: a batch that would run short of
     // covering records must not leave a partial set of reservations behind.
-    const needed = Number(quote.summary.count ?? 1);
+    const needed = Math.max(1, count);
     const covering = await coveringRecordCount(session, quote.plan as SwapQuote);
     if (covering !== undefined && covering < needed) {
       return { status: "failed", checkpoint: { phase: "preparing" }, result: { covering, needed,
         remedies: ["rebalance_record_inventory", "maintain_inventory"],
         error: { code: "insufficient_records", message: `${covering} unreserved record(s) cover this input; ${needed} needed. Reshape once with rebalance_record_inventory or keep a floor with maintain_inventory, then quote again.` } } };
     }
+    // A swap is a batch of one. Every item shares the quote and runs at once;
+    // each keeps its own checkpoint so recovery reasons about them separately.
+    const tracked = Boolean(session.submissionTracked);
+    const items: SwapItem[] = Array.from({ length: needed }, (_, index) => ({ index, status: "pending", phase: "preparing", ...(tracked ? { submissionBoundary: 1 } : {}) }));
+    const persist = () => context.checkpoint({ swaps: items.map(item => ({ ...item })) });
+    persist();
+    // All items start from the identity set that existed before any began;
+    // each save is attributed to the item whose record it changed.
     const initial = new Set((await session.identities.load()).map(record => record.counter));
-    const state: SwapSubmission = { execution: context, initial, submissionStarted: false,
-      checkpoint: { phase: "preparing", ...(session.submissionTracked ? { submissionBoundary: 1 } : {}) } };
-    context.checkpoint(state.checkpoint);
-    let handle;
-    try {
-      handle = await swapContext.run(state, () => session.client.swap({ quote: quote.plan as SwapQuote }));
-    } catch (error) {
-      if (!session.submissionTracked || state.submissionStarted) {
-        const evidence = transactionEvidence(error);
-        const rejected = error instanceof FinalizeRevertError;
-        const checkpoint = { ...state.checkpoint, ...evidence, ...(rejected ? { phase: "rejected" } : {}) };
-        context.checkpoint(checkpoint);
-        return { status: rejected ? "failed" : "uncertain", checkpoint,
-          result: { ...evidence, error: { code: rejected ? "transaction_rejected" : "submission_uncertain",
-            message: rejected ? "The swap transaction was rejected. Inspect its fee effects before a newly authorized attempt."
-              : "The submission result is uncertain. Reconcile this operation before any retry." } } };
+    await Promise.allSettled(items.map(async item => {
+      const state: SwapSubmission = { initial, submissionStarted: false,
+        checkpoint: { phase: "preparing", ...(tracked ? { submissionBoundary: 1 } : {}) },
+        execution: { operationId: context.operationId, checkpoint: value => { Object.assign(item, value as Partial<SwapItem>); persist(); } } };
+      try {
+        const handle = await swapContext.run(state, () => session.client.swap({ quote: quote.plan as SwapQuote }));
+        Object.assign(item, { status: "submitted", phase: "submitted", swapId: handle.swapId, transactionId: handle.transactionId });
+      } catch (error) {
+        if (!tracked || state.submissionStarted) {
+          const evidence = transactionEvidence(error);
+          const rejected = error instanceof FinalizeRevertError;
+          Object.assign(item, evidence, rejected
+            ? { status: "failed", phase: "rejected", error: { code: "transaction_rejected", ...evidence, message: "The swap transaction was rejected. Inspect its fee effects before a newly authorized attempt." } }
+            : { status: "uncertain", error: { code: "submission_uncertain", ...evidence, message: "The submission result is uncertain. Reconcile this operation before any retry." } });
+        } else {
+          Object.assign(item, { status: "failed", error: { code: "not_submitted", message: "Swap preparation failed before proving or submission. Check balances and request a fresh quote." } });
+        }
       }
-      return { status: "failed", result: { error: { code: "not_submitted",
-        message: "Swap preparation failed before proving or submission. Check balances and request a fresh quote." } },
-        checkpoint: state.checkpoint };
-    }
-    context.checkpoint({ phase: "submitted", swapId: handle.swapId, transactionId: handle.transactionId });
-    return { status: "submitted", result: { transactionId: handle.transactionId, swapId: handle.swapId, nextAction: "claim_when_ready" } };
+      persist();
+    }));
+    return batchProgress(items);
   }
 
   async read(action: string, profile: Profile, input: Summary): Promise<Summary> {
@@ -376,24 +405,41 @@ export class VeilBackend implements TradingBackend {
     const session = await this.session(quote.profile);
     if (quote.kind === "inventory") return this.reconcileInventory(quote, operation, session);
     if (quote.kind === "claim") return this.reconcileClaims(quote, operation, session);
-    const checkpoint = operation.checkpoint as SwapCheckpoint | undefined;
-    if (!checkpoint || checkpoint.phase === "preparing" || (checkpoint.submissionBoundary === 1 && checkpoint.phase === "reserved")) return { status: "failed", result: { error: { code: "not_submitted", message: "Execution did not reach the proving or submission boundary." } } };
-    const rejection = checkpoint.phase === "rejected" ? { code: "transaction_rejected", transactionId: checkpoint.transactionId, feeTransactionId: checkpoint.feeTransactionId }
-      : await confirmedRejection(session, checkpoint.transactionId);
-    if (rejection) return { status: "failed", result: { ...rejection, error: rejection } };
-    const historyRecovery = await this.reconcileHistory(session, quote.profile);
-    const records = await session.identities.load();
-    const record = records.find(item => checkpoint.swapId ? item.swapId === checkpoint.swapId : item.counter === checkpoint.counter);
-    if (record?.claim) return { status: "complete", result: { historyRecovery, swapId: record.swapId, transactionId: record.handle?.transactionId,
-      claimTransactionId: record.claim.transactionId, amountOut: record.claim.amountOut, amountRemaining: record.claim.amountRemaining } };
-    const pending = await session.client.getUnclaimedSwaps();
-    const found = pending.swaps.find(swap => swap.swapId === (record?.swapId ?? checkpoint.swapId));
-    if (found) return { status: "submitted", result: { historyRecovery, swapId: found.swapId, transactionId: record?.handle?.transactionId ?? checkpoint.transactionId,
-      claimable: found.claimable, amountOut: found.output.amount_out.toString(), nextAction: "claim_when_ready" } };
-    // A timeout can carry a transaction ID without proving acceptance. Keep
-    // that wallet blocked until chain/history evidence resolves the outcome.
-    return { status: record?.handle || checkpoint.phase === "submitted" ? "pending" : "uncertain",
-      result: { historyRecovery, swapId: record?.swapId ?? checkpoint.swapId, transactionId: record?.handle?.transactionId ?? checkpoint.transactionId, nextAction: "wait" } };
+    // Operations recorded before batches hold one checkpoint; read it as a batch of one.
+    const raw = operation.checkpoint as ({ swaps?: SwapItem[] } & SwapCheckpoint) | undefined;
+    const items: SwapItem[] = Array.isArray(raw?.swaps) ? raw.swaps.map(item => ({ ...item })) : [{ index: 0, status: "pending", ...(raw ?? {}) }];
+    let historyRecovery: Summary | undefined;
+    let records: Awaited<ReturnType<AleoSession["identities"]["load"]>> | undefined;
+    let pending: Awaited<ReturnType<AleoSession["client"]["getUnclaimedSwaps"]>> | undefined;
+    for (const item of items) {
+      if (!item.phase || item.phase === "preparing" || (item.submissionBoundary === 1 && item.phase === "reserved")) {
+        Object.assign(item, { status: "failed", error: { code: "not_submitted", message: "Execution did not reach the proving or submission boundary." } });
+        continue;
+      }
+      const rejection = item.phase === "rejected" ? { code: "transaction_rejected", transactionId: item.transactionId, feeTransactionId: item.feeTransactionId }
+        : await confirmedRejection(session, item.transactionId);
+      if (rejection) { Object.assign(item, { status: "failed", transactionId: rejection.transactionId, feeTransactionId: rejection.feeTransactionId, error: rejection }); continue; }
+      historyRecovery ??= await this.reconcileHistory(session, quote.profile);
+      records ??= await session.identities.load();
+      const record = records.find(entry => item.swapId ? entry.swapId === item.swapId : entry.counter === item.counter);
+      if (record?.claim) {
+        Object.assign(item, { status: "complete", swapId: record.swapId, transactionId: record.handle?.transactionId,
+          claimTransactionId: record.claim.transactionId, amountOut: record.claim.amountOut, amountRemaining: record.claim.amountRemaining });
+        continue;
+      }
+      pending ??= await session.client.getUnclaimedSwaps();
+      const found = pending.swaps.find(swap => swap.swapId === (record?.swapId ?? item.swapId));
+      if (found) {
+        Object.assign(item, { status: "submitted", swapId: found.swapId, transactionId: record?.handle?.transactionId ?? item.transactionId,
+          claimable: found.claimable, amountOut: found.output.amount_out.toString() });
+        continue;
+      }
+      // A timeout can carry a transaction ID without proving acceptance. Keep
+      // that wallet blocked until chain/history evidence resolves the outcome.
+      Object.assign(item, { status: record?.handle || item.phase === "submitted" ? "pending" : "uncertain",
+        swapId: record?.swapId ?? item.swapId, transactionId: record?.handle?.transactionId ?? item.transactionId });
+    }
+    return batchProgress(items, historyRecovery ? { historyRecovery } : {});
   }
 
   private async claim(quote: SavedQuote, context: ExecutionContext, prior: ClaimItem[] = []): Promise<Progress> {

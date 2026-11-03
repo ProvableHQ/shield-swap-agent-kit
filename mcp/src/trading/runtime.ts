@@ -47,7 +47,7 @@ export class TradingRuntime {
     }
   }
 
-  private authorize(quote: SavedQuote): void {
+  private authorize(quote: SavedQuote, count = 1): void {
     const profile = this.profile(quote.profile.id);
     if (this.scope(profile) !== quote.scope || JSON.stringify({ ...profile, policy: undefined }) !== JSON.stringify({ ...quote.profile, policy: undefined })) {
       throw new TradingError("profile_changed", "Wallet configuration changed; request a new quote.");
@@ -72,9 +72,12 @@ export class TradingRuntime {
       throw new TradingError("spend_limit", "The quoted input exceeds this wallet's configured token spending limit.");
     }
     if (!bridge && Number(quote.summary.slippageBps) > p.maxSlippageBps) throw new TradingError("slippage_limit", "The quote exceeds the configured slippage limit.");
+    // Each swap in a batch is capped by swapLimits, so the count multiplies that cap.
+    if (!bridge && count > (p.maxBatchSwaps ?? 20)) throw new TradingError("batch_limit", `This wallet allows at most ${p.maxBatchSwaps ?? 20} swaps per execute; configure --max-batch-swaps to change it.`);
   }
 
-  async execute(quoteId: string, requestKey: string): Promise<Summary> {
+  async execute(quoteId: string, requestKey: string, count = 1): Promise<Summary> {
+    if (!Number.isInteger(count) || count < 1) throw new TradingError("invalid_count", "count must be a whole number of at least 1.");
     const quote = this.store.get<SavedQuote>("quote:" + quoteId);
     if (!quote) throw new TradingError("quote_missing", "Quote was not found.");
     const requestId = createHash("sha256").update(quote.scope + ":" + requestKey).digest("hex");
@@ -89,11 +92,11 @@ export class TradingRuntime {
       const current = this.store.get<SavedQuote>("quote:" + quoteId)!;
       if (current.operationId) throw new TradingError("quote_consumed", "Quote has already been consumed; inspect its original operation.");
       if (current.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired; request a fresh quote.");
-      this.authorize(current);
+      this.authorize(current, count);
       this.assertWalletAvailable(quote.profile);
       const now = Date.now();
       const op: Operation = { id: randomUUID(), kind: quote.kind, profileId: quote.profile.id, scope: quote.scope,
-        quoteId, requestKey: requestId, status: "queued", createdAt: now, updatedAt: now, result: {} };
+        quoteId, requestKey: requestId, status: "queued", createdAt: now, updatedAt: now, result: {}, ...(quote.kind === "swap" ? { count } : {}) };
       this.store.set("operation:" + op.id, op);
       this.store.set("request:" + requestId, op.id);
       this.store.set("quote:" + quoteId, { ...current, operationId: op.id });
@@ -141,7 +144,7 @@ export class TradingRuntime {
             op = { ...op, checkpoint, updatedAt: Date.now() };
             this.store.set("operation:" + id, op);
           } };
-          const result = resuming ? await this.backend.resume(quote, op, context) : await this.backend.execute(quote, context);
+          const result = resuming ? await this.backend.resume(quote, op, context) : await this.backend.execute(quote, context, op.count ?? 1);
           this.save(op, result);
         });
       } catch (error) {

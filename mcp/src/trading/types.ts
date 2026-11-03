@@ -26,6 +26,8 @@ export type Policy = {
   maxSlippageBps: number;
   swapLimits: Record<string, string>;
   bridgeLimits: Record<string, string>;
+  /** Most swaps one execute may submit as a batch; each is capped by swapLimits. Absent means 20. */
+  maxBatchSwaps?: number;
 };
 export type Profile = {
   id: string;
@@ -42,6 +44,22 @@ export type Profile = {
 };
 export type Kind = "swap" | "bridge" | "claim" | "inventory";
 export type Status = "queued" | "running" | "submitted" | "pending" | "complete" | "uncertain" | "failed";
+/** One swap of a batch. A swap operation's checkpoint is `{ swaps: SwapItem[] }`; a single swap is a batch of one. */
+export type SwapItem = {
+  index: number;
+  status: "pending" | "submitted" | "uncertain" | "failed" | "complete";
+  phase?: string;
+  submissionBoundary?: number;
+  counter?: number;
+  swapId?: string;
+  transactionId?: string;
+  feeTransactionId?: string;
+  claimable?: boolean;
+  amountOut?: string;
+  amountRemaining?: string;
+  claimTransactionId?: string;
+  error?: { code: string; message?: string; transactionId?: string; feeTransactionId?: string };
+};
 export type Summary = Record<string, unknown>;
 export type SavedQuote = {
   id: string;
@@ -66,6 +84,8 @@ export type Operation = {
   updatedAt: number;
   result: Summary;
   checkpoint?: unknown;
+  /** Swaps requested by execute; absent on operations recorded before batches existed. */
+  count?: number;
 };
 export type Progress = { status: Status; result: Summary; checkpoint?: unknown };
 export interface ExecutionContext {
@@ -74,7 +94,7 @@ export interface ExecutionContext {
 }
 export interface TradingBackend {
   quote(kind: Kind, profile: Profile, input: Summary): Promise<{ plan: unknown; summary: Summary; expiresAt?: number }>;
-  execute(quote: SavedQuote, context: ExecutionContext): Promise<Progress>;
+  execute(quote: SavedQuote, context: ExecutionContext, count?: number): Promise<Progress>;
   read(action: string, profile: Profile, input: Summary): Promise<Summary>;
   reconcile(quote: SavedQuote, operation: Operation): Promise<Progress>;
   resume(quote: SavedQuote, operation: Operation, context: ExecutionContext): Promise<Progress>;

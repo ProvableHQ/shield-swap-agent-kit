@@ -47,6 +47,7 @@ configure changes trusted terminal permissions:
   --bridge-limit ASSET=RAW Per-operation base-unit input cap (repeatable)
   --inventory-fee-limit N  Total network fee in microcredits per rebalance; 0 disables
   --max-slippage-bps N     Maximum swap slippage (0–1000)
+  --max-batch-swaps N      Most swaps one execute may batch (1–1000; default 20)
   --evm-key-env NAME --evm-rpc-url URL
   --solana-key-env NAME --solana-rpc-url URL
                           Configure existing bridge wallets from environment keys
@@ -72,7 +73,7 @@ export function argumentsFor(argv: string[]) {
       "allow-bridges": { type: "boolean" }, "deny-bridges": { type: "boolean" },
       "allow-inventory": { type: "boolean" }, "deny-inventory": { type: "boolean" },
       "swap-limit": { type: "string", multiple: true }, "bridge-limit": { type: "string", multiple: true },
-      "inventory-fee-limit": { type: "string" }, "max-slippage-bps": { type: "string" },
+      "inventory-fee-limit": { type: "string" }, "max-slippage-bps": { type: "string" }, "max-batch-swaps": { type: "string" },
       "evm-key-env": { type: "string" }, "evm-rpc-url": { type: "string" },
       "solana-key-env": { type: "string" }, "solana-rpc-url": { type: "string" },
       "evm-wallet-env": { type: "string" }, "solana-wallet-env": { type: "string" },
@@ -80,7 +81,7 @@ export function argumentsFor(argv: string[]) {
     const command = parsed.positionals[0] ?? "serve";
     if (parsed.positionals.length > 1 || !["setup", "configure", "serve"].includes(command)) throw new Error();
     const allowed = command === "setup" ? new Set(["help", "state-dir", "profile", "network", "guided", "key-env", "store-key", "generate", "network-url", "api-url", "fee-master"])
-      : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "allow-inventory", "deny-inventory", "swap-limit", "bridge-limit", "inventory-fee-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
+      : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "allow-inventory", "deny-inventory", "swap-limit", "bridge-limit", "inventory-fee-limit", "max-slippage-bps", "max-batch-swaps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
       : new Set(["help", "state-dir"]);
     if (Object.keys(parsed.values).some(key => !allowed.has(key))) throw new Error();
     return { command, values: parsed.values };
@@ -246,6 +247,11 @@ export async function configure(options: Options): Promise<Record<string, unknow
       const value = Number(options["max-slippage-bps"]);
       if (!/^\d+$/.test(options["max-slippage-bps"]) || !Number.isInteger(value) || value < 0 || value > 1000) throw new TradingError("invalid_slippage", "Slippage must be a whole number from 0 to 1000 basis points.");
       policy.maxSlippageBps = value;
+    }
+    if (options["max-batch-swaps"] !== undefined) {
+      const value = Number(options["max-batch-swaps"]);
+      if (!/^\d+$/.test(options["max-batch-swaps"]) || !Number.isInteger(value) || value < 1 || value > 1000) throw new TradingError("invalid_limit", "The batch cap must be a whole number of swaps from 1 to 1000.");
+      policy.maxBatchSwaps = value;
     }
     if (options["fee-master"] && options["no-fee-master"]) throw new TradingError("invalid_arguments", "Choose either sponsored or wallet-funded Aleo fees.");
     const useFeeMaster = options["fee-master"] ? true : options["no-fee-master"] ? false : profile.useFeeMaster ?? false;

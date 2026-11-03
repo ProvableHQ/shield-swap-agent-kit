@@ -94,7 +94,7 @@ for (const rejected of [false, true]) {
       assert.equal(result.status, rejected ? "failed" : "uncertain");
       assert.equal(result.result.transactionId, "at1swap");
       assert.equal(result.result.feeTransactionId, rejected ? "at1fee" : undefined);
-      assert.equal(store.get<{ transactionId: string }>("checkpoint")?.transactionId, "at1swap");
+      assert.equal(store.get<{ swaps: { transactionId: string }[] }>("checkpoint")?.swaps[0]?.transactionId, "at1swap");
       assert.doesNotMatch(JSON.stringify(result), /PRIVATE-DETAIL/);
     } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
   });
@@ -158,7 +158,7 @@ test("balances include underlying public bridge tokens and native credits withou
 const inventoryToken = { id: "1field", symbol: "USDCx", decimals: 6, ammTokenProgram: "wrapped_usdcx.aleo", underlyingProgram: "usdcx.aleo" };
 function inventorySession(available: bigint[], token: Record<string, unknown> = inventoryToken) {
   const swaps: unknown[] = [];
-  const session = { client: {
+  const session = { submissionTracked: true, client: {
     quote: async () => offer,
     tokenData: async () => token,
     getRecordInventory: async ({ asset }: { asset: { program: string } }) => {
@@ -178,15 +178,15 @@ test("swap quotes report covering records and execute refuses a shortfall before
   try {
     const priced = await backend.quote("swap", profile, { from: "USDCx", to: "ETH", amount: "1", slippageBps: 50 });
     assert.equal((priced.summary as Record<string, unknown>).coveringRecords, 1);
-    const quote: SavedQuote = { id: "q", kind: "swap", profile, scope: "", createdAt: 0, expiresAt: offer.expiresAt, ...priced, summary: { ...priced.summary, count: 2 } };
-    const short = await backend.execute(quote, { operationId: "o", checkpoint: () => {} });
+    const quote: SavedQuote = { id: "q", kind: "swap", profile, scope: "", createdAt: 0, expiresAt: offer.expiresAt, ...priced };
+    const short = await backend.execute(quote, { operationId: "o", checkpoint: () => {} }, 2);
     assert.equal(short.status, "failed");
     assert.equal((short.result.error as { code: string }).code, "insufficient_records");
     assert.equal(short.result.covering, 1);
     assert.equal(short.result.needed, 2);
     assert.deepEqual(short.result.remedies, ["rebalance_record_inventory", "maintain_inventory"]);
     assert.equal(swaps.length, 0, "a refused batch reserves and submits nothing");
-    const enough = await backend.execute({ ...quote, summary: { ...priced.summary, count: 1 } }, { operationId: "o2", checkpoint: () => {} });
+    const enough = await backend.execute(quote, { operationId: "o2", checkpoint: () => {} }, 1);
     assert.equal(enough.status, "submitted");
     assert.equal(swaps.length, 1);
   } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
@@ -206,5 +206,59 @@ test("a token without a private record program counts zero covering records", as
     assert.equal((result.result.error as { code: string }).code, "insufficient_records");
     assert.equal(result.result.covering, 0);
     assert.equal(swaps.length, 0);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("count 3 submits three swaps concurrently with one quote and reports per-item outcomes", async () => {
+  const root = mkdtempSync(join(tmpdir(), "shield-veil-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  const { session, swaps } = inventorySession([1_000_000n, 1_000_000n, 1_000_000n]);
+  let calls = 0;
+  const inFlight: number[] = [];
+  (session.client as unknown as { swap: (input: unknown) => Promise<unknown> }).swap = async (input: unknown) => {
+    swaps.push(input);
+    const n = ++calls;
+    inFlight.push(n);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    if (n === 3) throw new Error("no covering record PRIVATE-DETAIL");
+    return { swapId: "s" + n, transactionId: "at" + n, blindingFactor: "PRIVATE-CLAIM-SECRET" };
+  };
+  const backend = new VeilBackend(store, async () => session);
+  const checkpoints: unknown[] = [];
+  try {
+    const priced = await backend.quote("swap", profile, { from: "USDCx", to: "ETH", amount: "1", slippageBps: 50 });
+    const quote: SavedQuote = { id: "q", kind: "swap", profile, scope: "", createdAt: 0, expiresAt: offer.expiresAt, ...priced };
+    const result = await backend.execute(quote, { operationId: "o", checkpoint: value => { checkpoints.push(structuredClone(value)); } }, 3);
+    assert.equal(swaps.length, 3);
+    assert.ok(swaps.every(input => (input as { quote: unknown }).quote === offer), "every item uses the one quote");
+    assert.equal(inFlight.length, 3, "all three started before any finished");
+    assert.equal(result.status, "submitted");
+    assert.equal(result.result.submittedCount, 2);
+    assert.equal(result.result.nextAction, "claim_when_ready");
+    const items = result.result.swaps as { index: number; status: string; swapId?: string; transactionId?: string; error?: { code: string } }[];
+    assert.deepEqual(items.map(item => [item.index, item.status]), [[0, "submitted"], [1, "submitted"], [2, "failed"]]);
+    assert.equal(items[1]!.transactionId, "at2");
+    assert.equal(items[2]!.error?.code, "not_submitted");
+    assert.equal("swapId" in result.result, false, "a batch above one does not mirror a single item at the top level");
+    const last = checkpoints.at(-1) as { swaps: { index: number }[] };
+    assert.equal(last.swaps.length, 3);
+    assert.doesNotMatch(JSON.stringify([result, checkpoints]), /PRIVATE-CLAIM-SECRET|PRIVATE-DETAIL/);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("count 1 mirrors the single item at the top level", async () => {
+  const root = mkdtempSync(join(tmpdir(), "shield-veil-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  const { session } = inventorySession([1_000_000n]);
+  const backend = new VeilBackend(store, async () => session);
+  try {
+    const priced = await backend.quote("swap", profile, { from: "USDCx", to: "ETH", amount: "1", slippageBps: 50 });
+    const quote: SavedQuote = { id: "q", kind: "swap", profile, scope: "", createdAt: 0, expiresAt: offer.expiresAt, ...priced };
+    const result = await backend.execute(quote, { operationId: "o", checkpoint: () => {} }, 1);
+    assert.equal(result.status, "submitted");
+    assert.equal(result.result.swapId, "4field");
+    assert.equal(result.result.transactionId, "at1test");
+    assert.equal(result.result.nextAction, "claim_when_ready");
+    assert.equal((result.result.swaps as unknown[]).length, 1);
   } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
 });

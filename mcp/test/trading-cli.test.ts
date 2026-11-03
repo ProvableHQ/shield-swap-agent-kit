@@ -87,6 +87,10 @@ test("terminal setup encrypts an imported key and stdio survives process restart
       } finally { await client.close(); }
       assert.ok(!diagnostics.includes(account.privateKey));
     }
+    const capped = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root, "--max-batch-swaps", "40"], { env });
+    assert.equal(JSON.parse(capped.stdout).policy.maxBatchSwaps, 40);
+    await assert.rejects(run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root, "--max-batch-swaps", "0"], { env }));
+    await assert.rejects(run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root, "--max-batch-swaps", "1001"], { env }));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

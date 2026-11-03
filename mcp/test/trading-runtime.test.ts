@@ -217,3 +217,20 @@ test("history and quote refresh cannot mutate wallet state during submission", a
     await assert.rejects(f.runtime.quote("claim", "alice", {}), /busy/);
   } finally { release(); await f.close(); }
 });
+
+test("execute enforces the profile's batch cap and persists count on the operation", async () => {
+  const f = fixture(async () => ({ transactionId: "at1test" }));
+  const seen: number[] = [];
+  f.backend.execute = async (_quote, _context, count) => { seen.push(count ?? -1); return { status: "submitted", result: { count } }; };
+  try {
+    const quote = await f.runtime.quote("swap", "alice", { from: "tokenA", to: "tokenB", amount: "0.001" });
+    await assert.rejects(f.runtime.execute(quote.quoteId as string, "r0", 0), (error: { code: string }) => error.code === "invalid_count");
+    await assert.rejects(f.runtime.execute(quote.quoteId as string, "r1", 21), (error: { code: string }) => error.code === "batch_limit");
+    f.store.set("profile:alice", { ...profile, policy: { ...profile.policy, maxBatchSwaps: 100 } });
+    const raised = await f.runtime.quote("swap", "alice", { from: "tokenA", to: "tokenB", amount: "0.001" });
+    const op = await f.runtime.execute(raised.quoteId as string, "r2", 50);
+    await f.runtime.drain();
+    assert.deepEqual(seen, [50]);
+    assert.equal(f.store.get<{ count: number }>("operation:" + op.operationId)!.count, 50);
+  } finally { await f.close(); }
+});

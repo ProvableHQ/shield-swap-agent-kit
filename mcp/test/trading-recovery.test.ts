@@ -84,3 +84,36 @@ test("swap reconciliation resolves a confirmed rejection without replaying its d
     await assert.rejects(f.backend.resume(f.quote, f.operation, { operationId: "o", checkpoint() {} }), /cannot be resubmitted/);
   } finally { f.close(); }
 });
+
+test("a legacy single-swap checkpoint reconciles to the same result as a one-item batch", async () => {
+  const f = fixture();
+  try {
+    f.accept();
+    const legacy = await f.backend.reconcile(f.quote, f.operation);
+    const batch = await f.backend.reconcile(f.quote, { ...f.operation, id: "o2", checkpoint: { swaps: [{ index: 0, status: "pending", phase: "reserved", counter: 0 }] } });
+    assert.equal(legacy.status, "complete");
+    assert.equal(batch.status, legacy.status);
+    assert.equal(batch.result.claimTransactionId, legacy.result.claimTransactionId);
+    assert.equal(batch.result.swapId, legacy.result.swapId);
+    assert.equal((batch.result.swaps as { claimTransactionId: string }[])[0]!.claimTransactionId, "at1claim");
+    assert.equal((legacy.result.swaps as unknown[]).length, 1, "a legacy checkpoint is read as a one-item batch");
+  } finally { f.close(); }
+});
+
+test("a batch with one uncertain item reconciles uncertain until it resolves", async () => {
+  const f = fixture();
+  const operation = { ...f.operation, checkpoint: { swaps: [
+    { index: 0, status: "submitted", phase: "submitted", swapId: "9field", transactionId: "at1other" },
+    { index: 1, status: "uncertain", phase: "reserved", counter: 0 },
+  ] } };
+  try {
+    const first = await f.backend.reconcile(f.quote, operation);
+    assert.equal(first.status, "uncertain");
+    f.accept();
+    const later = await f.backend.reconcile(f.quote, operation);
+    const items = later.result.swaps as { index: number; status: string }[];
+    assert.deepEqual(items.map(item => item.status), ["pending", "complete"]);
+    assert.equal(later.status, "pending", "an item still awaiting its output keeps the batch pending");
+    assert.equal("swapId" in later.result, false);
+  } finally { f.close(); }
+});

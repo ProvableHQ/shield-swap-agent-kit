@@ -79,6 +79,12 @@ node dist/cli.js configure --profile default --allow-swaps --swap-limit TOKEN_ID
 
 Replace `TOKEN_ID` and `RAW_AMOUNT` with a discovered token ID and the desired integer cap. Limits apply **per operation**, not per day or across a strategy. An absent or zero cap prevents execution for that token. Use `--deny-swaps`, `--deny-claims`, `--deny-bridges`, or `--deny-inventory` to revoke permissions. The MCP configuration tool cannot grant permissions, change signers, or set spending limits. Tools use the configured default profile when `profileId` is omitted; an explicit profile overrides it.
 
+`execute` accepts `count` to submit several swaps of one quote at once; each swap is capped by the token limit, so the count multiplies it. The per-wallet batch cap defaults to 20:
+
+```sh
+node dist/cli.js configure --profile default --max-batch-swaps 50
+```
+
 Record inventory maintenance (joins and splits) is a separate permission with its own fee ceiling:
 
 ```sh

@@ -22,7 +22,7 @@ const tools = {
   list_tokens: { description: "List network token metadata from Shield Swap.", schema: z.object({ ...profile, ...page }).strict(), read: true },
   list_pools: { description: "List Shield Swap pools from the network API.", schema: z.object({ ...profile, ...page }).strict(), read: true },
   quote: { description: "Save an executable exact-input swap quote with its route, minimum output and expiry. Does not submit.", schema: z.object({ ...profile, from: id, to: id, amount: decimal, slippageBps: z.number().int().min(0).max(1000).optional() }).strict(), read: true },
-  execute: { description: "Execute a saved swap quote once under locally configured permissions. Returns an operation ID; poll its status.", schema: z.object(executeArgs).strict(), read: false },
+  execute: { description: "Execute a saved swap quote once under locally configured permissions. Returns an operation ID; poll its status. count submits that many swaps of the same quote at once, each capped by the token limit, after checking that enough unreserved records cover the input.", schema: z.object({ ...executeArgs, count: z.number().int().min(1).max(1000).default(1) }).strict(), read: false },
   swap_history: { description: "List this account's stored swaps and reconcile claim state. Reports bounded recovery coverage.", schema: z.object({ ...profile, ...page, reconcile: z.boolean().default(false) }).strict(), read: true },
   claim_unclaimed_swaps: { description: "Claim selected unclaimed swap outputs, or a bounded snapshot of up to 20 claimable outputs. Persist per-swap results.", schema: z.object({ ...profile, swapIds: z.array(id).min(1).max(20).optional(), idempotencyKey: id }).strict(), read: false },
   list_bridge_routes: { description: "List SDK bridge routes for the configured network, including availability.", schema: z.object({ ...profile, ...page }).strict(), read: true },
@@ -104,7 +104,7 @@ async function call(runtime: TradingRuntime, name: ToolName, args: Summary): Pro
       const quoteId = String(name === "rebalance_record_inventory" ? args.planId : args.quoteId);
       const quote = runtime.store.get<{ kind: Kind }>("quote:" + quoteId);
       if (quote?.kind !== kind) throw new TradingError("quote_mismatch", "This quote belongs to a different action or is unavailable.");
-      return runtime.execute(quoteId, String(args.idempotencyKey));
+      return runtime.execute(quoteId, String(args.idempotencyKey), name === "execute" ? Number(args.count ?? 1) : 1);
     }
     case "get_operation_status": return runtime.status(String(args.operationId));
     case "bridge_status":
