@@ -12,11 +12,17 @@ The examples run **six 0.1 USDCx → ETH swaps on testnet with 50 basis points s
 - One quote can be shared by every swap in the batch; it fixes the same output floor for each. A quote reserves no pool liquidity, so later trades can execute at worse prices or fail on their floor while earlier ones succeed. Inspect every swap and every claim.
 - Blinded identities are allocated by the identity store. Veil's bundled stores coordinate counters within one process; Python's journal locks under the profile. Run one trader process per account unless each process supplies distinct explicit identities.
 - A timeout is an unknown result. Reopen the same stores, reconcile the record journal and unclaimed swaps, and resolve them before starting another batch. Never repeat a batch to recover one trade.
-- Count unreserved covering records before a batch and reshape only on a shortfall. In SDK 0.16.0 and Python 0.8.0 both the `balanced` and `preserve` targets rewrite the whole balance (one join of every record, then one split per extra record), so an unneeded plan costs one transaction per record plus a join. Several batches selling one token draw on the same records; add their counts before firing any of them.
+- Count unreserved covering records before a batch and refuse on a shortfall; never reshape inside a trade. Reshape once with the [UTXO management](swap-utxo-management.md) recipes, or keep a floor with a maintainer, then rerun the batch. In SDK 0.16.0 and Python 0.8.0 both the `balanced` and `preserve` targets rewrite the whole balance (one join of every record, then one split per extra record); the Veil `floor` target merged in ProvableHQ/veil#215 splits only the shortfall. Several batches selling one token draw on the same records; add their counts before firing any of them.
 
 ## AgentKit MCP
 
-The standalone server serializes operations per wallet, so it does not submit same-token swaps simultaneously. Use its [inventory tools](swap-utxo-management.md#agentkit-mcp--inspect-plan-rebalance) to keep enough covering records, then run the [single-swap recipe](../toolchains/mcp.md#execute-and-claim-one-swap) once per trade; each swap reserves its input in the server's journal and the next swap selects another record. For truly simultaneous submissions, use the SDK recipes below in a bot process that owns the account.
+A swap is a batch of one: `execute` takes `count` (default 1) and submits that many swaps of one saved quote at once inside one locked operation. The quote reports `coveringRecords`, the unreserved records of the input token that each cover the quoted input; a `count` above it fails as `insufficient_records` before anything is reserved, naming the two remedies: one `rebalance_record_inventory`, or a standing `maintain_inventory` process. Each swap keeps its own checkpoint; `get_operation_status` reports every item and the batch is `submitted` once nothing is uncertain, then `claim_unclaimed_swaps` claims the outputs. The count is capped per wallet by `configure --max-batch-swaps` (20 by default), and each swap is still capped by the token limit. The wallet lock is held for the whole batch, so other operations on that wallet wait for it.
+
+```json
+{"name":"execute","arguments":{"quoteId":"QUOTE_ID","idempotencyKey":"batch-2026-11-02-1","count":6}}
+```
+
+`maintain_inventory` keeps named tokens at a floor of covering records as a child process of the server; `get_maintenance_status` and `stop_maintenance` read and end it. The floor target needs the Veil release that contains the floor planner; until the kit pins it, a shortfall pass records `pass_failed`. Operators who want a maintainer that outlives the server run `node dist/cli.js maintain` themselves. See the [MCP README](../../mcp/README.md#record-inventory-and-reservations).
 
 ## CLI
 
@@ -33,7 +39,7 @@ Check the installed command's `--help` for the exact leg syntax before running i
 
 Use the `managed-session.mts` from [UTXO management](swap-utxo-management.md#veil--managed-session-and-inventory-methods); it enables record management, the SQLite journal, and the blinded-identity file. Install `@provablehq/shield-swap-cli` for the store and use Node.js 22.13 or newer.
 
-Save as `concurrent-swaps.mts`. Without `--execute` it reconciles, plans, and quotes, then stops:
+Save as `concurrent-swaps.mts`. Without `--execute` it reconciles, counts covering records, and quotes, then stops:
 
 ```ts
 import { formatUnits, parseUnits } from '@provablehq/shield-swap-sdk'
@@ -53,29 +59,18 @@ try {
   const token = await client.tokenData(from)
   if (!token.underlyingProgram) throw new Error('Token has no private record program')
   const minimum = parseUnits(amountIn, token.decimals)
-  // One swap spends one unreserved covering record. A plan rewrites the whole
-  // balance (join everything, then split), so plan only when the batch runs short.
+  // One swap spends one unreserved covering record. A batch never reshapes
+  // inside a trade: reshape once with rebalance.mts, or keep a floor with a
+  // maintainer, then rerun.
   const records = await client.getRecordInventory({ asset: { program: token.underlyingProgram } })
   const covering = records.available.filter(record => record.amount >= minimum).length
-  const plan = covering >= count ? undefined : await client.planInventory({
-    token: token.id,
-    target: { records: count, minRecordAmount: minimum, distribution: 'balanced', toleranceBps: 0 },
-    maxTransactions: 24,
-  })
-  console.log({ covering, needed: count, reshapeSteps: plan?.steps.length ?? 0 })
-  if (plan) console.table(plan.steps.map(step => ({ operation: step.kind, inputs: step.inputs.length, helper: step.joinProgram?.program ?? 'native' })))
-  const preview = await client.quote({ from, to, amountIn, slippageBps: 50 })
-  console.log({ perSwapMinimum: formatUnits(preview.minOut, preview.to.decimals), outputSymbol: preview.to.symbol })
+  console.log({ covering, needed: count })
+  if (covering < count) throw new Error(`${covering} unreserved record(s) cover ${amountIn} ${from}; ${count} needed. Reshape once or run a maintainer, then rerun.`)
+  const quote = await client.quote({ from, to, amountIn, slippageBps: 50 })
+  console.log({ perSwapMinimum: formatUnits(quote.minOut, quote.to.decimals), outputSymbol: quote.to.symbol })
   if (!execute) {
-    console.log('Preview only. Pass --execute to prepare records, submit swaps and claim outputs.')
+    console.log('Preview only. Pass --execute to submit swaps and claim outputs.')
   } else {
-    if (plan) {
-      const maintenance = await client.rebalanceRecordInventory({ plan, timeoutMs: 600_000, pollIntervalMs: 3_000 })
-      if (maintenance.status !== 'complete') throw new Error(`Inventory preparation interrupted: ${maintenance.reason}`)
-    }
-
-    // Quote after maintenance so joins and splits do not consume its lifetime.
-    const quote = await client.quote({ from, to, amountIn, slippageBps: 50 })
     const swaps = await Promise.allSettled(Array.from({ length: count }, () => client.swap({ quote })))
     const handles = swaps.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
     const claims = await Promise.allSettled(handles.map(async handle => {
@@ -96,7 +91,7 @@ try {
 }
 ```
 
-Run `npx tsx concurrent-swaps.mts` to preview and `npx tsx concurrent-swaps.mts --execute` only for an authorized batch. `claims[i]` belongs to `handles[i]`, not `swaps[i]`, because failed swaps return no handle. A successful claim can return both the output and a refund of unspent input in their respective base units. Do not print handles: they contain claim material. The console summaries print only transaction IDs and amounts.
+Run `npx tsx concurrent-swaps.mts` to preview and `npx tsx concurrent-swaps.mts --execute` only for an authorized batch. A shortfall stops the script before any reservation; it never reshapes records itself. `claims[i]` belongs to `handles[i]`, not `swaps[i]`, because failed swaps return no handle. A successful claim can return both the output and a refund of unspent input in their respective base units. Do not print handles: they contain claim material. The console summaries print only transaction IDs and amounts.
 
 After a timeout, crash, or failed claim, keep `inventory.sqlite` and `blinded.json`, stop other writers for the account, and run `npx tsx recover-batch.mts`:
 
@@ -131,13 +126,13 @@ Reconciliation submits nothing by default; an entry whose saved transaction neve
 
 Python SDK 0.8.0 ports the same model: a record inventory store shared by every call, reservation before proving, reselection of the next eligible record when another swap took the first choice, and a journal that keeps uncertain inputs reserved. Use the `managed_session.py` from [UTXO management](swap-utxo-management.md#python--managed-facade-and-inventory-methods); a client from `ShieldSwap.from_profile()` alone is unmanaged. An explicit `token_record` is never replaced, and proving or broadcast errors are never retried.
 
-Save as `concurrent_swaps.py`. Without `--execute` it reconciles, plans, and quotes, then stops:
+Save as `concurrent_swaps.py`. Without `--execute` it reconciles, counts covering records, and quotes, then stops:
 
 ```python
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
-from aleo.inventory import InventoryTarget, RecordAsset
+from aleo.inventory import RecordAsset
 from managed_session import client, dex
 
 count, token_in, token_out, amount_in = 6, "USDCx", "ETH", "0.1"
@@ -152,29 +147,18 @@ if dex.journal.pending_claims():
 
 token = dex.api.get_token(token_in)
 minimum = int(Decimal(amount_in).scaleb(token.decimals))
-# One swap spends one unreserved covering record. A plan rewrites the whole
-# balance (join everything, then split), so plan only when the batch runs short.
+# One swap spends one unreserved covering record. A batch never reshapes
+# inside a trade: reshape once with rebalance_inventory.py, or keep a floor
+# with a maintainer, then rerun.
 snapshot = client.inventory.get_record_inventory(RecordAsset(program=token.underlying_program))
 covering = sum(1 for record in snapshot.available if record.amount >= minimum)
-plan = None if covering >= count else dex.plan_inventory(
-    token_in, InventoryTarget(records=count, min_record_amount=minimum, distribution="balanced", tolerance_bps=0),
-    max_transactions=24)
-print({"covering": covering, "needed": count, "reshape_steps": len(plan.steps) if plan else 0})
-for step in (plan.steps if plan else []):
-    helper = step.join_program.program if step.join_program else "native"
-    print(f"{step.kind:5} inputs={len(step.inputs):2} outputs={len(step.outputs)} via {helper}")
-preview = dex.quote(token_in=token_in, token_out=token_out, amount_in=amount_in, slippage_bps=50)
-print({"per_swap_minimum": preview.minimum_amount_out, "output_token": preview.token_out_id})
-if not execute:
-    raise SystemExit("Preview only. Pass --execute to prepare records, submit swaps and claim outputs.")
-
-if plan:
-    result = client.inventory.rebalance_record_inventory(plan, timeout=600.0, poll_interval=3.0)
-    if result.status != "complete":
-        raise SystemExit(f"Inventory preparation interrupted: {result.reason}")
-
-# Quote after maintenance so joins and splits do not consume its lifetime.
+print({"covering": covering, "needed": count})
+if covering < count:
+    raise SystemExit(f"{covering} unreserved record(s) cover {amount_in} {token_in}; {count} needed. Reshape once or run a maintainer, then rerun.")
 quote = dex.quote(token_in=token_in, token_out=token_out, amount_in=amount_in, slippage_bps=50)
+print({"per_swap_minimum": quote.minimum_amount_out, "output_token": quote.token_out_id})
+if not execute:
+    raise SystemExit("Preview only. Pass --execute to submit swaps and claim outputs.")
 
 def trade(index):
     try:
@@ -205,7 +189,7 @@ if failures:
     raise SystemExit(f"{failures} trades need recovery; do not repeat the batch")
 ```
 
-Run `python concurrent_swaps.py` to preview and `python concurrent_swaps.py --execute` only for an authorized batch. Each thread's swap journals its blinded identity and handle in the profile journal and reserves its input in `inventory.sqlite`. Printing exception types and HTTP statuses rather than messages keeps request details out of logs; inspect the protected journal for recovery material. A swap that fails in delegated proving never broadcasts, and its reservation is released as `cancelled` by the next reconcile; the SDK does not retry `AleoProvingError`, so rerun only the failed count after reconciling.
+Run `python concurrent_swaps.py` to preview and `python concurrent_swaps.py --execute` only for an authorized batch. A shortfall stops the script before any reservation; it never reshapes records itself. Each thread's swap journals its blinded identity and handle in the profile journal and reserves its input in `inventory.sqlite`. Printing exception types and HTTP statuses rather than messages keeps request details out of logs; inspect the protected journal for recovery material. A swap that fails in delegated proving never broadcasts, and its reservation is released as `cancelled` by the next reconcile; the SDK does not retry `AleoProvingError`, so rerun only the failed count after reconciling.
 
 After a timeout, crash, or failed claim, keep the profile directory, stop other writers for the account, and run `python recover_batch.py`:
 
