@@ -154,3 +154,65 @@ test("balances include underlying public bridge tokens and native credits withou
     await assert.rejects(backend.read("get_balances", profile, { tokens: ["3field"] }), /RPC unavailable/);
   } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
 });
+
+
+test("managed swap status uses its live output or saved claim before scanning unrelated history", async () => {
+  const root = mkdtempSync(join(tmpdir(), "shield-swap-targeted-status-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  let output: unknown = { amount_out: 42n };
+  let historyCalls = 0;
+  const session = { client: {
+    getSwapOutput: async ({ swapId }: { swapId: string }) => { assert.equal(swapId, "4field"); return output; },
+    getUnclaimedSwaps: async () => ({ swaps: [] }),
+    reconcileSwapHistory: async () => { historyCalls++; return { complete: false, pagesScanned: 10 }; },
+  }, identities: { load: async () => [{ counter: 7, swapId: "4field", handle: { transactionId: "at1swap" } }], save: async () => {} },
+  reconcileRecords: async () => [],
+  publicClient: { request: async () => { throw Object.assign(new Error("not found"), { status: 404 }); } },
+  } as unknown as AleoSession;
+  const quote: SavedQuote = { id: "q", kind: "swap", profile, scope: "wallet", createdAt: 0, expiresAt: 1, plan: offer, summary: {} };
+  const operation = { id: "o", kind: "swap", managedRecords: true, checkpoint: { phase: "submitted", counter: 7, swapId: "4field", transactionId: "at1swap" } } as import("../src/trading/types").Operation;
+  const backend = new VeilBackend(store, async () => session);
+  try {
+    const pending = await backend.reconcile(quote, operation);
+    assert.equal(pending.status, "pending"); assert.equal(pending.result.claimable, true);
+    assert.equal(historyCalls, 0, "an existing output needs no global history scan");
+    output = null;
+    await backend.reconcile(quote, operation);
+    assert.equal(historyCalls, 1, "a missing output still requires recovery evidence");
+    store.set("operation:other-wallet", { kind: "claim", scope: "other", checkpoint: { claims: [{ swapId: "4field", status: "claimed", transactionId: "at1wrong" }] } });
+    assert.equal((await backend.reconcile(quote, operation)).status, "pending", "another wallet cannot establish our claim");
+    store.set("operation:active-claim", { id: "active-claim", kind: "claim", scope: "wallet", status: "submitted", checkpoint: { claims: [{ swapId: "4field", status: "submitting", transactionId: "at1claim" }] } });
+    const activeBefore = historyCalls;
+    const waiting = await backend.reconcile(quote, operation);
+    assert.equal(waiting.status, "pending"); assert.equal(waiting.result.claimOperationId, "active-claim");
+    assert.equal(historyCalls, activeBefore, "a claim consuming the output must finish its bookkeeping without a history lock");
+    store.set("operation:claim", { kind: "claim", scope: "wallet", checkpoint: { claims: [{ swapId: "4field", status: "claimed", transactionId: "at1claim", amountOut: "42", amountRemaining: "0" }] } });
+    const before = historyCalls;
+    const complete = await backend.reconcile(quote, operation);
+    assert.equal(complete.status, "complete"); assert.equal(complete.result.claimTransactionId, "at1claim");
+    assert.equal(complete.result.amountOut, "42"); assert.equal(historyCalls, before);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test("managed claim recovery scans only its selected identities and preserves unrelated history", async () => {
+  const root = mkdtempSync(join(tmpdir(), "shield-targeted-history-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  let records = [{ counter: 1, swapId: "one", blindedAddress: "aleo1one", blindingFactor: "1field", status: "swapped", claimSearched: true },
+    { counter: 2, swapId: "two", blindedAddress: "aleo1two", blindingFactor: "2field", status: "swapped", claimSearched: true }];
+  let locked = false, calls = 0;
+  const session = { client: {
+    request: async ({ method }: { method: string }) => { assert.equal(method, "getProgramCallsPaginated"); assert.equal(locked, true); calls++; return { calls: [], next_cursor: null }; },
+    reconcileSwapHistory: async () => { throw new Error("must not scan the complete identity store"); },
+  }, reconcileRecords: async () => [], withIdentities: async (fn: () => Promise<unknown>) => { locked = true; try { return await fn(); } finally { locked = false; } },
+  identities: { load: async () => records, save: async (next: typeof records) => { assert.equal(locked, true); records = next; } },
+  } as unknown as AleoSession;
+  const quote = { id: "q", kind: "claim", profile, scope: "wallet", plan: { swapIds: ["one"] } } as SavedQuote;
+  const operation = { id: "o", kind: "claim", managedRecords: true, checkpoint: { claims: [{ swapId: "one", status: "pending" }] } } as import("../src/trading/types").Operation;
+  try {
+    await new VeilBackend(store, async () => session).reconcile(quote, operation);
+    assert.equal(calls, 1);
+    assert.equal(records.length, 2); assert.equal(records[1].claimSearched, true);
+    assert.equal(records[0].claimSearched, true);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});

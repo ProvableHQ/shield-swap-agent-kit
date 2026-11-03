@@ -99,7 +99,7 @@ export class TradingRuntime {
     if (!bridge && Number(quote.summary.slippageBps) > p.maxSlippageBps) throw new TradingError("slippage_limit", "The quote exceeds the configured slippage limit.");
   }
 
-  async execute(quoteId: string, requestKey: string): Promise<Summary> {
+  async execute(quoteId: string, requestKey: string, registrationGuard?: () => void): Promise<Summary> {
     const quote = this.store.get<SavedQuote>("quote:" + quoteId);
     if (!quote) throw new TradingError("quote_missing", "Quote was not found.");
     const requestId = createHash("sha256").update(quote.scope + ":" + requestKey).digest("hex");
@@ -114,6 +114,7 @@ export class TradingRuntime {
       const current = this.store.get<SavedQuote>("quote:" + quoteId)!;
       if (current.operationId) throw new TradingError("quote_consumed", "Quote has already been consumed; inspect its original operation.");
       if (current.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired; request a fresh quote.");
+      registrationGuard?.();
       this.authorize(current);
       this.assertWalletAvailable(quote);
       const now = Date.now();

@@ -89,3 +89,40 @@ test("the worker advances another token while a check is blocked and stop wins b
     assert.equal(await jobs.running(), false);
   } finally { releaseA(); controller.abort(); await running; await runtime.drain(); store.close(); rmSync(root, { recursive: true, force: true }); }
 });
+
+import { recoverOperations } from "../src/trading/maintenance";
+test("failed recovery lookups cannot starve later operations", async () => {
+  const root = mkdtempSync(join(tmpdir(), "recovery-fairness-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  try {
+    for (let id = 0; id < 10; id++) store.set("operation:" + id, { id: String(id), status: "uncertain", updatedAt: id });
+    const runtime = new TradingRuntime(store, {} as TradingBackend);
+    const visited = new Set<string>();
+    runtime.status = async id => { visited.add(id); if (Number(id) < 8) throw Error("RPC unavailable"); return { status: "complete" }; };
+    await recoverOperations(runtime); await recoverOperations(runtime);
+    assert.equal(visited.size, 10);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test("stop is rechecked atomically when a maintenance operation is registered", async () => {
+  const root = mkdtempSync(join(tmpdir(), "maintain-register-stop-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  store.set("profile:alice", { id: "alice", network: "testnet", address: "aleo1test", key: { type: "env", name: "KEY" },
+    policy: { inventory: true, inventoryFeeLimit: "100" } });
+  let writes = 0;
+  const backend = { concurrentRecords: true,
+    read: async () => ({ token: { id: "A", decimals: 6 }, asset: { program: "A.aleo" }, available: [] }),
+    quote: async () => ({ plan: {}, summary: { asset: "A.aleo", stepCount: 1 } }),
+    execute: async () => { writes++; return { status: "complete", result: {} }; },
+  } as unknown as TradingBackend;
+  const runtime = new TradingRuntime(store, backend), jobs = new InventoryMaintenance(runtime);
+  try {
+    const job = await jobs.start("alice", { token: "A", records: 2, minRecordAmount: "1" });
+    const execute = runtime.execute.bind(runtime);
+    runtime.execute = async (...args) => { jobs.stop(job.id); return execute(...args); };
+    await jobs.check(job.id); await runtime.drain();
+    assert.equal(writes, 0, "a stop committed before registration wins");
+    assert.equal(jobs.get(job.id)!.enabled, false);
+    assert.equal(jobs.get(job.id)!.activeOperationId, undefined);
+  } finally { await runtime.drain(); store.close(); rmSync(root, { recursive: true, force: true }); }
+});

@@ -77,10 +77,17 @@ export class InventoryMaintenance {
           const current = this.get(id)!;
           if (!current.enabled || current.revision !== state.revision) return current;
           if (!Number(plan.stepCount)) return this.save(id, { lastError: "insufficient_available_inventory" });
-          const operation = await this.runtime.execute(String(plan.quoteId), "maintenance:" + randomUUID());
+          const operation = await this.runtime.execute(String(plan.quoteId), "maintenance:" + randomUUID(), () => {
+            // This runs inside the same SQLite transaction as registration;
+            // another process cannot stop/change the job between the check and write.
+            const latest = this.get(id);
+            if (!latest?.enabled || latest.revision !== state.revision)
+              throw new TradingError("maintenance_changed", "The token job stopped or changed before registration.");
+          });
           return this.save(id, { activeOperationId: String(operation.operationId), operationStatus: String(operation.status), lastError: undefined });
         } catch (error) {
           // If a manual plan won the registration race, adopt its original op.
+          if (error instanceof TradingError && error.code === "maintenance_changed") return this.get(id)!;
           const active = this.active(state);
           return this.save(id, { nextCheckAt, ...(active ? { activeOperationId: active.id, operationStatus: active.status } : {}),
             lastError: error instanceof TradingError ? error.code : "maintenance_check_failed" });
@@ -119,8 +126,14 @@ export class InventoryMaintenance {
 }
 
 /** Polling is read-only recovery. It never creates a trade or resumes a claim. */
+const recoveryAttempts = new WeakMap<TradingRuntime, Map<string, number>>();
 export async function recoverOperations(runtime: TradingRuntime): Promise<void> {
-  const pending = runtime.store.list<Operation>("operation:").filter(op => !terminal.has(op.status))
-    .sort((a, b) => a.updatedAt - b.updatedAt).slice(0, 8);
-  await Promise.allSettled(pending.map(op => runtime.status(op.id)));
+  const pending = runtime.store.list<Operation>("operation:").filter(op => !terminal.has(op.status));
+  const attempts = recoveryAttempts.get(runtime) ?? new Map<string, number>();
+  recoveryAttempts.set(runtime, attempts);
+  const ids = new Set(pending.map(op => op.id));
+  for (const id of attempts.keys()) if (!ids.has(id)) attempts.delete(id);
+  const selected = pending.sort((a, b) => (attempts.get(a.id) ?? 0) - (attempts.get(b.id) ?? 0) || a.updatedAt - b.updatedAt).slice(0, 8);
+  for (const op of selected) attempts.set(op.id, Date.now());
+  await Promise.allSettled(selected.map(op => runtime.status(op.id)));
 }

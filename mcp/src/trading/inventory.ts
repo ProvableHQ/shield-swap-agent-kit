@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { RecordInventoryStore, RecordSpend } from "@provablehq/veil-core";
-import { operationContext, journalContext } from "./ownership";
+import { inventoryContext, operationContext, journalContext } from "./ownership";
 import { TradingStore } from "./store";
 
 // Journal entries hold record nonces, lifecycle status and the proved
@@ -36,13 +36,24 @@ export function createRecordInventoryStore(store: TradingStore): RecordInventory
       store.set(key(entry.scope) + saved.id, saved);
       return saved;
     }),
-    update: async (scope, id, patch) => store.transaction(() => {
-      const current = store.get<RecordSpend>(key(scope) + id);
-      if (!current) throw new Error("Unknown record reservation");
-      const updated: RecordSpend = { ...current, ...patch };
-      // JSON omits undefined; drop fields the SDK clears explicitly.
-      for (const field of Object.keys(patch) as (keyof typeof patch)[]) if (patch[field] === undefined) delete updated[field];
-      store.set(key(scope) + id, updated);
-    }),
+    update: async (scope, id, patch) => {
+      const updated = store.transaction(() => {
+        const current = store.get<OwnedRecordSpend>(key(scope) + id);
+        if (!current) throw new Error("Unknown record reservation");
+        const updated: OwnedRecordSpend = { ...current, ...patch };
+        // JSON omits undefined; drop fields the SDK clears explicitly.
+        for (const field of Object.keys(patch) as (keyof typeof patch)[]) if (patch[field] === undefined) delete updated[field];
+        store.set(key(scope) + id, updated);
+        return updated;
+      });
+      // Inventory uses writeContract/buildTransaction, while swaps use
+      // executeContract/execute. Both persist here before broadcasting. Observe
+      // only this operation's writes, after its proof has committed durably.
+      const active = operationContext.getStore();
+      if (active && updated.operationId === active.operationId) {
+        if (patch.status === "prepared" && updated.transactionId) inventoryContext.getStore()?.prepared(updated.transactionId);
+        if (patch.status === "submitted") active.submitted?.();
+      }
+    },
   };
 }

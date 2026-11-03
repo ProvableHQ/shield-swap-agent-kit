@@ -57,3 +57,9 @@ export function shieldSwapActions({ blindedIdentities: identities }) {
     },
   });
 }
+
+// The production adapter also uses the public scoped history action.
+export async function reconcileSwapHistory(_client, { store }) {
+  await store.load();
+  return { complete: true, pagesScanned: 1 };
+}

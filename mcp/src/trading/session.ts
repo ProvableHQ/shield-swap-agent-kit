@@ -1,7 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { LocalAccount, PublicClient, WalletClient, ProvingConfig } from "@provablehq/veil-core";
 import type { BlindedIdentityRecord, BlindedIdentityStore, ShieldSwapActions } from "@provablehq/shield-swap-sdk";
-import { operationContext } from "./ownership";
+import { inventoryContext, operationContext } from "./ownership";
+export { inventoryContext } from "./ownership";
 import { coordinateSession } from "./managed-session";
 import { TradingStore } from "./store";
 import { createRecordInventoryStore } from "./inventory";
@@ -31,7 +32,6 @@ export const claimContext = new AsyncLocalStorage<{
 // Inventory maintenance submits several transactions. Record each proved
 // transaction ID after the SDK journals it and before its broadcast, so a
 // crash mid-plan leaves evidence without recording a proof the SDK rejected.
-export const inventoryContext = new AsyncLocalStorage<{ prepared(transactionId: string): void }>();
 export function trackSwapSubmission(proving: ProvingConfig): void {
   const execute = proving.execute;
   if (!execute) throw new TradingError("proving_unavailable", "The configured SDK cannot submit Aleo transactions.");

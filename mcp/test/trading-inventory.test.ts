@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { RecordSpend } from "@provablehq/veil-core";
+import { writeContract, type Client, type RecordSpend } from "@provablehq/veil-core";
+import { operationContext } from "../src/trading/ownership";
 import { TradingStore } from "../src/trading/store";
 import { createRecordInventoryStore } from "../src/trading/inventory";
 
@@ -232,4 +233,34 @@ test("a plan rejected by the SDK before any submission fails definitively", asyn
     assert.equal((failed.error as { code: string }).code, "not_submitted");
     assert.doesNotMatch(JSON.stringify(failed), /PRIVATE-DETAIL/);
   } finally { await f.close(); }
+});
+
+
+test("inventory writeContract checkpoints its journaled proof before broadcast", async () => {
+  const root = mkdtempSync(join(tmpdir(), "shield-inventory-progress-"));
+  const store = new TradingStore(root, "test-password-long-enough", true);
+  const journal = createRecordInventoryStore(store);
+  const events: string[] = [];
+  try {
+    await operationContext.run({ operationId: "inventory-plan", submitted: () => { events.push("submitted"); } }, async () => {
+      const reserved = await journal.acquire(entry(["1group"]));
+      const transaction = { id: "at1split", type: "execute" } as unknown as NonNullable<RecordSpend["transaction"]>;
+      const client = { account: { type: "local", sign() {} }, proving: {
+        buildTransaction: async () => transaction,
+      }, request: async () => {
+        assert.deepEqual(events, ["prepared:at1split"], "evidence exists before the SDK sends the transaction");
+        assert.equal((await journal.list(scope))[0].status, "prepared");
+        events.push("broadcast"); return "at1split";
+      } } as unknown as Client;
+      await inventoryContext.run({ prepared: id => { events.push("prepared:" + id); } }, () => writeContract(client, {
+        program: "credits.aleo", function: "split", inputs: [], onProgress: async event => {
+          if (event.type === "transaction-prepared") await journal.update(scope, reserved!.id, {
+            status: "prepared", transactionId: event.transactionId, transaction: event.transaction,
+          });
+          if (event.type === "transaction-submitted") await journal.update(scope, reserved!.id, { status: "submitted" });
+        },
+      }));
+    });
+    assert.deepEqual(events, ["prepared:at1split", "broadcast", "submitted"]);
+  } finally { store.close(); rmSync(root, { recursive: true, force: true }); }
 });

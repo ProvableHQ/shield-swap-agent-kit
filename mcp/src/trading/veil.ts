@@ -1,4 +1,4 @@
-import type { BlindedIdentityRecord, SwapQuote } from "@provablehq/shield-swap-sdk";
+import { reconcileSwapHistory as reconcileSdkHistory, type BlindedIdentityRecord, type SwapQuote } from "@provablehq/shield-swap-sdk";
 import { FinalizeRevertError, TransactionTimeoutError, getConfirmedTransaction, type InventoryPlan, type InventoryRecord, type InventoryTarget, type RecordSpend } from "@provablehq/veil-core";
 import { BridgeBackend } from "./bridge";
 import { TradingStore } from "./store";
@@ -167,8 +167,11 @@ export class VeilBackend implements TradingBackend {
 
   private async reconcileInventory(quote: SavedQuote, operation: Operation, session: AleoSession): Promise<Progress> {
     const checkpoint = operation.checkpoint as InventoryCheckpoint | undefined;
-    const ids = checkpoint?.transactionIds ?? [];
     const journal = await reconcileJournal(session);
+    // A crash can occur after the SDK commits its proof but before our
+    // checkpoint callback. Managed reconciliation sees only this owner's entries.
+    const ids = [...new Set([...(checkpoint?.transactionIds ?? []),
+      ...(operation.managedRecords ? journal.flatMap(entry => entry.transactionId ? [entry.transactionId] : []) : [])])];
     const transactions: Record<string, string> = {};
     for (const id of ids) transactions[id] = journal.find(entry => entry.transactionId === id)?.status ?? await unjournaledStatus(session, id);
     const base = { transactionIds: ids, transactions, completedSteps: checkpoint?.completedSteps, plannedSteps: (quote.plan as InventoryPlan).steps.length,
@@ -176,7 +179,8 @@ export class VeilBackend implements TradingBackend {
       ...(checkpoint?.reasonCode ? { reasonCode: checkpoint.reasonCode } : {}),
       unresolvedJournalEntries: journal.filter(entry => !resolvedJournalStatuses.has(entry.status)).length };
     if (checkpoint?.phase === "complete") return { status: "complete", result: base };
-    if (ids.some(id => !["confirmed", "rejected", "not_submitted"].includes(transactions[id]))) {
+    if (ids.some(id => !["confirmed", "rejected", "not_submitted"].includes(transactions[id])) ||
+        operation.managedRecords && journal.some(entry => !resolvedJournalStatuses.has(entry.status))) {
       // A prepared or submitted transaction without a chain result keeps its
       // inputs reserved. A missing lookup never proves rejection.
       return { status: "uncertain", result: { ...base, nextAction: "reconcile", error: { code: "maintenance_uncertain",
@@ -336,22 +340,34 @@ export class VeilBackend implements TradingBackend {
       identityWindow: 16, identityCeiling: 256, pagesScanned: result.pagesScanned };
   }
 
-  private async reconcileHistory(session: AleoSession, profile: Profile) {
+  private async reconcileHistory(session: AleoSession, profile: Profile, selected?: (record: BlindedIdentityRecord) => boolean) {
     await reconcileJournal(session);
-    return session.withIdentities ? session.withIdentities(() => this.reconcileHistoryLocked(session, profile)) : this.reconcileHistoryLocked(session, profile);
+    return session.withIdentities ? session.withIdentities(() => this.reconcileHistoryLocked(session, profile, selected)) : this.reconcileHistoryLocked(session, profile);
   }
-  private async reconcileHistoryLocked(session: AleoSession, profile: Profile) {
+  private async reconcileHistoryLocked(session: AleoSession, profile: Profile, selected?: (record: BlindedIdentityRecord) => boolean) {
     // Managed swaps and claims journal their input records. Resolve those
     // entries first so settled inputs are released and consumed ones stay excluded.
     // SDK 0.12 caches a negative result at the current history tip. Pending
     // transactions can land after that scan, so only concrete claims are final.
-    const records = await session.identities.load();
-    if (records.some(record => !record.claim && record.claimSearched)) {
-      await session.identities.save(records.map(record => record.claim ? record : { ...record, claimSearched: false }));
-    }
+    const refresh = (records: BlindedIdentityRecord[]) => records.map(record => record.claim ? record : { ...record, claimSearched: false });
     const key = "history-recovery:" + walletScope(profile);
     const pageLimit = this.store.get<number>(key) ?? 10;
-    const result = await session.client.reconcileSwapHistory({ maxPages: pageLimit });
+    // The SDK accepts a caller store. While holding the identity lock, present
+    // only this operation's identities and merge its updates into the full list.
+    // Unrelated old identities must not force every claim to scan their history.
+    let result;
+    if (selected) {
+      result = await reconcileSdkHistory(session.client, { program: profile.program, maxPages: pageLimit, store: {
+        load: async () => refresh((await session.identities.load()).filter(selected)),
+        save: async updates => {
+          const byCounter = new Map(updates.map(record => [record.counter, record]));
+          await session.identities.save((await session.identities.load()).map(record => byCounter.get(record.counter) ?? record));
+        },
+      } });
+    } else {
+      await session.identities.save(refresh(await session.identities.load()));
+      result = await session.client.reconcileSwapHistory({ maxPages: pageLimit });
+    }
     // The public SDK restarts from the newest page; increase the window after
     // an incomplete scan so older claims remain reachable across polls/restarts.
     this.store.set(key, result.complete ? 10 : Math.min(160, pageLimit * 2));
@@ -376,7 +392,28 @@ export class VeilBackend implements TradingBackend {
     const rejection = checkpoint.phase === "rejected" ? { code: "transaction_rejected", transactionId: checkpoint.transactionId, feeTransactionId: checkpoint.feeTransactionId }
       : await confirmedRejection(session, checkpoint.transactionId);
     if (rejection) return { status: "failed", result: { ...rejection, error: rejection } };
-    const historyRecovery = await this.reconcileHistory(session, quote.profile);
+    // Normal status checks do not need an account-wide history walk. A live
+    // output or a confirmed claim saved by this runtime is direct evidence.
+    const known = (await session.identities.load()).find(item => checkpoint.swapId ? item.swapId === checkpoint.swapId : item.counter === checkpoint.counter);
+    const swapId = known?.swapId ?? checkpoint.swapId;
+    const claimOperations = operation.managedRecords && swapId ? this.store.list<Operation>("operation:")
+      .filter(item => item.kind === "claim" && item.scope === quote.scope)
+      .flatMap(owner => ((owner.checkpoint as { claims?: ClaimItem[] } | undefined)?.claims ?? [])
+        .filter(item => item.swapId === swapId).map(item => ({ owner, item }))) : [];
+    const localClaim = claimOperations.find(({ item }) => item.status === "claimed" && item.transactionId)?.item;
+    const claimed = known?.claim ?? localClaim;
+    if (claimed) return { status: "complete", result: { swapId, transactionId: known?.handle?.transactionId ?? checkpoint.transactionId,
+      claimTransactionId: claimed.transactionId, amountOut: claimed.amountOut, amountRemaining: claimed.amountRemaining } };
+    const activeClaim = claimOperations.find(({ owner }) => owner.status !== "failed" && owner.status !== "complete");
+    if (activeClaim) return { status: "pending", result: { swapId, transactionId: known?.handle?.transactionId ?? checkpoint.transactionId,
+      claimOperationId: activeClaim.owner.id, nextAction: "inspect_claim" } };
+    if (operation.managedRecords && swapId && session.client.getSwapOutput) {
+      const output = await session.client.getSwapOutput({ swapId });
+      if (output) return { status: "pending", result: { swapId, transactionId: known?.handle?.transactionId ?? checkpoint.transactionId,
+        claimable: Boolean(known?.handle), amountOut: output.amount_out.toString(), nextAction: "claim_when_ready" } };
+    }
+    const historyRecovery = await this.reconcileHistory(session, quote.profile, operation.managedRecords && (swapId || checkpoint.counter !== undefined)
+      ? item => Boolean(swapId && item.swapId === swapId) || checkpoint.counter !== undefined && item.counter === checkpoint.counter : undefined);
     const records = await session.identities.load();
     const record = records.find(item => checkpoint.swapId ? item.swapId === checkpoint.swapId : item.counter === checkpoint.counter);
     if (record?.claim) return { status: "complete", result: { historyRecovery, swapId: record.swapId, transactionId: record.handle?.transactionId,
@@ -437,16 +474,28 @@ export class VeilBackend implements TradingBackend {
   }
 
   private async reconcileClaims(quote: SavedQuote, operation: Operation, session: AleoSession): Promise<Progress> {
-    const historyRecovery = await this.reconcileHistory(session, quote.profile);
+    const owned = operation.managedRecords ? await reconcileJournal(session) : [];
+    const selected = new Set((quote.plan as ClaimPlan).swapIds);
+    const historyRecovery = await this.reconcileHistory(session, quote.profile, operation.managedRecords ? item => Boolean(item.swapId && selected.has(item.swapId)) : undefined);
     const records = await session.identities.load();
     const previous = (operation.checkpoint as { claims?: ClaimItem[] } | undefined)?.claims ?? [];
     const items: ClaimItem[] = [];
+    const completedIds = new Set(previous.filter(item => item.status === "claimed").map(item => item.transactionId));
+    // Claims execute sequentially within one operation. The newest reservation
+    // not belonging to a completed item describes its interrupted attempt.
+    const latestAttempt = owned.filter(entry => !entry.transactionId || !completedIds.has(entry.transactionId))
+      .sort((a, b) => Number(b.id) - Number(a.id))[0];
     for (const swapId of (quote.plan as ClaimPlan).swapIds) {
       const record = records.find(record => record.swapId === swapId);
       const prior = previous.find(item => item.swapId === swapId);
       let item: ClaimItem = record?.claim ? { swapId, status: "claimed", transactionId: record.claim.transactionId, amountOut: record.claim.amountOut, amountRemaining: record.claim.amountRemaining }
         : prior ?? { swapId, status: "pending" };
       if (item.status === "preparing") item = { ...item, status: "pending", lastFailure: { code: "not_submitted" } };
+      if ((item.status === "submitting" || item.status === "uncertain") && !item.transactionId && latestAttempt?.accountType === "local") {
+        if (latestAttempt.status === "cancelled" && !latestAttempt.transactionId)
+          item = { ...item, status: "pending", lastFailure: { code: "not_submitted" } };
+        else if (latestAttempt.transactionId) item = { ...item, transactionId: latestAttempt.transactionId };
+      }
       if (item.status === "submitting" || item.status === "uncertain") {
         const rejection = await confirmedRejection(session, item.transactionId);
         if (rejection) item = { ...item, status: "pending", lastFailure: rejection };
