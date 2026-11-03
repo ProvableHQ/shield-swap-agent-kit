@@ -8,8 +8,10 @@ Classify an error by the last completed stage and possible side effects, not jus
 | DEX 401/403 | Check the selected session and [authenticate](configure-shield-swap.md). | Require an invite code or re-onboard for funding. |
 | Read-only 429/5xx or transport failure | Retry the read with bounded backoff; preserve the error if it persists. | Interpret an outage as empty state. |
 | Expired/stale quote or unacceptable minimum output | Obtain fresh terms and check the existing authorization. | Widen slippage or approve a new trade automatically. |
-| No suitable private record | Check funding type, fragmentation, scanner visibility, and reservations. | Treat aggregate balance as a guaranteed input. |
+| No suitable private record | Check funding type, fragmentation, scanner visibility, and reservations with [UTXO management](swap-utxo-management.md). | Treat aggregate balance as a guaranteed input. |
+| Record reservation conflict (every candidate held) | Reconcile the shared record journal and read the inventory; plan more covering records if needed. | Bypass the journal with an uncoordinated writer. |
 | Record spent / duplicate input | Stop competing writers and resolve the original spend. | Reuse the record after a timeout. |
+| Inventory plan interrupted | Reconcile the journal until each submitted transaction is confirmed or rejected, then read the inventory and plan again. | Re-execute the same plan or delete the journal. |
 | Proving or broadcast timeout | Preserve job/transaction IDs and inspect whether submission happened. | Wrap the whole swap in an automatic retry. |
 | Accepted broadcast, confirmation missing | Follow [unknown-operation recovery](recover-swaps.md). | Equate broadcaster acceptance with chain acceptance. |
 | Confirmed rejection | Record the rejection and fee effects; re-plan only within authorization. | Reset identity counters or reuse stale record snapshots. |

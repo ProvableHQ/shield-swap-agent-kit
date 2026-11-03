@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { executeContract, type Client, type ProvingConfig } from "@provablehq/veil-core";
-import { claimContext, swapContext, trackSwapSubmission, type SwapSubmission } from "../src/trading/session";
+import { claimContext, inventoryContext, swapContext, trackSwapSubmission, type SwapSubmission } from "../src/trading/session";
 
 test("the public SDK execution path checkpoints before entering its proving adapter", async () => {
   const events: string[] = [];
@@ -46,6 +46,24 @@ test("claims persist the boundary before proving and the returned ID before SDK 
     events.push("sdk-bookkeeping");
   });
   assert.deepEqual(events, ["checkpoint", "proving", "at1claim", "sdk-bookkeeping"]);
+});
+
+test("inventory evidence records a proved transaction only after the SDK journals it", async () => {
+  const events: string[] = [];
+  const prepared = { type: "transaction-prepared", transactionId: "at1split", transaction: {} } as const;
+  const proving: ProvingConfig = { mode: "delegated", execute: async options => {
+    await options.onProgress?.(prepared as never);
+    events.push("broadcast");
+    return { transactionId: "at1split", transitions: [], outputs: [] };
+  } };
+  trackSwapSubmission(proving);
+  const call = (handler: () => Promise<void>) => inventoryContext.run({ prepared: id => { events.push("evidence:" + id); } },
+    () => proving.execute!({ programName: "credits.aleo", functionName: "split", inputs: [], fee: 0n, onProgress: handler }));
+  // The SDK's handler rejects the proof before journaling it; nothing is broadcast.
+  await assert.rejects(call(async () => { throw new Error("Proved transaction exceeds maxFeeMicrocredits"); }), /maxFeeMicrocredits/);
+  assert.equal(events.length, 0, "a proof the SDK rejected is never recorded as submission evidence");
+  await call(async () => { events.push("journal"); });
+  assert.deepEqual(events, ["journal", "evidence:at1split", "broadcast"]);
 });
 
 test("failed claim boundary persistence prevents proving and submission", async () => {

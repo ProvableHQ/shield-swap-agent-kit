@@ -1,6 +1,6 @@
 # Shield Swap MCP
 
-Draft TypeScript MCP server for terminal users, backed by the published Veil 0.12.1 packages. Wallet configuration happens in a trusted terminal; MCP exposes structured trading tools. The server is a draft; validation coverage and remaining limits are recorded below.
+Draft TypeScript MCP server for terminal users, backed by the published Veil 0.16.1 packages. Wallet configuration happens in a trusted terminal; MCP exposes structured trading tools. The server is a draft; validation coverage and remaining limits are recorded below.
 
 ## Run from this repository
 
@@ -77,7 +77,15 @@ node dist/cli.js configure --profile default --allow-claims
 node dist/cli.js configure --profile default --allow-swaps --swap-limit TOKEN_ID=RAW_AMOUNT --max-slippage-bps 100
 ```
 
-Replace `TOKEN_ID` and `RAW_AMOUNT` with a discovered token ID and the desired integer cap. Limits apply **per operation**, not per day or across a strategy. An absent or zero cap prevents execution for that token. Use `--deny-swaps`, `--deny-claims`, or `--deny-bridges` to revoke permissions. The MCP configuration tool cannot grant permissions, change signers, or set spending limits. Tools use the configured default profile when `profileId` is omitted; an explicit profile overrides it.
+Replace `TOKEN_ID` and `RAW_AMOUNT` with a discovered token ID and the desired integer cap. Limits apply **per operation**, not per day or across a strategy. An absent or zero cap prevents execution for that token. Use `--deny-swaps`, `--deny-claims`, `--deny-bridges`, or `--deny-inventory` to revoke permissions. The MCP configuration tool cannot grant permissions, change signers, or set spending limits. Tools use the configured default profile when `profileId` is omitted; an explicit profile overrides it.
+
+Record inventory maintenance (joins and splits) is a separate permission with its own fee ceiling:
+
+```sh
+node dist/cli.js configure --profile default --allow-inventory --inventory-fee-limit 5000000
+```
+
+The limit is the total network fee in microcredits that one `rebalance_record_inventory` operation may spend; absent or zero prevents execution, and native credits splits deduct 10,000 microcredits each in addition to fees. It also gates `reconcile_record_inventory` with `rebroadcast: true`. Profiles written before this permission existed report `inventory: false`.
 
 ## Configure local bridge wallets
 
@@ -91,7 +99,7 @@ node dist/cli.js configure --profile default --allow-bridges --bridge-limit ethe
 
 EVM accepts a hex private key; Solana accepts a JSON array of 64 keypair bytes. Configuration derives and stores the public address and environment reference locally. It does not broadcast or grant bridge permission unless explicitly requested. Solana routes currently require mainnet; Ethereum testnet uses Sepolia.
 
-Use `list_bridge_routes` → `quote_bridge` → `execute_bridge`. Read progress with `bridge_status`, reconcile checkpoints with `recover_bridge_transactions`, and use `resume_operation` only for the SDK's required next step. Signed EVM/Solana transaction IDs are persisted before the RPC broadcast; Aleo uses the SDK's prepared-transaction checkpoints. A private xReserve mint retains its secret nonce encrypted for recovery.
+Use `list_bridge_routes` → `quote_bridge` → `execute_bridge`. Read progress with `bridge_status`, reconcile checkpoints with `recover_bridge_transactions`, and use `resume_operation` only for the SDK's required next step. Signed EVM/Solana transaction IDs are persisted before the RPC broadcast; Aleo uses the SDK's prepared-transaction checkpoints. A private xReserve mint retains its secret nonce encrypted for recovery. SDK 0.16.0 reads each route's on-chain pause flags: a quote reports `paused` and `routeStatus`, and execution, resumption, or completion of a paused route fails with `route_paused` before any wallet is asked to sign. An execution refused this way is `not_submitted`; a deposited transfer whose completion is refused stays `pending` with the same `nextAction` for a later resume.
 
 ## Configure hosted bridge wallets
 
@@ -165,6 +173,8 @@ The server uses stdio and does not open a listening port. It can start locked or
 | Markets and balances | `get_balances`, `list_tokens`, `list_pools` |
 | Swaps | `quote`, `execute`, `swap_history`, `claim_unclaimed_swaps` |
 | Bridges | `list_bridge_routes`, `quote_bridge`, `execute_bridge`, `bridge_status`, `recover_bridge_transactions` |
+| Maintenance | `start_inventory_maintenance`, `stop_inventory_maintenance`, `get_inventory_maintenance`, `check_inventory_maintenance` |
+| Record inventory | `get_record_inventory`, `plan_record_inventory`, `rebalance_record_inventory`, `reconcile_record_inventory` |
 | Durable operations | `get_operation_status`, `list_operations`, `resume_operation` |
 
 `get_balances` includes public AMM tokens, underlying public bridge tokens, and native Aleo fee credits. Its `publicByProgram` breakdown identifies where those balances live; private records remain separate. A total balance does not imply that every operation can spend every balance type.
@@ -183,17 +193,79 @@ SDK confirmation timeouts retain their public transaction ID; confirmed rejectio
 
 After a lost response or restart, `get_operation_status` reconciles history and checks known transaction IDs for confirmed rejection. An absent transaction, RPC error, or accepted transaction without sufficient claim-history evidence does not authorize another claim. Such claims remain uncertain and block unrelated writes. Older ambiguous checkpoints without submission-boundary evidence or a transaction ID remain conservative; this update does not infer that those transactions failed.
 
+### Record inventory and reservations
+
+The session creates its Veil wallet client with `recordManagement` enabled, using a `RecordInventoryStore` adapter over this package's encrypted state and the chain identity `aleo:<network>`. Every managed write (swap, claim, join, split) reserves its input record nonces atomically under the state file's SQLite write lock before proving, saves the proved transaction before broadcast, and keeps the reservation until the chain outcome is known. Processes sharing the state directory share these reservations; a CLI journal, SDK store, or another state directory does not. The journal holds nonces, statuses, fees, and pending proved transactions, never record plaintext or keys.
+
+`get_record_inventory` resolves the token's underlying record program and reports available and reserved records with base-unit amounts; it reserves nothing. `plan_record_inventory` saves a plan as a durable quote of kind `inventory` (ten-minute lifetime) and returns `planId`, the resolved asset, target, steps, and intrinsic deduction. `minRecordAmount` is a human decimal amount converted with the token's decimals. `rebalance_record_inventory` consumes that plan once under the inventory permission and fee limit and returns an operation ID. The SDK rechecks each input before every step, so a plan whose inventory changed stops before proving.
+
+Each proved transaction ID is checkpointed once the SDK has journaled it and before its broadcast; a proof the SDK rejects, such as one over the fee limit, is never recorded as evidence. The wallet client waits up to ten minutes for each managed write to confirm, matching the per-step inventory timeout. A `complete` operation lists `transactionIds` and `completedSteps`. An interruption with no submitted transaction fails as `not_submitted`. An interruption after submission is `uncertain` with `reasonCode` (`confirmation_timeout`, `inventory_changed`, `transaction_rejected`, `fee_limit`, `cancelled`, or `interrupted`); `get_operation_status` reconciles the journal until every listed transaction is confirmed or rejected, then reports `failed` with `nextAction: "plan_again"`. A checkpointed ID the journal never recorded is looked up on chain; because the SDK journals every proof before broadcasting it, an ID absent from both resolves as `not_submitted` rather than blocking the wallet. Accepted joins and splits remain on chain, and `resume_operation` never re-executes a plan.
+
+`reconcile_record_inventory` returns sanitized journal metadata without saved transaction payloads or raw SDK errors. With `rebroadcast: true` it resends saved proved transactions unchanged and reports `rebroadcastAttempts` and `rebroadcastFailed`; broadcast acceptance is not confirmation. Reconciliation first obtains each operation's OS lock. It skips live writers and cancels an abandoned local reservation only if no transaction was prepared. A missing chain response or failed rebroadcast never frees a prepared input. Confirmed inputs remain excluded while the scanner catches up.
+
+### Independent concurrent trades
+
+Quote each intended trade separately, then call `execute` with its own quote ID and idempotency key. Different pairs, amounts and routes can run together, including multiple sales of the same token. Every swap keeps its original expiry, route, minimum output and per-operation input cap. If suitable unreserved records are exhausted, prepare inventory or wait for pending records; no replacement trade is submitted automatically.
+
+All participating processes and profile aliases must use the same encrypted state directory and this server version. Record reservations are atomic, identity allocation and whole-list updates use short cross-process locks, and each operation holds its own lifetime lock. Claims reserve their selected swap outputs so two requests cannot claim the same output simultaneously. Uncertainty quarantines the affected operation's resources; unrelated managed trades may proceed. Legacy ambiguity and bridge execution retain account-level exclusion. External SDK/CLI stores are not coordinated.
+
+| Operation status | Meaning |
+| --- | --- |
+| `queued` | Saved and waiting to start. |
+| `running` | Preparing or proving a step. |
+| `submitted` | Broadcast acknowledged; awaiting confirmation. |
+| `pending` | A confirmed step awaits indexing, an output, a claim, or a safe next step. |
+| `complete` | Finished; for a swap, its output has been claimed. |
+| `uncertain` | Original submission has no established outcome; resources stay held. |
+| `failed` | This operation stopped definitively. Earlier accepted maintenance steps and charged fees remain effective. |
+
+The SDK journal separately uses `reserved`, `prepared`, `submitted`, `confirmed`, `rejected`, and `cancelled`. The MCP polls up to eight unfinished operations every 15 seconds while connected. Polls never create trades or resume claims. `get_operation_status` provides explicit reconciliation; `resume_operation` advances only a safe claim or bridge step.
+
+### Per-token maintenance
+
+After terminal authorization, call `start_inventory_maintenance` with `token`, `records`, `minRecordAmount` (human decimal), and optional `intervalSeconds` (default 120). This authorizes recurring replenishment under the inventory fee limit **per plan**, not a daily budget. It saves a job scoped to network, account and the canonical underlying token program, then starts one worker for the state directory. For example, a USDCx job targeting eight records covering 0.1 USDCx is independent of an ALEO job targeting four records covering 1 ALEO.
+
+A pass reconciles the existing operation first. If none is unresolved, it counts unreserved covering records and plans a `floor` target only on a shortfall. Veil 0.16.1 floor planning splits available records without joining already suitable records. The worker records the operation ID and moves on; confirmation for one token does not block checks for another. Manual `check_inventory_maintenance` uses the same token lock. A directly submitted inventory plan participates in the same atomic operation registration. `get_record_inventory` remains an immediate, non-reserving snapshot.
+
+`get_inventory_maintenance` returns each job's `enabled`, `target`, `coveringRecords`, `checkedAt`, `activeOperationId`, `operationStatus` and `lastError`, plus `workerRunning`. Snapshot counts are not reservations. `stop_inventory_maintenance` disables new plans for that job; it leaves submitted work available for reconciliation and other tokens enabled. An uncertain operation retains its ID until resolved. A failed pass remains visible before a later pass prepares a fresh plan from current inventory.
+
+The worker uses an OS-held lock rather than persistent PID ownership. It stays idle when no targets are enabled. It drains on SIGINT/SIGTERM, releases its lock on a crash, and reopens durable jobs on restart. Run `shield-swap-mcp maintain` under a service manager if automatic process restart is required; the MCP start tool can also restart it. Credentials come from the same environment or encrypted state, never tool arguments.
+
+
 ## Current limitations
 
 - Privy/Dynamic EVM/Solana adapters are checked offline. Production provider authentication, wallet policies, and funded hosted-wallet execution have not yet been validated.
 - Aleo bridge inputs currently use public balances. Private-record burns are not exposed. Inbound xReserve transfers support public, record, and private mint modes.
 - Bridge quotes display SDK fees, which the SDK recalculates before execution; token input caps do not cap network gas fees.
 - Bridge recovery requires this server's saved checkpoints. It does not import arbitrary external transactions.
-- `rebalance_swap_inventory` is deferred until the SDK exposes that operation.
-- Aleo-to-Ethereum xReserve recovery confirms the source burn, but SDK 0.12.1 does not verify the Ethereum release. Its status remains `DELIVERY_PENDING` with `nextAction: "verify_destination_externally"` and `deliveryVerification: "unsupported_by_sdk"`; inspect destination delivery independently and do not repeat the transfer.
+- Inventory maintenance pays public fees or uses FeeMaster; managed private fee selection is not exposed. Rebalances run one at a time per token; swaps may use other available records concurrently.
+- Record inventory tools were exercised once on testnet (see below); rebroadcast of a saved inventory transaction has not been exercised live.
+- Status reconciliation grows its history scan from 10 to at most 160 pages on incomplete polls and reports coverage. On an account with a long swap history one `get_operation_status` call grew from 11 seconds at 10 pages to 79 seconds at 80 pages, beyond a 60-second MCP client request timeout; configure clients to allow long status calls.
+- Queued operations run inside the server process. Graceful MCP shutdown drains them; a process crash interrupts them; a rebalance interrupted before its first proof reconciles to `not_submitted` and its reservations are released on the next reconcile.
+- Aleo-to-Ethereum xReserve recovery confirms the source burn, but SDK 0.16.0 does not verify the Ethereum release. Its status remains `DELIVERY_PENDING` with `nextAction: "verify_destination_externally"` and `deliveryVerification: "unsupported_by_sdk"`; inspect destination delivery independently and do not repeat the transfer.
 - History discovery probes a bounded identity window and reports incomplete coverage; it cannot promise discovery across arbitrary missing counter gaps.
-- Existing Shield Swap CLI file stores do not share this package's encryption or locking. Do not operate the same wallet concurrently through an uncoordinated CLI or another state directory.
-- Permission changes are refused while the profile has a queued or running operation.
+- Existing Shield Swap CLI file stores and inventory journals do not share this package's encryption, locking, or record reservations. Do not operate the same wallet concurrently through an uncoordinated CLI or another state directory.
+- Permission changes are refused while the profile has a queued, running or submitted operation.
+
+## Concurrent implementation validation
+
+The replacement implementation has offline coverage for distinct quotes across two OS processes, record and identity allocation through shared encrypted state, claim conflicts, legacy exclusion, abandoned-writer recovery, prepared proofs without confirmation, and independent maintenance jobs. Installed-tarball checks cover two MCP restarts, worker exclusion, crash replacement, graceful shutdown, and simulated claim recovery across three process restarts. No live funds were used for this implementation; funded concurrent execution and replenishment remain unvalidated.
+
+## Testnet validation
+
+The following evidence predates this concurrent MCP implementation. It does not validate the new concurrency or maintenance worker on chain.
+
+On 2026-11-02, the built stdio server used an existing funded testnet wallet, Veil 0.16.0, and fee sponsorship for these checks through one persistent server process:
+
+| Flow | Evidence |
+| --- | --- |
+| `plan_record_inventory` for 8 credits records of at least 5 ALEO (`preserve`) | 18 inputs planned as 2 joins and 7 splits; the plan joined every record, including the two that already qualified. |
+| `rebalance_record_inventory` | Completed all 9 steps in 113 seconds; the journal lists each transaction with its fee (53,320 and 3,833 microcredits for the joins, 0 for the sponsored splits). Inventory afterwards: 8 records of 668.74 ALEO. |
+| Three rebalances interrupted before proving | Reservations left by killed server processes were reported as `cancelled` by the next reconcile and the operations reconciled to `not_submitted`. |
+| 0.1 USDCx → ETH swap | Reserved one USDCx record, confirmed with a 939,822 microcredit fee, reported `claimable`. |
+| `claim_unclaimed_swaps` | Claimed 50,676,718,961,226 output base units; the claim entry joined the journal with no record inputs. |
+
+The same account ran the kit's Veil and Python concurrent-swap recipes the same day; those results are recorded in [docs/source-map.md](../docs/source-map.md).
 
 ## Mainnet validation
 
@@ -210,7 +282,7 @@ The USDC inputs were the smallest pair accepted by the SDK that could cover its 
 
 ## Development and verification
 
-Run `pnpm test`, `pnpm run typecheck`, and `pnpm run build`. Tests cover SDK quote retention, encrypted persistence, idempotency, delayed confirmations, submission uncertainty, concurrent recovery, OS lock release after a crash, terminal key import, provider identity matching, hosted EVM/Solana signing, and stdio restart. Onboarding tests cover missing/locked/configured accounts, guided profile reuse, public-only and insufficient private holdings, and scanner failures. They use temporary test wallets without submitting transactions. Launcher tests use a local stand-in for Claude to check intro loading, account reuse, credential isolation, two MCP connections, cleanup, and failed unlocks. These checks do not establish that a real model reproduces the intro verbatim.
+Run `pnpm test`, `pnpm run typecheck`, and `pnpm run build`. Tests cover SDK quote retention, encrypted persistence, idempotency, delayed confirmations, submission uncertainty, concurrent recovery, OS lock release after a crash, terminal key import, provider identity matching, hosted EVM/Solana signing, paused bridge routes, and stdio restart. Inventory tests cover atomic reservations across two state handles, the SDK's release rules for rejected and cancelled entries, durable plans with bigint round trips, permission and fee-limit gating, prepared-transaction evidence after an interruption, evidence withheld for a proof the SDK rejects, reconciliation to `plan_again`, chain lookup of an unjournaled ID, release of reservations orphaned before proving, and plaintext-free reads. Onboarding tests cover missing/locked/configured accounts, guided profile reuse, public-only and insufficient private holdings, and scanner failures. They use temporary test wallets without submitting transactions. Launcher tests use a local stand-in for Claude to check intro loading, account reuse, credential isolation, two MCP connections, cleanup, and failed unlocks. These checks do not establish that a real model reproduces the intro verbatim.
 
 After installing the tarball into an independent project, run:
 
@@ -221,4 +293,4 @@ node scripts/smoke-installed-recovery.mjs /absolute/path/to/independent-project
 
 The recovery smoke requires Node 22.15 or newer for module hooks. It runs the installed CLI over MCP with simulated SDK outcomes, checking preparation failure, partial batches, uncertain submission, confirmed rejection, and explicit resume across three process restarts. It uses disposable test wallets and makes no network calls or transactions.
 
-This checks the installed SDK/WASM files, local key import, encrypted state, guided profile reuse, structured readiness, all 20 tool schemas over stdio, and restart. No real wallet material belongs in this repository.
+This checks the installed SDK/WASM files, local key import, encrypted state, guided profile reuse, structured readiness, all 24 tool schemas over stdio, and restart. No real wallet material belongs in this repository.

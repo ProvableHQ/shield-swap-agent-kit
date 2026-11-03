@@ -32,7 +32,7 @@ test("Veil adapter retains the exact SDK quote through execution and hides claim
     const quote: SavedQuote = { id: "q1", kind: "swap", profile, scope: "testnet:aleo1test:shield_swap.aleo", createdAt: Date.now(), expiresAt: offer.expiresAt, ...priced };
     const result = await backend.execute(quote, { operationId: "o1", checkpoint: () => {} });
     assert.deepEqual(submitted, { quote: offer });
-    assert.equal(result.status, "submitted");
+    assert.equal(result.status, "pending");
     assert.equal(result.result.transactionId, "at1test");
     assert.doesNotMatch(JSON.stringify(result.result), /PRIVATE-CLAIM-SECRET/);
   } finally { store.close(); rmSync(root, { recursive: true, force: true }); }

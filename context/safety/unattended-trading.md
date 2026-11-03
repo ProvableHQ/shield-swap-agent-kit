@@ -12,7 +12,9 @@ These values are user decisions, not kit defaults. Do not infer an unlimited bud
 
 ## Coordinate the account
 
-Reserve budget and input records before submission. Keep one durable operation record across planning, proving, submission, waiting, and claiming. All strategies sharing an account must use coordinated reservations and account-wide limits; independent per-strategy budgets alone are insufficient.
+Reserve budget and input records before submission. Keep one durable operation record across planning, proving, submission, waiting, and claiming. All strategies sharing an account must use coordinated reservations and account-wide limits; independent per-strategy budgets alone are insufficient. The SDKs' record management supplies the input-record reservations when every writer shares one store and chain identity; the budget still belongs to the worker policy.
+
+Unattended inventory maintenance is its own spend. The CLI's `shield-swap inventory run` applies per-transaction and rolling daily fee ceilings, cooldowns, and a transaction cap from its configuration; the MCP caps each rebalance operation with a terminal-configured fee limit. Set those values from the user's authorization, review plans before enabling continuous maintenance, and keep the journal across restarts.
 
 On restart, recover in-flight work before admitting new writes. A timed-out submission remains in flight until its outcome is resolved. Return the original operation for duplicate signals rather than launching another swap.
 
@@ -31,4 +33,4 @@ Before an authorized limited rollout, demonstrate:
 
 Measure quote latency, proving/submission latency, time until output is claimable, claim confirmation, scanner visibility, and unresolved operations separately. Track p50/p95/p99 with sample count, SDK version, network, and cold/warm state. Do not call a bot fast based only on HTTP response time.
 
-Use [UTXO management](../shield-swap-setup/swap-utxo-management.md) for record readiness and [unknown-operation recovery](../shield-swap-setup/recover-swaps.md) for ambiguous outcomes.
+Use [UTXO management](../shield-swap-setup/swap-utxo-management.md) for record readiness, [concurrent swaps](../shield-swap-setup/concurrent-swaps.md) for batches, and [unknown-operation recovery](../shield-swap-setup/recover-swaps.md) for ambiguous outcomes.

@@ -1,7 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { LocalAccount, PublicClient, WalletClient, ProvingConfig } from "@provablehq/veil-core";
 import type { BlindedIdentityRecord, BlindedIdentityStore, ShieldSwapActions } from "@provablehq/shield-swap-sdk";
+import { operationContext } from "./ownership";
+import { coordinateSession } from "./managed-session";
 import { TradingStore } from "./store";
+import { createRecordInventoryStore } from "./inventory";
 import { TradingError, type ExecutionContext, type Profile, type SecretRef } from "./types";
 
 export type AleoSession = {
@@ -10,6 +13,8 @@ export type AleoSession = {
   account: LocalAccount;
   identities: BlindedIdentityStore;
   submissionTracked?: boolean;
+  withIdentities?: <T>(fn: () => Promise<T>) => Promise<T>;
+  reconcileRecords?: (params?: { rebroadcast?: boolean }) => Promise<import("@provablehq/veil-core").RecordSpend[]>;
 };
 export type SessionFactory = (profile: Profile) => Promise<AleoSession>;
 export type SwapSubmission = {
@@ -23,6 +28,10 @@ export const claimContext = new AsyncLocalStorage<{
   beforeSubmit(): void;
   submitted(transactionId: string): void;
 }>();
+// Inventory maintenance submits several transactions. Record each proved
+// transaction ID after the SDK journals it and before its broadcast, so a
+// crash mid-plan leaves evidence without recording a proof the SDK rejected.
+export const inventoryContext = new AsyncLocalStorage<{ prepared(transactionId: string): void }>();
 export function trackSwapSubmission(proving: ProvingConfig): void {
   const execute = proving.execute;
   if (!execute) throw new TradingError("proving_unavailable", "The configured SDK cannot submit Aleo transactions.");
@@ -36,7 +45,24 @@ export function trackSwapSubmission(proving: ProvingConfig): void {
     }
     const claim = claimContext.getStore();
     claim?.beforeSubmit();
-    const result = await execute(options);
+    const inventory = inventoryContext.getStore();
+    const onProgress = options.onProgress;
+    // Managed writes always supply a progress handler; only observe an existing
+    // one so the SDK's broadcast behavior for unmanaged calls stays unchanged.
+    const result = await execute(onProgress ? { ...options, onProgress: async event => {
+      // The SDK's handler enforces the fee ceiling and journals the proof. A
+      // proof it rejects is never broadcast, so it is not submission evidence.
+      await onProgress(event);
+      if (event.type === "transaction-prepared") {
+        inventory?.prepared(event.transactionId);
+        claim?.submitted(event.transactionId);
+        if (active) {
+          active.checkpoint = { ...active.checkpoint, transactionId: event.transactionId };
+          active.execution.checkpoint(active.checkpoint);
+        }
+      }
+      if (event.type === "transaction-submitted") operationContext.getStore()?.submitted?.();
+    } } : options);
     // Keep the confirmed ID even if later SDK bookkeeping or our result write fails.
     claim?.submitted(result.transactionId);
     return result;
@@ -62,8 +88,16 @@ export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv
         ]);
         const network = await loadNetwork(profile.network);
         const key = resolveSecret(profile.key, store, env);
+        // Shared record reservations use the same encrypted state as every
+        // other document, so swaps, claims and inventory maintenance from any
+        // process on this state directory see each other's held inputs.
+        // Every managed write waits for its confirmation inside the proving
+        // adapter; the SDK's 60s default turns ordinary block latency into an
+        // interrupted plan or an uncertain swap. Operations run in background
+        // workers, so match the inventory step timeout.
         const pair = network.createAleoClient({ privateKey: key, networkUrl: profile.networkUrl,
-          provingMode: "delegated", useFeeMaster: profile.useFeeMaster ?? false });
+          provingMode: "delegated", useFeeMaster: profile.useFeeMaster ?? false, confirmationTimeout: 600_000,
+          recordManagement: { enabled: true, store: createRecordInventoryStore(store), chainId: "aleo:" + profile.network } });
         if (pair.account.address !== profile.address) throw new TradingError("wallet_mismatch", "Configured key does not match this profile's address.");
         if (!pair.walletClient.proving) throw new TradingError("proving_unavailable", "The configured SDK has no proving adapter.");
         trackSwapSubmission(pair.walletClient.proving);
@@ -72,9 +106,11 @@ export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv
           load: async () => store.get<BlindedIdentityRecord[]>(recordId) ?? [],
           save: async records => {
             store.transaction(() => {
+              const previous = store.get<BlindedIdentityRecord[]>(recordId) ?? [];
               store.set(recordId, records);
               const active = swapContext.getStore();
-              const reserved = active && records.find(record => !active.initial.has(record.counter));
+              const reserved = active && records.find(record => active.checkpoint.counter !== undefined
+                ? record.counter === active.checkpoint.counter : !previous.some(old => old.counter === record.counter));
               if (active && reserved) {
                 active.checkpoint = {
                   phase: reserved.handle ? "submitted" : active.submissionStarted ? "submitting" : "reserved",
@@ -88,7 +124,7 @@ export function createSessionFactory(store: TradingStore, env: NodeJS.ProcessEnv
         };
         const client = pair.walletClient.extend(shieldSwapActions({ program: profile.program, api: { baseUrl: profile.apiUrl }, blindedIdentities: identities }));
         if (authenticate) await client.authenticateShieldSwap();
-        return { client, publicClient: pair.publicClient, account: pair.account, identities, submissionTracked: true };
+        return coordinateSession(store, profile, { client, publicClient: pair.publicClient, account: pair.account, identities, submissionTracked: true });
       })();
       sessions.set(cacheKey, pending);
       void pending.catch(() => sessions.delete(cacheKey));

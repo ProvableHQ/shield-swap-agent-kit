@@ -2,6 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { createHash } from "node:crypto";
+import { InventoryMaintenance } from "./maintenance";
 import { TradingRuntime } from "./runtime";
 import { onboardingStatus, setupSchema } from "./onboarding";
 import { TradingError, type Kind, type Summary } from "./types";
@@ -11,6 +12,9 @@ const profile = { profileId: id.optional().describe("Defaults to the configured 
 const page = { limit: z.number().int().min(1).max(100).default(25), offset: z.number().int().min(0).max(10000).default(0) };
 const executeArgs = { quoteId: id, idempotencyKey: id };
 const operation = { operationId: id };
+const decimal = z.string().regex(/^(0|[1-9][0-9]*)(\.[0-9]+)?$/).max(100);
+const maintenanceTarget = { ...profile, token: id, records: z.number().int().min(1).max(1000), minRecordAmount: decimal,
+  intervalSeconds: z.number().int().min(10).max(86400).default(120) };
 const tools = {
   setup: { description: "Report account, funding and execution checks for the selected journey. Optional access/balance checks may authenticate and initialize scanner state but never move funds. Never accepts keys or passwords.", schema: setupSchema, read: true },
   get_config: { description: "Read safe configuration and wallet execution permissions.", schema: z.object({}).strict(), read: true },
@@ -20,28 +24,36 @@ const tools = {
   get_balances: { description: "Read public and private token balances for the configured Aleo account.", schema: z.object({ ...profile, tokens: z.array(id).max(30).optional() }).strict(), read: true },
   list_tokens: { description: "List network token metadata from Shield Swap.", schema: z.object({ ...profile, ...page }).strict(), read: true },
   list_pools: { description: "List Shield Swap pools from the network API.", schema: z.object({ ...profile, ...page }).strict(), read: true },
-  quote: { description: "Save an executable exact-input swap quote with its route, minimum output and expiry. Does not submit.", schema: z.object({ ...profile, from: id, to: id, amount: z.string().regex(/^(0|[1-9][0-9]*)(\.[0-9]+)?$/).max(100), slippageBps: z.number().int().min(0).max(1000).optional() }).strict(), read: true },
+  quote: { description: "Save an executable exact-input swap quote with its route, minimum output and expiry. Does not submit.", schema: z.object({ ...profile, from: id, to: id, amount: decimal, slippageBps: z.number().int().min(0).max(1000).optional() }).strict(), read: true },
   execute: { description: "Execute a saved swap quote once under locally configured permissions. Returns an operation ID; poll its status.", schema: z.object(executeArgs).strict(), read: false },
   swap_history: { description: "List this account's stored swaps and reconcile claim state. Reports bounded recovery coverage.", schema: z.object({ ...profile, ...page, reconcile: z.boolean().default(false) }).strict(), read: true },
   claim_unclaimed_swaps: { description: "Claim selected unclaimed swap outputs, or a bounded snapshot of up to 20 claimable outputs. Persist per-swap results.", schema: z.object({ ...profile, swapIds: z.array(id).min(1).max(20).optional(), idempotencyKey: id }).strict(), read: false },
   list_bridge_routes: { description: "List SDK bridge routes for the configured network, including availability.", schema: z.object({ ...profile, ...page }).strict(), read: true },
-  quote_bridge: { description: "Quote a bridge into another configured wallet in this profile. The route, sender and recipient are bound to the quote.", schema: z.object({ ...profile, sourceChain: z.enum(["aleo", "ethereum", "solana"]), sourceAsset: id, destinationChain: z.enum(["aleo", "ethereum", "solana"]), destinationAsset: id, amount: z.string().regex(/^(0|[1-9][0-9]*)(\.[0-9]+)?$/).max(100), protocol: z.enum(["hyperlane", "xreserve", "cctp"]).optional(), mintMode: z.enum(["public", "record", "private"]).optional() }).strict(), read: true },
+  quote_bridge: { description: "Quote a bridge into another configured wallet in this profile. The route, sender and recipient are bound to the quote.", schema: z.object({ ...profile, sourceChain: z.enum(["aleo", "ethereum", "solana"]), sourceAsset: id, destinationChain: z.enum(["aleo", "ethereum", "solana"]), destinationAsset: id, amount: decimal, protocol: z.enum(["hyperlane", "xreserve", "cctp"]).optional(), mintMode: z.enum(["public", "record", "private"]).optional() }).strict(), read: true },
   execute_bridge: { description: "Execute a saved bridge quote once, persisting recovery checkpoints.", schema: z.object(executeArgs).strict(), read: false },
   bridge_status: { description: "Read current bridge progress for an existing operation without resubmitting.", schema: z.object(operation).strict(), read: true },
   recover_bridge_transactions: { description: "Reconcile saved bridge checkpoints against the chain. Does not submit; use resume_operation for a required next transaction.", schema: z.object({ ...profile, operationIds: z.array(id).min(1).max(25).optional() }).strict(), read: true },
   get_operation_status: { description: "Inspect and reconcile a saved operation. An uncertain result must never be treated as a failed submission.", schema: z.object(operation).strict(), read: true },
   list_operations: { description: "List persisted operations, optionally for one profile.", schema: z.object({ profileId: id.optional(), limit: z.number().int().min(1).max(100).default(25) }).strict(), read: true },
   resume_operation: { description: "Reconcile and resume a claim or bridge only when the SDK identifies a safe next step. Never repeats a swap deposit.", schema: z.object(operation).strict(), read: false },
+  start_inventory_maintenance: { description: "Enable recurring inventory replenishment for one token and start the shared worker. Each floor plan can spend up to the terminal-configured inventory fee limit. Requires inventory permission.", schema: z.object(maintenanceTarget).strict(), read: false },
+  stop_inventory_maintenance: { description: "Disable new replenishment for one token. Already submitted work remains reserved and reconciled.", schema: z.object({ maintenanceId: id }).strict(), read: false },
+  get_inventory_maintenance: { description: "Read per-token targets, observations, active operations and errors, plus whether the worker is running.", schema: z.object({ maintenanceId: id.optional() }).strict(), read: true },
+  check_inventory_maintenance: { description: "Run one check of a saved token job using the same coordination as the timer. Enabled jobs may replenish; disabled jobs only inspect and reconcile. A concurrent check returns the current snapshot.", schema: z.object({ maintenanceId: id }).strict(), read: false },
+  get_record_inventory: { description: "Read one token's spendable private records: available and reserved records with base-unit amounts. Reserves and spends nothing.", schema: z.object({ ...profile, token: id }).strict(), read: true },
+  plan_record_inventory: { description: "Plan the joins and splits that reshape one token's private records into the requested count. Saves a reviewable plan ID; submits nothing. minRecordAmount is a human decimal amount.", schema: z.object({ ...profile, token: id, records: z.number().int().min(1).max(1000), minRecordAmount: decimal.optional(), distribution: z.enum(["floor", "preserve", "balanced"]).optional(), toleranceBps: z.number().int().min(0).max(10000).optional(), maxTransactions: z.number().int().min(1).max(10000).optional() }).strict(), read: true },
+  rebalance_record_inventory: { description: "Execute a saved inventory plan once under the terminal-configured inventory permission and fee limit. Returns an operation ID; poll its status. Accepted joins and splits are never repeated.", schema: z.object({ planId: id, idempotencyKey: id }).strict(), read: false },
+  reconcile_record_inventory: { description: "Reconcile this account's record journal against the chain. With rebroadcast, resends saved proved transactions unchanged; that requires inventory permission.", schema: z.object({ ...profile, rebroadcast: z.boolean().default(false) }).strict(), read: false },
 } as const;
 type ToolName = keyof typeof tools;
 
 function json(value: unknown): Summary {
   return JSON.parse(JSON.stringify(value, (_key, item) => typeof item === "bigint" ? item.toString() : item)) as Summary;
 }
-export function createTradingServer(runtime?: TradingRuntime, options: { stateExists?: boolean } = {}): Server {
+export function createTradingServer(runtime?: TradingRuntime, options: { stateExists?: boolean; startMaintainer?: () => Promise<void> } = {}): Server {
   const server = new Server({ name: "shield-swap-mcp", version: "0.1.0" }, {
     capabilities: { tools: {} },
-    instructions: "Trade through saved quotes and durable operations. setup reports required terminal configuration. Never request keys/passwords in chat. execute returns an operation ID. After uncertainty, inspect that operation; do not create a new swap as a retry. A swap's proceeds require a later claim.",
+    instructions: "Trade through saved quotes and durable operations. setup reports required terminal configuration. Never request keys/passwords in chat. execute returns an operation ID. After uncertainty, inspect that operation; do not create a new swap as a retry. A swap's proceeds require a later claim. Record inventory tools inspect, plan and rebalance private records; independent swaps use distinct reserved records and can run concurrently. Maintenance is per token. Uncertain operations retain their resources; inspect the original operation instead of replacing it.",
   });
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: Object.entries(tools).map(([name, definition]) => ({
@@ -63,7 +75,7 @@ export function createTradingServer(runtime?: TradingRuntime, options: { stateEx
         output = await onboardingStatus(runtime, setupSchema.parse(args), options.stateExists);
       } else {
         if (!runtime) throw new TradingError("setup_required", "Wallet state is not unlocked. Run terminal setup and configure the process passphrase.");
-        output = await call(runtime, name, args);
+        output = await call(runtime, name, args, options.startMaintainer);
       }
     } catch (error) {
       isError = true;
@@ -75,7 +87,7 @@ export function createTradingServer(runtime?: TradingRuntime, options: { stateEx
   return server;
 }
 
-async function call(runtime: TradingRuntime, name: ToolName, args: Summary): Promise<Summary> {
+async function call(runtime: TradingRuntime, name: ToolName, args: Summary, startMaintainer?: () => Promise<void>): Promise<Summary> {
   const profileId = String(args.profileId ?? runtime.store.get<Summary>("settings")?.defaultProfile ?? "default");
   switch (name) {
     case "get_config": return { profiles: runtime.profiles(), defaults: runtime.store.get("settings") ?? {} };
@@ -85,15 +97,33 @@ async function call(runtime: TradingRuntime, name: ToolName, args: Summary): Pro
       runtime.store.set("settings", { ...current, ...args });
       return { defaults: { ...current, ...args } };
     }
+    case "start_inventory_maintenance": {
+      const jobs = new InventoryMaintenance(runtime);
+      const job = await jobs.start(profileId, { token: String(args.token), records: Number(args.records), minRecordAmount: String(args.minRecordAmount), intervalSeconds: Number(args.intervalSeconds) });
+      await startMaintainer?.();
+      return { ...job, workerRunning: await jobs.running() };
+    }
+    case "stop_inventory_maintenance": return { ...new InventoryMaintenance(runtime).stop(String(args.maintenanceId)) };
+    case "check_inventory_maintenance": return { ...await new InventoryMaintenance(runtime).check(String(args.maintenanceId)) };
+    case "get_inventory_maintenance": {
+      const jobs = new InventoryMaintenance(runtime);
+      return { jobs: args.maintenanceId ? [jobs.get(String(args.maintenanceId))].filter(Boolean) : jobs.list(), workerRunning: await jobs.running() };
+    }
     case "list_wallets": return { wallets: runtime.profiles() };
     case "quote":
     case "quote_bridge": return runtime.quote(name === "quote" ? "swap" : "bridge", profileId, args);
+    case "plan_record_inventory": {
+      const plan = await runtime.quote("inventory", profileId, args);
+      return { planId: plan.quoteId, ...plan };
+    }
     case "execute":
-    case "execute_bridge": {
-      const kind: Kind = name === "execute" ? "swap" : "bridge";
-      const quote = runtime.store.get<{ kind: Kind }>("quote:" + String(args.quoteId));
+    case "execute_bridge":
+    case "rebalance_record_inventory": {
+      const kind: Kind = name === "execute" ? "swap" : name === "execute_bridge" ? "bridge" : "inventory";
+      const quoteId = String(name === "rebalance_record_inventory" ? args.planId : args.quoteId);
+      const quote = runtime.store.get<{ kind: Kind }>("quote:" + quoteId);
       if (quote?.kind !== kind) throw new TradingError("quote_mismatch", "This quote belongs to a different action or is unavailable.");
-      return runtime.execute(String(args.quoteId), String(args.idempotencyKey));
+      return runtime.execute(quoteId, String(args.idempotencyKey));
     }
     case "get_operation_status": return runtime.status(String(args.operationId));
     case "bridge_status":

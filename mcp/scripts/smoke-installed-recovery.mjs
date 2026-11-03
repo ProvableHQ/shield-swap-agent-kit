@@ -67,7 +67,7 @@ if (process.argv[3] !== "--installed-child") {
         const uncertain = await call("resume_operation", { operationId: op.operationId });
         assert.equal(uncertain.status, "uncertain");
         assert.equal(uncertain.claims[0].transactionId, "at1claim");
-        const blocked = await client.callTool({ name: "claim_unclaimed_swaps", arguments: { swapIds: ["two"], idempotencyKey: "must-block" } });
+        const blocked = await client.callTool({ name: "claim_unclaimed_swaps", arguments: { swapIds: ["one"], idempotencyKey: "must-block" } });
         assert.equal(blocked.isError, true);
         assert.equal(await count(), 1);
         await mode("rejected");
@@ -86,5 +86,5 @@ if (process.argv[3] !== "--installed-child") {
       assert.ok(!(await readFile(join(root, "state.sqlite"))).includes(key));
     } finally { await client?.close(); await rm(root, { recursive: true, force: true }); }
   }
-  process.stdout.write("Installed recovery: preparation failure, partial batch, uncertain submission, rejected transaction evidence, blocked duplicate writes, and explicit resume passed across three process restarts. SDK outcomes were simulated; no network or transactions used.\n");
+  process.stdout.write("Installed recovery: preparation failure, partial batch, uncertain submission, rejected transaction evidence, blocked duplicate claims, and explicit resume passed across three process restarts. SDK outcomes were simulated; no network or transactions used.\n");
 }

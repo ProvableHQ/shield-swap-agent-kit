@@ -4,6 +4,10 @@ import { closeSync, chmodSync, existsSync, lstatSync, mkdirSync, openSync } from
 import { join, resolve } from "node:path";
 import { AsyncLocalStorage } from "node:async_hooks";
 
+export class LockBusyError extends Error {
+  constructor() { super("Wallet is busy in another operation. Retry after it finishes."); }
+}
+
 // All wallet material, plans and checkpoints are encrypted before SQLite sees them.
 // The passphrase comes from the terminal or the host environment, never an MCP tool.
 export class TradingStore {
@@ -110,7 +114,7 @@ export class TradingStore {
     if (lstatSync(path).isSymbolicLink()) throw new Error("Invalid wallet lock file.");
     const lock = new DatabaseSync(path);
     try { lock.exec("PRAGMA busy_timeout=0; BEGIN EXCLUSIVE"); }
-    catch { lock.close(); throw new Error("Wallet is busy in another operation. Retry after it finishes."); }
+    catch { lock.close(); throw new LockBusyError(); }
     this.activeLocks++;
     try { return await fn(); }
     finally { lock.exec("ROLLBACK"); lock.close(); this.activeLocks--; }

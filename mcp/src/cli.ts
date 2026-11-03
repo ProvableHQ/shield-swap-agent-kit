@@ -1,6 +1,9 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { argumentsFor, configure, help, setup, stateDirectory } from "./terminal";
+import { InventoryMaintenance, recoverOperations } from "./trading/maintenance";
+import { ensureMaintainer } from "./trading/maintenance-process";
+import { LockBusyError } from "./trading/store";
 import { TradingError } from "./trading/types";
 
 // SDK diagnostics can include credential-bearing requests. The host owns safe
@@ -24,12 +27,32 @@ async function main(): Promise<void> {
   const stateExists = existsSync(join(directory, "state.sqlite"));
   const store = passphrase && stateExists ? new TradingStore(directory, passphrase) : undefined;
   const runtime = store ? new TradingRuntime(store, new VeilBackend(store)) : undefined;
-  const server = createTradingServer(runtime, { stateExists });
+  if (command === "maintain") {
+    if (!runtime || !store) throw new TradingError("setup_required", "Unlock configured state before starting maintenance.");
+    const controller = new AbortController();
+    process.once("SIGINT", () => controller.abort());
+    process.once("SIGTERM", () => controller.abort());
+    try {
+      await new InventoryMaintenance(runtime).run(controller.signal, () => { process.send?.({ ready: true }); });
+    } catch (error) {
+      if (error instanceof LockBusyError && process.send) process.send({ ready: true });
+      else throw error;
+    } finally { await runtime.drain(); store.close(); }
+    return;
+  }
+  const server = createTradingServer(runtime, { stateExists, startMaintainer: runtime ? () => ensureMaintainer(runtime, process.argv[1]) : undefined });
+  let recovering: Promise<void> | undefined;
+  const recoveryTimer = runtime ? setInterval(() => {
+    if (!recovering) recovering = recoverOperations(runtime).catch(() => {}).finally(() => { recovering = undefined; });
+  }, 15_000) : undefined;
+  recoveryTimer?.unref();
   let closing = false;
   const close = async () => {
     if (closing) return;
     closing = true;
+    clearInterval(recoveryTimer);
     await server.close();
+    await recovering;
     await runtime?.drain();
     store?.close();
   };
