@@ -15,6 +15,8 @@ if (!new URL(import.meta.url).search) {
 }
 const control = () => JSON.parse(readFileSync(process.env.RECOVERY_CONTROL, "utf8"));
 
+export function parseUnits(value, decimals) { const [whole, fraction = ""] = String(value).split("."); return BigInt(whole + fraction.padEnd(decimals, "0")); }
+
 export async function loadNetwork() {
   const account = { type: "local", address: process.env.RECOVERY_ADDRESS, sign() {} };
   const proving = { mode: "delegated", execute: async () => {
@@ -34,6 +36,11 @@ export async function loadNetwork() {
 export function shieldSwapActions({ blindedIdentities: identities }) {
   return client => ({
     authenticateShieldSwap: async () => {},
+    reserveBlindedIdentity: async () => { throw new Error("No swaps in claim recovery smoke"); },
+    recordBlindedSwap: async () => { throw new Error("No swaps in claim recovery smoke"); },
+    syncBlindedIdentities: async () => identities.load(),
+    swap: async () => { throw new Error("No swaps in claim recovery smoke"); },
+    reconcileRecordInventory: async () => [],
     getUnclaimedSwaps: async () => {
       const records = await identities.load();
       return { swaps: ["one", "two"].filter(swapId => !records.some(r => r.swapId === swapId && r.claim))
@@ -49,4 +56,10 @@ export function shieldSwapActions({ blindedIdentities: identities }) {
       return { transactionId: result.transactionId, amountOut: 99n, amountRemaining: 1n };
     },
   });
+}
+
+// The production adapter also uses the public scoped history action.
+export async function reconcileSwapHistory(_client, { store }) {
+  await store.load();
+  return { complete: true, pagesScanned: 1 };
 }

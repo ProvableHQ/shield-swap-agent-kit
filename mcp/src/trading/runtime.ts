@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { TradingStore } from "./store";
+import { operationContext } from "./ownership";
+import { LockBusyError, TradingStore } from "./store";
 import { sharesAccount, withWalletLocks } from "./coordination";
 import { TradingError, type Kind, type Operation, type Profile, type SavedQuote, type Summary, type TradingBackend, type Progress } from "./types";
 
-const activeStatuses = new Set(["queued", "running", "uncertain"]);
+const activeStatuses = new Set(["queued", "running", "submitted", "pending", "uncertain"]);
 export class TradingRuntime {
   private workers = new Set<Promise<void>>();
   constructor(readonly store: TradingStore, private backend: TradingBackend) {}
@@ -19,17 +20,22 @@ export class TradingRuntime {
       wallets: [{ chain: "aleo", provider: "local", address: p.address },
         ...(p.evm ? [{ chain: "ethereum", provider: p.evm.provider, address: p.evm.address }] : []),
         ...(p.solana ? [{ chain: "solana", provider: p.solana.provider, address: p.solana.address }] : [])],
-      policy: p.policy, useFeeMaster: p.useFeeMaster ?? false,
+      policy: p.policy, useFeeMaster: p.useFeeMaster ?? true,
     }));
   }
   scope(profile: Profile): string { return [profile.network, profile.address, profile.program ?? "shield_swap.aleo"].join(":"); }
 
   async quote(kind: Kind, profileId: string, input: Summary): Promise<Summary> {
     const profile = this.profile(profileId);
-    const priced = await withWalletLocks(this.store, [profile], () => this.backend.quote(kind, profile, input));
+    const priced = this.backend.concurrentRecords && kind !== "bridge"
+      ? await this.backend.quote(kind, profile, input)
+      : await withWalletLocks(this.store, [profile], () => this.backend.quote(kind, profile, input));
     const now = Date.now();
+    // An inventory plan is a snapshot that execution rechecks input by input,
+    // so it may be reviewed longer than a priced swap quote.
+    const lifetime = kind === "inventory" ? 600_000 : 60_000;
     const quote: SavedQuote = { id: randomUUID(), kind, profile, scope: this.scope(profile),
-      createdAt: now, ...priced, expiresAt: Math.min(now + 60_000, priced.expiresAt ?? Infinity) };
+      createdAt: now, ...priced, expiresAt: Math.min(now + lifetime, priced.expiresAt ?? Infinity) };
     if (kind === "swap") {
       if (BigInt(String(priced.summary.minOut ?? "0")) <= 0n) throw new TradingError("unquoted_swap", "No executable minimum output is available for this route.");
     }
@@ -37,11 +43,33 @@ export class TradingRuntime {
     return { quoteId: quote.id, kind, profileId, network: profile.network, address: profile.address, expiresAt: quote.expiresAt, ...quote.summary };
   }
 
-  private assertWalletAvailable(profile: Profile, exceptId?: string): void {
-    if (this.store.list<Operation>("operation:").some(op => op.id !== exceptId && activeStatuses.has(op.status) &&
-      sharesAccount(this.store.get<SavedQuote>("quote:" + op.quoteId)!.profile, profile))) {
-      throw new TradingError("operation_pending", "Resolve the wallet\'s existing active or uncertain operation before submitting another.");
+  private managed(quote: SavedQuote): boolean { return Boolean(this.backend.concurrentRecords && quote.kind !== "bridge"); }
+  private assertWalletAvailable(quote: SavedQuote, exceptId?: string): void {
+    const managed = this.managed(quote);
+    for (const op of this.store.list<Operation>("operation:")) {
+      if (op.id === exceptId || !activeStatuses.has(op.status)) continue;
+      const other = this.store.get<SavedQuote>("quote:" + op.quoteId);
+      if (!other || !sharesAccount(other.profile, quote.profile)) continue;
+      if (managed && op.managedRecords) {
+        if (quote.kind === "claim" && op.kind === "claim") {
+          const selected = new Set((quote.plan as { swapIds: string[] }).swapIds);
+          if ((other.plan as { swapIds: string[] }).swapIds.some(id => selected.has(id)))
+            throw new TradingError("operation_pending", "An existing claim operation owns this swap output. Inspect or resume it.");
+        }
+        if (quote.kind === "inventory" && op.kind === "inventory" && quote.summary.asset === other.summary.asset)
+          throw new TradingError("operation_pending", "An inventory operation for this token is pending. Inspect its original operation.");
+        continue;
+      }
+      // Previously accepted legacy swaps may await a claim, but uncertain or
+      // live legacy writers cannot be isolated to their own resources.
+      if (!op.managedRecords && !["queued", "running", "uncertain"].includes(op.status)) continue;
+      throw new TradingError("operation_pending", "Resolve the wallet's existing active or uncertain operation before submitting another.");
     }
+  }
+
+  private withOperation<T>(op: Operation, quote: SavedQuote, fn: () => Promise<T>): Promise<T> {
+    return this.store.withLock("operation:" + op.id, () => operationContext.run({ operationId: op.id }, () =>
+      op.managedRecords ? fn() : withWalletLocks(this.store, [quote.profile], fn)));
   }
 
   private authorize(quote: SavedQuote): void {
@@ -52,6 +80,10 @@ export class TradingRuntime {
     const p = profile.policy;
     if (quote.kind === "claim") {
       if (!p.claims) throw new TradingError("permission_required", "Claim permission must be enabled in terminal setup.");
+      return;
+    }
+    if (quote.kind === "inventory") {
+      if (!p.inventory) throw new TradingError("permission_required", "Inventory maintenance permission must be enabled in terminal setup.");
       return;
     }
     const bridge = quote.kind === "bridge";
@@ -65,7 +97,7 @@ export class TradingRuntime {
     if (!bridge && Number(quote.summary.slippageBps) > p.maxSlippageBps) throw new TradingError("slippage_limit", "The quote exceeds the configured slippage limit.");
   }
 
-  async execute(quoteId: string, requestKey: string): Promise<Summary> {
+  async execute(quoteId: string, requestKey: string, registrationGuard?: () => void): Promise<Summary> {
     const quote = this.store.get<SavedQuote>("quote:" + quoteId);
     if (!quote) throw new TradingError("quote_missing", "Quote was not found.");
     const requestId = createHash("sha256").update(quote.scope + ":" + requestKey).digest("hex");
@@ -80,11 +112,12 @@ export class TradingRuntime {
       const current = this.store.get<SavedQuote>("quote:" + quoteId)!;
       if (current.operationId) throw new TradingError("quote_consumed", "Quote has already been consumed; inspect its original operation.");
       if (current.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired; request a fresh quote.");
+      registrationGuard?.();
       this.authorize(current);
-      this.assertWalletAvailable(quote.profile);
+      this.assertWalletAvailable(quote);
       const now = Date.now();
       const op: Operation = { id: randomUUID(), kind: quote.kind, profileId: quote.profile.id, scope: quote.scope,
-        quoteId, requestKey: requestId, status: "queued", createdAt: now, updatedAt: now, result: {} };
+        quoteId, managedRecords: this.managed(quote), requestKey: requestId, status: "queued", createdAt: now, updatedAt: now, result: {} };
       this.store.set("operation:" + op.id, op);
       this.store.set("request:" + requestId, op.id);
       this.store.set("quote:" + quoteId, { ...current, operationId: op.id });
@@ -103,48 +136,58 @@ export class TradingRuntime {
 
   private launch(id: string, quote: SavedQuote, resuming: boolean, ready?: { resolve(value: Summary): void; reject(error: unknown): void }): void {
     const worker = (async () => {
-      let entered = false;
       try {
-        await withWalletLocks(this.store, [quote.profile], async () => {
+        await this.withOperation(this.store.get<Operation>("operation:" + id)!, quote, async () => {
           let op = this.store.get<Operation>("operation:" + id)!;
-          // A different process may reconcile a queued operation before this
-          // worker acquires the lock. Never resurrect an operation it resolved.
-          if (!resuming && op.status !== "queued") return;
-          if (resuming) {
-            if (op.status !== "complete" && op.status !== "failed") {
-              op = this.save(op, await this.backend.reconcile(quote, op));
+          let entered = false;
+          try {
+            // A different process may reconcile a queued operation before this
+            // worker acquires the lock. Never resurrect an operation it resolved.
+            if (!resuming && op.status !== "queued") return;
+            if (resuming) {
+              if (op.status !== "complete" && op.status !== "failed") {
+                op = this.save(op, await this.backend.reconcile(quote, op));
+              }
+              // Reconcile and start the next step under the same operation lock.
+              if (op.status === "complete" || op.status === "failed" || op.kind === "swap" ||
+                  !["resume", "complete", "claim"].includes(String(op.result.nextAction))) {
+                ready?.resolve(this.publicOperation(op));
+                return;
+              }
             }
-            // Reconcile and start the next step under the same wallet lock.
-            // Another caller must never queue work based on a stale status.
-            if (op.status === "complete" || op.status === "failed" || op.kind === "swap" ||
-                !["resume", "complete", "claim"].includes(String(op.result.nextAction))) {
-              ready?.resolve(this.publicOperation(op));
-              return;
-            }
+            // Registration in another process must observe this start atomically.
+            // The operation lock alone does not exclude a different operation ID.
+            op = this.store.transaction(() => {
+              const current = this.store.get<Operation>("operation:" + id)!;
+              this.assertWalletAvailable(quote, current.id);
+              this.authorize(quote);
+              if (!resuming && quote.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired before execution began.");
+              return this.save(current, { status: "running", result: current.result });
+            });
+            entered = true;
+            ready?.resolve(this.publicOperation(op));
+            operationContext.getStore()!.submitted = () => { op = this.save(op, { status: "submitted", result: op.result }); };
+            const context = { operationId: id, checkpoint: (checkpoint: unknown) => {
+              op = { ...op, checkpoint, updatedAt: Date.now() };
+              this.store.set("operation:" + id, op);
+            } };
+            const result = resuming ? await this.backend.resume(quote, op, context) : await this.backend.execute(quote, context);
+            this.save(op, result);
+          } catch (error) {
+            if (resuming && !entered) throw error;
+            // Persist failures while ownership is still held. A successor must
+            // never observe or overwrite a half-finished execution checkpoint.
+            const current = this.store.get<Operation>("operation:" + id)!;
+            this.save(current, { status: entered ? "uncertain" : "failed",
+              result: { error: { code: entered ? "submission_uncertain" : error instanceof TradingError ? error.code : "wallet_busy",
+                message: entered ? "The submission result is uncertain. Reconcile this operation before any retry." : "Execution did not start. Check the wallet permissions, quote expiry, and active operations." } } });
           }
-          this.assertWalletAvailable(quote.profile, op.id);
-          this.authorize(quote);
-          if (!resuming && quote.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired before execution began.");
-          entered = true;
-          op = this.save(op, { status: "running", result: op.result });
-          ready?.resolve(this.publicOperation(op));
-          const context = { operationId: id, checkpoint: (checkpoint: unknown) => {
-            op = { ...op, checkpoint, updatedAt: Date.now() };
-            this.store.set("operation:" + id, op);
-          } };
-          const result = resuming ? await this.backend.resume(quote, op, context) : await this.backend.execute(quote, context);
-          this.save(op, result);
         });
       } catch (error) {
-        const op = this.store.get<Operation>("operation:" + id)!;
-        if (resuming && !entered) {
-          if (error instanceof Error && /busy/.test(error.message)) ready?.resolve(this.publicOperation(op));
-          else ready?.reject(error);
-          return;
-        }
-        this.save(op, { status: entered ? "uncertain" : "failed",
-          result: { error: { code: entered ? "submission_uncertain" : error instanceof TradingError ? error.code : "wallet_busy",
-            message: entered ? "The submission result is uncertain. Reconcile this operation before any retry." : "Execution did not start. Check the wallet permissions, quote expiry, and active operations." } } });
+        // Lock contention belongs to the current owner. Neither initial launch
+        // nor resume may change shared operation state without owning the lock.
+        if (error instanceof LockBusyError) ready?.resolve(this.operation(id));
+        else ready?.reject(error);
       }
     })();
     this.workers.add(worker);
@@ -170,7 +213,7 @@ export class TradingRuntime {
     if (op.status === "complete" || op.status === "failed") return this.publicOperation(op);
     try {
       const saved = this.store.get<SavedQuote>("quote:" + op.quoteId)!;
-      return await withWalletLocks(this.store, [saved.profile], async () => {
+      return await this.withOperation(op, saved, async () => {
         const current = this.store.get<Operation>("operation:" + id)!;
         const quote = this.store.get<SavedQuote>("quote:" + current.quoteId)!;
         return this.publicOperation(this.save(current, await this.backend.reconcile(quote, current)));
@@ -188,7 +231,8 @@ export class TradingRuntime {
   }
   async read(action: string, profileId: string, input: Summary): Promise<Summary> {
     const profile = this.profile(profileId);
-    return withWalletLocks(this.store, [profile], () => this.backend.read(action, profile, input));
+    return this.backend.concurrentRecords ? this.backend.read(action, profile, input)
+      : withWalletLocks(this.store, [profile], () => this.backend.read(action, profile, input));
   }
   async drain(): Promise<void> { while (this.workers.size) await Promise.allSettled([...this.workers]); }
 }

@@ -39,11 +39,12 @@ test("terminal setup encrypts an imported key and stdio survives process restart
   try {
     const result = await run(process.execPath, ["--import", "tsx", cli, "setup", "--network", "testnet", "--state-dir", root, "--key-env", "MCP_TEST_ALEO_KEY", "--store-key"], { env, timeout: 20000 });
     assert.equal(JSON.parse(result.stdout).address, account.address);
+    assert.equal(JSON.parse(result.stdout).useFeeMaster, true, "new profiles request delegated fee sponsorship by default");
     assert.ok(!result.stdout.includes(account.privateKey) && !result.stderr.includes(account.privateKey));
     assert.equal(readFileSync(join(root, "state.sqlite")).includes(account.privateKey), false);
-    const configured = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root, "--allow-claims", "--fee-master", "--swap-limit", "1field=1000", "--max-slippage-bps", "75"], { env });
+    const configured = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root, "--allow-claims", "--allow-inventory", "--swap-limit", "1field=1000", "--max-slippage-bps", "75"], { env });
     assert.equal(JSON.parse(configured.stdout).useFeeMaster, true);
-    assert.deepEqual(JSON.parse(configured.stdout).policy, { swaps: false, claims: true, bridges: false, maxSlippageBps: 75, swapLimits: { "1field": "1000" }, bridgeLimits: {} });
+    assert.deepEqual(JSON.parse(configured.stdout).policy, { swaps: false, claims: true, bridges: false, inventory: true, maxSlippageBps: 75, swapLimits: { "1field": "1000" }, bridgeLimits: {} });
     const evmKey = "0x" + "01".repeat(32);
     const bridgeConfig = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root,
       "--evm-key-env", "MCP_EVM_TEST_KEY", "--evm-rpc-url", "https://rpc.invalid"], { env: { ...env, MCP_EVM_TEST_KEY: evmKey } });
@@ -78,7 +79,7 @@ test("terminal setup encrypts an imported key and stdio survives process restart
       transport.stderr?.on("data", chunk => { diagnostics += chunk.toString(); });
       try {
         await client.connect(transport);
-        assert.equal((await client.listTools()).tools.length, 20);
+        assert.equal((await client.listTools()).tools.length, 27);
         const setup = await client.callTool({ name: "setup", arguments: {} });
         assert.equal((setup.structuredContent as { checks: { account: { status: string } } }).checks.account.status, "configured");
         const wallets = await client.callTool({ name: "list_wallets", arguments: {} });
@@ -147,6 +148,10 @@ test("guided setup reuses a non-default testnet profile without changing signer 
     const reopened = new TradingStore(root, password);
     try { assert.deepEqual(reopened.get("profile:desk"), original); }
     finally { reopened.close(); }
+    const configured = await run(process.execPath, ["--import", "tsx", cli, "configure", "--state-dir", root,
+      "--profile", "desk", "--allow-inventory"], { env });
+    assert.equal(JSON.parse(configured.stdout).useFeeMaster, true, "a missing preference enables fee sponsorship");
+    assert.equal(JSON.parse(configured.stdout).policy.inventory, true);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

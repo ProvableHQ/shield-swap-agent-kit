@@ -16,6 +16,6 @@ These are strategy requirements, not claims that the kit already implements each
 
 The strategy decides whether a trade is wanted. The execution path validates the quote, limits, account, spendable records, and outstanding work before submitting. A new signal must not cause a retry of an operation whose outcome is still unknown.
 
-For multiple strategies, assign each an identifier and budget, then enforce the combined account budget and record reservations centrally. Two individually valid strategies can still conflict over the same private record or exhaust the same daily allowance.
+For multiple strategies, assign each an identifier and budget, then enforce the combined account budget centrally and give every writer the same record management store so their input reservations exclude each other. Two individually valid strategies can still conflict over the same private record or exhaust the same daily allowance; see [UTXO management](../../shield-swap-setup/swap-utxo-management.md).
 
 Next: [set up trading tools](setup-trading-tools.md). Recurring execution also needs [unattended-trading limits](../../safety/unattended-trading.md); a one-off swap does not.

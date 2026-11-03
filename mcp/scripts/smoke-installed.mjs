@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { fork, execFile } from "node:child_process";
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { once } from "node:events";
 import { promisify } from "node:util";
 
 const installRoot = resolve(process.argv[2] ?? ".");
@@ -47,7 +48,15 @@ try {
     try {
       await client.connect(transport);
       const tools = await client.listTools();
-      assert.equal(tools.tools.length, 20);
+      assert.equal(tools.tools.length, 27);
+      assert.ok(tools.tools.some(tool => tool.name === "recover_record_inventory"));
+      assert.ok(tools.tools.some(tool => tool.name === "get_inventory_maintenance_status"));
+      assert.ok(!tools.tools.some(tool => ["reconcile_record_inventory", "get_inventory_maintenance", "check_inventory_maintenance"].includes(tool.name)));
+      for (const name of ["get_inventory_maintenance_status", "get_inventory_maintenance"]) {
+        const status = await client.callTool({ name, arguments: {} });
+        assert.equal(status.isError, false);
+        assert.deepEqual(status.structuredContent, { jobs: [], workerRunning: false });
+      }
       const setupResult = await client.callTool({ name: "setup", arguments: { journey: "connect_trading_tools", mode: "unattended" } });
       assert.equal(setupResult.structuredContent.checks.account.status, "configured");
       assert.equal(setupResult.structuredContent.checks.funding.status, "not_checked");
@@ -62,6 +71,33 @@ try {
     } finally { await client.close(); }
     assert.ok(!stderr.includes(key));
   }
-  process.stdout.write("Installed package: SDK key import, encrypted persistence, guided profile reuse, structured readiness, 20 stdio tools, testnet bridge discovery, and two restarts passed. No network calls or transactions requested.\n");
+  const workers = [];
+  const startWorker = async (attached = false) => {
+    const worker = fork(entry, ["maintain", "--state-dir", root, ...(attached ? ["--parent-attached"] : [])], { cwd: installRoot, env: { ...env }, stdio: ["ignore", "ignore", "pipe", "ipc"] });
+    workers.push(worker);
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("worker readiness timeout")), 15000);
+      worker.once("message", message => { clearTimeout(timer); assert.equal(message.ready, true); resolve(); });
+      worker.once("error", error => { clearTimeout(timer); reject(error); });
+      worker.once("exit", code => { clearTimeout(timer); if (code) reject(new Error("worker exited before readiness")); });
+    });
+    if (!attached && worker.connected) worker.disconnect();
+    return worker;
+  };
+  try {
+    const attached = await startWorker(true);
+    const disconnected = once(attached, "exit");
+    attached.disconnect();
+    assert.equal((await disconnected)[0], 0, "an attached worker exits when its parent IPC connection closes");
+    const first = await startWorker();
+    const duplicate = await startWorker();
+    assert.equal((await once(duplicate, "exit"))[0], 0, "a second worker leaves the owner running");
+    assert.equal(first.exitCode, null);
+    const crashed = once(first, "exit"); first.kill("SIGKILL"); await crashed;
+    const replacement = await startWorker();
+    const stopped = once(replacement, "exit"); replacement.kill("SIGTERM");
+    assert.equal((await stopped)[0], 0, "a replacement drains and releases its worker lock");
+  } finally { for (const worker of workers) if (worker.exitCode === null && worker.signalCode === null) worker.kill("SIGKILL"); }
+  process.stdout.write("Installed package: SDK key import, encrypted persistence, guided profile reuse, structured readiness, 27 stdio tools, testnet bridge discovery, two MCP restarts, attached-worker parent loss, worker exclusion, crash recovery and graceful worker shutdown passed. No network calls or transactions requested.\n");
 } finally { await rm(root, { recursive: true, force: true }); }
 }

@@ -13,6 +13,7 @@ export const help = `Shield Swap MCP
   shield-swap-mcp setup --network mainnet --key-env ALEO_PRIVATE_KEY
   shield-swap-mcp configure --profile default --allow-claims
   shield-swap-mcp serve
+  shield-swap-mcp maintain
 
 setup --guided reuses the selected profile or offers import/create in a trusted
 terminal. New guided profiles default to mainnet; existing profiles retain their
@@ -34,13 +35,15 @@ Common options:
   --generate               Create a new wallet instead of importing
   --network-url URL        Aleo RPC override (setup only)
   --api-url URL            Shield Swap API override (setup only)
-  --fee-master             Request the delegated prover's fee sponsorship
+  --fee-master             Request delegated fee sponsorship (enabled by default)
   --no-fee-master          Pay Aleo fees from the wallet (configure only)
 
 configure changes trusted terminal permissions:
   --allow-swaps / --deny-swaps
   --allow-claims / --deny-claims
   --allow-bridges / --deny-bridges
+  --allow-inventory / --deny-inventory
+                          Record inventory joins and splits (rebalance, rebroadcast)
   --swap-limit TOKEN=RAW   Per-operation base-unit input cap (repeatable)
   --bridge-limit ASSET=RAW Per-operation base-unit input cap (repeatable)
   --max-slippage-bps N     Maximum swap slippage (0–1000)
@@ -52,6 +55,13 @@ configure changes trusted terminal permissions:
 
 New profiles have execution disabled. Setup/configure require a hidden
 passphrase prompt or SHIELD_SWAP_MCP_PASSWORD from your secret manager.
+serve --maintenance-mode attached|detached (default attached) controls workers
+started by this MCP server. SHIELD_SWAP_MCP_MAINTENANCE_MODE sets the same default;
+the command flag takes precedence. Attached workers stop with their launching
+MCP server, with up to 10 seconds to drain. Detached workers survive its exit.
+maintain runs an independent worker for the saved per-token inventory targets;
+use this command with a service manager for restarts.
+Stopping a token prevents new work; Ctrl-C stops the foreground worker after drain.
 serve uses SHIELD_SWAP_MCP_PASSWORD and never prompts on MCP stdin.
 Never pass a key or passphrase as a command argument. Back up encrypted
 state and keep its passphrase separately. Use one state directory per wallet.
@@ -61,12 +71,14 @@ export function argumentsFor(argv: string[]) {
   try {
     const parsed = parseArgs({ args: argv, allowPositionals: true, strict: true, options: {
       help: { type: "boolean", short: "h" },
+      "maintenance-mode": { type: "string" }, "parent-attached": { type: "boolean" },
       "state-dir": { type: "string" }, profile: { type: "string" }, network: { type: "string" },
       "key-env": { type: "string" }, "store-key": { type: "boolean" }, generate: { type: "boolean" }, guided: { type: "boolean" },
       "network-url": { type: "string" }, "api-url": { type: "string" }, "fee-master": { type: "boolean" }, "no-fee-master": { type: "boolean" },
       "allow-swaps": { type: "boolean" }, "deny-swaps": { type: "boolean" },
       "allow-claims": { type: "boolean" }, "deny-claims": { type: "boolean" },
       "allow-bridges": { type: "boolean" }, "deny-bridges": { type: "boolean" },
+      "allow-inventory": { type: "boolean" }, "deny-inventory": { type: "boolean" },
       "swap-limit": { type: "string", multiple: true }, "bridge-limit": { type: "string", multiple: true },
       "max-slippage-bps": { type: "string" },
       "evm-key-env": { type: "string" }, "evm-rpc-url": { type: "string" },
@@ -74,11 +86,13 @@ export function argumentsFor(argv: string[]) {
       "evm-wallet-env": { type: "string" }, "solana-wallet-env": { type: "string" },
     } });
     const command = parsed.positionals[0] ?? "serve";
-    if (parsed.positionals.length > 1 || !["setup", "configure", "serve"].includes(command)) throw new Error();
+    if (parsed.positionals.length > 1 || !["setup", "configure", "serve", "maintain"].includes(command)) throw new Error();
     const allowed = command === "setup" ? new Set(["help", "state-dir", "profile", "network", "guided", "key-env", "store-key", "generate", "network-url", "api-url", "fee-master"])
-      : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "swap-limit", "bridge-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
-      : new Set(["help", "state-dir"]);
+      : command === "configure" ? new Set(["help", "state-dir", "profile", "fee-master", "no-fee-master", "allow-swaps", "deny-swaps", "allow-claims", "deny-claims", "allow-bridges", "deny-bridges", "allow-inventory", "deny-inventory", "swap-limit", "bridge-limit", "max-slippage-bps", "evm-key-env", "evm-rpc-url", "solana-key-env", "solana-rpc-url", "evm-wallet-env", "solana-wallet-env"])
+      : command === "serve" ? new Set(["help", "state-dir", "maintenance-mode"])
+      : new Set(["help", "state-dir", "parent-attached"]);
     if (Object.keys(parsed.values).some(key => !allowed.has(key))) throw new Error();
+    if (parsed.values["maintenance-mode"] !== undefined && !["attached", "detached"].includes(parsed.values["maintenance-mode"])) throw new Error();
     return { command, values: parsed.values };
   } catch {
     throw new TradingError("invalid_arguments", "Invalid command arguments. Use --help; keys and passphrases must never be passed as arguments.");
@@ -129,7 +143,7 @@ function profileId(options: Options): string {
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(id)) throw new TradingError("invalid_profile", "Use 1–64 letters, digits, hyphens or underscores for a profile.");
   return id;
 }
-const readOnlyPolicy = (): Policy => ({ swaps: false, claims: false, bridges: false, maxSlippageBps: 100, swapLimits: {}, bridgeLimits: {} });
+const readOnlyPolicy = (): Policy => ({ swaps: false, claims: false, bridges: false, inventory: false, maxSlippageBps: 100, swapLimits: {}, bridgeLimits: {} });
 
 export async function setup(options: Options, suppliedPassword?: string): Promise<Record<string, unknown>> {
   let id = profileId(options);
@@ -170,7 +184,7 @@ export async function setup(options: Options, suppliedPassword?: string): Promis
     const secretId = "aleo:" + id;
     const profile: Profile = { id, network, address: account.address,
       key: persistKey ? { type: "stored", id: secretId } : { type: "env", name: keyEnv! },
-      networkUrl, apiUrl, useFeeMaster: Boolean(options["fee-master"]), policy: readOnlyPolicy() };
+      networkUrl, apiUrl, useFeeMaster: true, policy: readOnlyPolicy() };
     store.transaction(() => {
       // SDK loading or a hidden prompt can yield while another process sets up.
       // Recheck under the SQLite write transaction before storing either key.
@@ -219,8 +233,9 @@ export async function configure(options: Options): Promise<Record<string, unknow
     if (!profile) throw new TradingError("profile_missing", "Profile does not exist; run setup first.");
     const [evm, solana] = await Promise.all([localBridgeWallet("evm", options), localBridgeWallet("solana", options)]);
     if (solana && profile.network !== "mainnet") throw new TradingError("unsupported_network", "The SDK registry has no Solana testnet bridge route.");
-    const policy = structuredClone(profile.policy);
-    for (const permission of ["swaps", "claims", "bridges"] as const) {
+    // Profiles written before record management carry no inventory fields.
+    const policy = structuredClone({ inventory: false, ...profile.policy });
+    for (const permission of ["swaps", "claims", "bridges", "inventory"] as const) {
       const allow = options[("allow-" + permission) as "allow-swaps"];
       const deny = options[("deny-" + permission) as "deny-swaps"];
       if (allow && deny) throw new TradingError("invalid_arguments", "Cannot both allow and deny the same permission.");
@@ -239,10 +254,10 @@ export async function configure(options: Options): Promise<Record<string, unknow
       policy.maxSlippageBps = value;
     }
     if (options["fee-master"] && options["no-fee-master"]) throw new TradingError("invalid_arguments", "Choose either sponsored or wallet-funded Aleo fees.");
-    const useFeeMaster = options["fee-master"] ? true : options["no-fee-master"] ? false : profile.useFeeMaster ?? false;
+    const useFeeMaster = options["fee-master"] ? true : options["no-fee-master"] ? false : profile.useFeeMaster ?? true;
     const updated = { ...profile, useFeeMaster, ...(evm ? { evm } : {}), ...(solana ? { solana } : {}), policy };
     await withWalletLocks(store, [profile, updated], async () => store.transaction(() => {
-      if (store.list<{ profileId: string; status: string }>("operation:").some(op => op.profileId === id && ["queued", "running"].includes(op.status))) {
+      if (store.list<{ profileId: string; status: string }>("operation:").some(op => op.profileId === id && ["queued", "running", "submitted"].includes(op.status))) {
         throw new TradingError("operation_pending", "Wait for the profile's active operation before changing its permissions.");
       }
       const current = store.get<Profile>("profile:" + id)!;

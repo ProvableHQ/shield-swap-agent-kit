@@ -19,6 +19,8 @@ export type Policy = {
   swaps: boolean;
   claims: boolean;
   bridges: boolean;
+  /** Record inventory maintenance (joins and splits). Absent in profiles written before 0.14.0; treated as false. */
+  inventory?: boolean;
   maxSlippageBps: number;
   swapLimits: Record<string, string>;
   bridgeLimits: Record<string, string>;
@@ -36,7 +38,7 @@ export type Profile = {
   solana?: HostedWallet;
   policy: Policy;
 };
-export type Kind = "swap" | "bridge" | "claim";
+export type Kind = "swap" | "bridge" | "claim" | "inventory";
 export type Status = "queued" | "running" | "submitted" | "pending" | "complete" | "uncertain" | "failed";
 export type Summary = Record<string, unknown>;
 export type SavedQuote = {
@@ -62,6 +64,8 @@ export type Operation = {
   updatedAt: number;
   result: Summary;
   checkpoint?: unknown;
+  /** Inputs and identities are coordinated by the managed backend. Legacy operations omit this. */
+  managedRecords?: boolean;
 };
 export type Progress = { status: Status; result: Summary; checkpoint?: unknown };
 export interface ExecutionContext {
@@ -69,6 +73,7 @@ export interface ExecutionContext {
   operationId: string;
 }
 export interface TradingBackend {
+  concurrentRecords?: boolean;
   quote(kind: Kind, profile: Profile, input: Summary): Promise<{ plan: unknown; summary: Summary; expiresAt?: number }>;
   execute(quote: SavedQuote, context: ExecutionContext): Promise<Progress>;
   read(action: string, profile: Profile, input: Summary): Promise<Summary>;

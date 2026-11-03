@@ -1,8 +1,13 @@
+import { checkRecovery } from "./recovery-context";
 import { DatabaseSync } from "node:sqlite";
 import { createCipheriv, createDecipheriv, randomBytes, createHash, scryptSync } from "node:crypto";
 import { closeSync, chmodSync, existsSync, lstatSync, mkdirSync, openSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { AsyncLocalStorage } from "node:async_hooks";
+
+export class LockBusyError extends Error {
+  constructor() { super("Wallet is busy in another operation. Retry after it finishes."); }
+}
 
 // All wallet material, plans and checkpoints are encrypted before SQLite sees them.
 // The passphrase comes from the terminal or the host environment, never an MCP tool.
@@ -52,6 +57,7 @@ export class TradingStore {
   }
 
   get<T>(id: string): T | undefined {
+    checkRecovery();
     const row = this.db.prepare("SELECT value FROM documents WHERE id=?").get(id);
     if (!row) return undefined;
     const blob = Buffer.from(row.value as Uint8Array);
@@ -63,6 +69,7 @@ export class TradingStore {
   }
 
   set(id: string, value: unknown): void {
+    checkRecovery();
     if (this.transactionContext.getStore()?.active === false) throw new Error("Storage transaction has ended.");
     const nonce = randomBytes(12);
     const cipher = createCipheriv("aes-256-gcm", this.key, nonce);
@@ -74,10 +81,12 @@ export class TradingStore {
   }
 
   list<T>(prefix: string): T[] {
+    checkRecovery();
     return this.db.prepare("SELECT id FROM documents WHERE substr(id, 1, ?) = ? ORDER BY id").all(prefix.length, prefix).map(row => this.get<T>(row.id as string)!);
   }
 
   transaction<T>(fn: () => T): T {
+    checkRecovery();
     if (fn.constructor.name === "AsyncFunction") throw new Error("Storage transactions must be synchronous.");
     const context = { active: true };
     this.db.exec("BEGIN IMMEDIATE");
@@ -98,6 +107,7 @@ export class TradingStore {
   }
 
   async withLock<T>(scope: string, fn: () => Promise<T>): Promise<T> {
+    checkRecovery();
     // A separate SQLite file holds only an OS-backed transaction lock. It does
     // not block reads/writes to the encrypted state DB. The kernel releases it
     // on process exit, so recovery needs neither a lease timeout nor a PID.
@@ -110,7 +120,7 @@ export class TradingStore {
     if (lstatSync(path).isSymbolicLink()) throw new Error("Invalid wallet lock file.");
     const lock = new DatabaseSync(path);
     try { lock.exec("PRAGMA busy_timeout=0; BEGIN EXCLUSIVE"); }
-    catch { lock.close(); throw new Error("Wallet is busy in another operation. Retry after it finishes."); }
+    catch { lock.close(); throw new LockBusyError(); }
     this.activeLocks++;
     try { return await fn(); }
     finally { lock.exec("ROLLBACK"); lock.close(); this.activeLocks--; }

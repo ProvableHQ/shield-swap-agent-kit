@@ -42,6 +42,15 @@ test("quote execution is durable and duplicate requests do not submit twice", as
   } finally { await f.close(); }
 });
 
+test("configuration reports sponsored fees by default and preserves an explicit opt-out", async () => {
+  const f = fixture(async () => ({}));
+  try {
+    assert.equal(f.runtime.profiles()[0].useFeeMaster, true);
+    f.store.set("profile:alice", { ...profile, useFeeMaster: false });
+    assert.equal(f.runtime.profiles()[0].useFeeMaster, false);
+  } finally { await f.close(); }
+});
+
 test("expired quotes and policy violations never submit", async () => {
   let submissions = 0;
   const f = fixture(async () => { submissions++; return {}; });
