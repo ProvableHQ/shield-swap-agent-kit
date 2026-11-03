@@ -79,15 +79,15 @@ export class TradingRuntime {
     }
     const p = profile.policy;
     if (quote.kind === "claim") {
-      if (!p.claims) throw new TradingError("permission_required", "Claim permission must be enabled in terminal setup.");
+      if (!p.claims) throw new TradingError("permission_required", "Claim permission requires approval through request_permissions or terminal configure.");
       return;
     }
     if (quote.kind === "inventory") {
-      if (!p.inventory) throw new TradingError("permission_required", "Inventory maintenance permission must be enabled in terminal setup.");
+      if (!p.inventory) throw new TradingError("permission_required", "Inventory permission requires approval through request_permissions or terminal configure.");
       return;
     }
     const bridge = quote.kind === "bridge";
-    if (bridge ? !p.bridges : !p.swaps) throw new TradingError("permission_required", "Execution permission must be enabled in terminal setup.");
+    if (bridge ? !p.bridges : !p.swaps) throw new TradingError("permission_required", "Execution permission requires approval through request_permissions or terminal configure.");
     const token = String(quote.summary.tokenIn ?? "");
     const limit = (bridge ? p.bridgeLimits : p.swapLimits)[token];
     const amount = String(quote.summary.amountIn ?? "0");

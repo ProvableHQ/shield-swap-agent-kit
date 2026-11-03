@@ -48,7 +48,7 @@ try {
     try {
       await client.connect(transport);
       const tools = await client.listTools();
-      assert.equal(tools.tools.length, 27);
+      assert.equal(tools.tools.length, 28);
       assert.ok(tools.tools.some(tool => tool.name === "recover_record_inventory"));
       assert.ok(tools.tools.some(tool => tool.name === "get_inventory_maintenance_status"));
       assert.ok(!tools.tools.some(tool => ["reconcile_record_inventory", "get_inventory_maintenance", "check_inventory_maintenance"].includes(tool.name)));
@@ -98,6 +98,6 @@ try {
     const stopped = once(replacement, "exit"); replacement.kill("SIGTERM");
     assert.equal((await stopped)[0], 0, "a replacement drains and releases its worker lock");
   } finally { for (const worker of workers) if (worker.exitCode === null && worker.signalCode === null) worker.kill("SIGKILL"); }
-  process.stdout.write("Installed package: SDK key import, encrypted persistence, guided profile reuse, structured readiness, 27 stdio tools, testnet bridge discovery, two MCP restarts, attached-worker parent loss, worker exclusion, crash recovery and graceful worker shutdown passed. No network calls or transactions requested.\n");
+  process.stdout.write("Installed package: SDK key import, encrypted persistence, guided profile reuse, structured readiness, 28 stdio tools, testnet bridge discovery, two MCP restarts, attached-worker parent loss, worker exclusion, crash recovery and graceful worker shutdown passed. No network calls or transactions requested.\n");
 } finally { await rm(root, { recursive: true, force: true }); }
 }

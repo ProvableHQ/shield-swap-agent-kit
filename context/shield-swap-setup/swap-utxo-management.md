@@ -26,7 +26,7 @@ The standalone server enables record management on its session and keeps the jou
 {"name":"plan_record_inventory","arguments":{"profileId":"SELECTED_PROFILE","token":"TOKEN_ID","records":4,"minRecordAmount":"1.5","distribution":"balanced","toleranceBps":0,"maxTransactions":24}}
 ```
 
-3. Execution needs `shield-swap-mcp configure --profile NAME --allow-inventory` from the trusted terminal. Delegated proving requests FeeMaster sponsorship by default; inventory execution has no separate fee limit. Then call `rebalance_record_inventory` with the `planId` and a stable `idempotencyKey`; it returns an operation ID. Poll `get_operation_status`.
+3. Execution needs inventory access. Explain the joins/splits and continuing maintenance authority, then request `request_permissions` with `profileId` and `permissions: { inventory: true }` for explicit client approval; see [execution access](../safety/permissions.md#agentkit-mcp-execution-access). Clients without confirmation forms receive the trusted-terminal fallback. Inspecting and planning need no grant. Delegated proving requests FeeMaster sponsorship by default; inventory execution has no separate fee limit. Then call `rebalance_record_inventory` with the `planId` and a stable `idempotencyKey`; it returns an operation ID. Poll `get_operation_status`.
 
 A `complete` operation lists its `transactionIds` and `completedSteps`. A `failed` operation with `not_submitted` sent nothing. An `uncertain` operation stopped after submitting; reconcile it until every listed transaction is confirmed or rejected, then it reports `failed` with `nextAction: "plan_again"`. `resume_operation` never re-executes a plan. Permission changes are refused while an operation is queued or running.
 

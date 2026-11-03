@@ -26,9 +26,15 @@ From a checkout of this branch, run one command:
 npm start
 ```
 
-Requires macOS or Linux, Node.js 22.13+, and Claude Code installed and signed in. The launcher prepares the MCP tools, prints the Shield Swap intro, guides local account import or creation when needed, and opens Claude with the intro skill and MCP connection. Existing profiles are reused. Run it from this checkout to use `~/shield-swap-trading`, or use `npm start -- --project /path/to/your/trading-project`.
+Requires macOS or Linux, Node.js 22.13+, and Claude Code installed and signed in. The launcher prepares the MCP tools, prints the Shield Swap intro, and opens Claude with an unauthenticated MCP connection. It does not prompt for a passphrase, create a profile, or unlock existing state, even if account credentials are set in the environment. Run it from this checkout to use `~/shield-swap-trading`, or use `npm start -- --project /path/to/your/trading-project`.
 
-The opening screen shows **SHIELD SWAP**, **Private asset trading**, setup status, and four choices: **Trade now**, **Connect trading tools**, **Build a strategy**, and **Explore markets**. Funding and transaction permissions remain steps in the chosen journey.
+The opening screen shows **SHIELD SWAP**, **Private asset trading**, setup status, and four choices: **Trade now**, **Connect trading tools**, **Build a strategy**, and **Explore markets**. Account setup begins only when you choose it in onboarding. Code-only work can proceed without an account; the current MCP market and quote tools require a connected account. To connect, exit Claude and run this in your own terminal from the checkout:
+
+```sh
+npm start -- --connect
+```
+
+This reuses the existing default profile or guides local import/creation, then opens a new connected session. Onboarding supplies a short task summary to carry into it; the chat is not transferred automatically. Preserve any `--project`, `--state-dir`, `--profile`, and `--network` options; onboarding supplies a command with those selections. Explicit `--generate` and `--key-env NAME` also opt into account setup for existing scripted workflows. Funding and transaction permissions remain separate steps in the chosen journey.
 
 Already inside Claude with the skill installed? Invoke `/shield-swap`, or ask “How do I trade with Shield Swap?” To try a checkout without reinstalling an older copy, send this single prompt:
 
@@ -58,7 +64,7 @@ context/
   safety/                    # Permissions, custody, and unattended execution
   strategies/                # Strategy design; currently arbitrage
   troubleshooting/           # Scanner lag, record contention, proving failures
-scripts/launch-claude.mjs     # One-command local setup and Claude launch
+scripts/launch-claude.mjs     # Account-optional Claude launcher
 mcp/                         # Draft standalone TypeScript MCP server
 tools/
   SKILL.md                   # When to use SDKs, CLI, MCP, or scripts

@@ -6,7 +6,7 @@ Use an available MCP connection for capabilities it actually exposes when it fit
 
 ## AgentKit standalone server
 
-The draft server pins published Veil packages to 0.16.1 and runs over stdio on Node.js 22.13 or newer. `setup` reports structured account/funding checks and next-step guidance for the [canonical journeys](../getting-started.md); signing keys and execution permissions are configured only in the trusted terminal. Starting an unconfigured server does not create an account.
+The draft server pins published Veil packages to 0.16.1 and runs over stdio on Node.js 22.13 or newer. `setup` reports structured account/funding checks and next-step guidance for the [canonical journeys](../getting-started.md); signing keys stay in the trusted terminal. `request_permissions` proposes execution access for explicit client confirmation, with a terminal fallback. Starting an unconfigured server does not create an account. The Claude launcher starts without account access by default; choosing account setup in onboarding leads to a trusted-terminal relaunch with `npm start -- --connect`. Until connected, only tool discovery and `setup` are available. Market reads and quotes still require an unlocked profile, but no execution grant.
 
 Its swap workflow is `quote` → `execute` → operation polling → `claim_unclaimed_swaps`. Executions consume durable quotes using idempotency keys. `swap_history` reads the encrypted identity store and reports recovery coverage. Record inventory follows the same shape: `get_record_inventory` → `plan_record_inventory` → `rebalance_record_inventory` → operation polling, with `recover_record_inventory` for the journal; see [UTXO management](../shield-swap-setup/swap-utxo-management.md#agentkit-mcp--inspect-plan-rebalance). The session enables the SDK's record management with a journal inside the encrypted state, so every swap, claim, and maintenance step reserves its inputs there. SDKs still own transaction construction, signing, and protocol logic; this server adds transport, operation IDs, encrypted storage, and local policy enforcement.
 
@@ -28,7 +28,7 @@ The amount and slippage above are illustrative, not authorization. Return `quote
 
 ## Execute and claim one swap
 
-Use the selected profile throughout. The requested trade must fit the permissions, per-operation token cap, and maximum slippage configured in the trusted terminal. `update_config` cannot grant these permissions. A quote-only session can leave swaps, claims, and bridges disabled.
+Use the selected profile throughout. The requested trade must fit its permissions, per-operation token cap, and maximum slippage. If access is missing, follow [execution access](../safety/permissions.md#agentkit-mcp-execution-access): explain swaps, claims, the discovered input-token cap, and persistent scope, then call `request_permissions` for client approval. `update_config` cannot grant these permissions. Keep quote-only sessions disabled. Check quote expiry again after approval; if no operation exists and the quote expired, obtain a fresh quote within the authorized bounds.
 
 1. Save the returned `quoteId` and a stable idempotency key for this signal before submission. Check the quote's network, account, route, input, minimum output, and expiry against the authorized trade.
 2. Call `execute` and retain the returned `operationId`:

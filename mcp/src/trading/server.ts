@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { InventoryMaintenance } from "./maintenance";
 import { TradingRuntime } from "./runtime";
 import { onboardingStatus, setupSchema } from "./onboarding";
+import { permissionRequestSchema, requestPermissions } from "./permissions";
 import { TradingError, type Kind, type Summary } from "./types";
 
 const id = z.string().min(1).max(128);
@@ -19,7 +20,8 @@ const maintenanceTarget = { ...profile, token: id, records: z.number().int().min
 const tools = {
   setup: { description: "Report account, funding and execution checks for the selected journey. Optional access/balance checks may authenticate and initialize scanner state but never move funds. Never accepts keys or passwords.", schema: setupSchema, read: true },
   get_config: { description: "Read safe configuration and wallet execution permissions.", schema: z.object({}).strict(), read: true },
-  update_config: { description: "Select an existing default profile and default slippage. Permissions and secret settings require terminal setup.", schema: z.object({ defaultProfile: id.optional(), slippageBps: z.number().int().min(0).max(1000).optional() }).strict(), read: false },
+  update_config: { description: "Select an existing default profile and default slippage. Use request_permissions for client-approved access changes; secrets require terminal setup.", schema: z.object({ defaultProfile: id.optional(), slippageBps: z.number().int().min(0).max(1000).optional() }).strict(), read: false },
+  request_permissions: { description: "Propose persistent per-profile permissions and base-unit per-operation limits. Requires explicit approval in a trusted client confirmation form; arguments alone never grant access. Unsupported clients receive terminal instructions. Does not transact or start maintenance.", schema: permissionRequestSchema, read: false },
   list_wallets: { description: "List configured wallet profiles and public addresses.", schema: z.object({}).strict(), read: true },
   get_wallet_status: { description: "Check configured signing access without submitting a transaction.", schema: z.object(profile).strict(), read: true },
   get_balances: { description: "Read public and private token balances for the configured Aleo account.", schema: z.object({ ...profile, tokens: z.array(id).max(30).optional() }).strict(), read: true },
@@ -42,7 +44,7 @@ const tools = {
   get_inventory_maintenance_status: { description: "Read saved per-token targets, observations, active operations and errors, plus whether the worker is running. Does not run maintenance or submit transactions.", schema: z.object({ maintenanceId: id.optional() }).strict(), read: true },
   get_record_inventory: { description: "Read one token's spendable private records: available and reserved records with base-unit amounts. Reserves and spends nothing.", schema: z.object({ ...profile, token: id }).strict(), read: true },
   plan_record_inventory: { description: "Plan the joins and splits that reshape one token's private records into the requested count. Saves a reviewable plan ID; submits nothing. minRecordAmount is a human decimal amount.", schema: z.object({ ...profile, token: id, records: z.number().int().min(1).max(1000), minRecordAmount: decimal.optional(), distribution: z.enum(["floor", "preserve", "balanced"]).optional(), toleranceBps: z.number().int().min(0).max(10000).optional(), maxTransactions: z.number().int().min(1).max(10000).optional() }).strict(), read: true },
-  rebalance_record_inventory: { description: "Execute a saved inventory plan once under the terminal-configured inventory permission. Returns an operation ID; poll its status. Accepted joins and splits are never repeated.", schema: z.object({ planId: id, idempotencyKey: id }).strict(), read: false },
+  rebalance_record_inventory: { description: "Execute a saved inventory plan once under the approved inventory permission. Returns an operation ID; poll its status. Accepted joins and splits are never repeated.", schema: z.object({ planId: id, idempotencyKey: id }).strict(), read: false },
   recover_record_inventory: { description: "Recover pending record spends by checking their original transactions and releasing reservations only when safe. With rebroadcast, resends saved proved transactions unchanged; that requires inventory permission.", schema: z.object({ ...profile, rebroadcast: z.boolean().default(false) }).strict(), read: false },
 } as const;
 type ToolName = keyof typeof tools;
@@ -58,7 +60,7 @@ function json(value: unknown): Summary {
 export function createTradingServer(runtime?: TradingRuntime, options: { stateExists?: boolean; startMaintainer?: () => Promise<void> } = {}): Server {
   const server = new Server({ name: "shield-swap-mcp", version: "0.1.0" }, {
     capabilities: { tools: {} },
-    instructions: "Trade through saved quotes and durable operations. setup reports required terminal configuration. Never request keys/passwords in chat. execute returns an operation ID. After uncertainty, inspect that operation; do not create a new swap as a retry. A swap's proceeds require a later claim. Record inventory tools inspect, plan and rebalance private records; independent swaps use distinct reserved records and can run concurrently. Maintenance is per token. Uncertain operations retain their resources; inspect the original operation instead of replacing it.",
+    instructions: "Trade through saved quotes and durable operations. setup reports account readiness and access guidance. Use request_permissions only for access needed by the user's task, with explicit client confirmation. Account secrets require terminal setup. Never request keys/passwords in chat. execute returns an operation ID. After uncertainty, inspect that operation; do not create a new swap as a retry. A swap's proceeds require a later claim. Record inventory tools inspect, plan and rebalance private records; independent swaps use distinct reserved records and can run concurrently. Maintenance is per token. Uncertain operations retain their resources; inspect the original operation instead of replacing it.",
   });
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: Object.entries(tools).map(([name, definition]) => ({
@@ -67,7 +69,7 @@ export function createTradingServer(runtime?: TradingRuntime, options: { stateEx
       annotations: { readOnlyHint: definition.read, destructiveHint: !definition.read, openWorldHint: true },
     })),
   }));
-  server.setRequestHandler(CallToolRequestSchema, async request => {
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     let output: Summary;
     let isError = false;
     try {
@@ -76,17 +78,28 @@ export function createTradingServer(runtime?: TradingRuntime, options: { stateEx
         ? legacyToolNames[requested as keyof typeof legacyToolNames] : requested) as ToolName;
       if (!Object.hasOwn(tools, name)) throw new TradingError("unknown_tool", "Unknown tool.");
       const parsed = tools[name].schema.safeParse(request.params.arguments ?? {});
-      if (!parsed.success) throw new TradingError("invalid_arguments", "Invalid tool arguments. Check the tool schema; keys and permission grants are never accepted.");
+      if (!parsed.success) throw new TradingError("invalid_arguments", "Invalid tool arguments. Check the tool schema; keys and direct permission grants are never accepted.");
       const args = parsed.data as Summary;
       if (name === "setup") {
         output = await onboardingStatus(runtime, setupSchema.parse(args), options.stateExists);
       } else {
         if (!runtime) throw new TradingError("setup_required", "Wallet state is not unlocked. Run terminal setup and configure the process passphrase.");
-        output = await call(runtime, name, args, options.startMaintainer);
+        output = name === "request_permissions"
+          ? await requestPermissions(runtime, server, permissionRequestSchema.parse(args), extra)
+          : await call(runtime, name, args, options.startMaintainer);
       }
     } catch (error) {
       isError = true;
       output = { error: error instanceof TradingError ? { code: error.code, message: error.message } : { code: "unavailable", message: "The operation could not be completed. Inspect wallet readiness or the original operation status. No automatic transaction retry was performed." } };
+      if (runtime && error instanceof TradingError && ["permission_required", "spend_limit", "slippage_limit"].includes(error.code)) {
+        const args = request.params.arguments ?? {};
+        const quoteId = args.quoteId ?? args.planId;
+        const quote = typeof quoteId === "string" ? runtime.store.get<{ profile: { id: string } }>("quote:" + quoteId) : undefined;
+        const operation = typeof args.operationId === "string" ? runtime.store.get<{ profileId: string }>("operation:" + args.operationId) : undefined;
+        (output.error as Summary).access = { tool: "request_permissions",
+          profileId: quote?.profile.id ?? operation?.profileId ?? args.profileId ?? runtime.store.get<Summary>("settings")?.defaultProfile ?? "default",
+          guidance: "Inspect get_config. Explain only the access and limits needed by the user's task, then request explicit client approval. Read-only inspection and quotes need no grant. After approval, inspect any existing operation before continuing; do not retry an uncertain submission." };
+      }
     }
     const safe = json(output);
     return { structuredContent: safe, content: [{ type: "text" as const, text: JSON.stringify(safe) }], isError };

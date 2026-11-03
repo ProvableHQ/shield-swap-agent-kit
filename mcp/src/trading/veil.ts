@@ -247,7 +247,7 @@ export class VeilBackend implements TradingBackend {
       }
       case "recover_record_inventory": {
         const rebroadcast = input.rebroadcast === true;
-        if (rebroadcast && !profile.policy.inventory) throw new TradingError("permission_required", "Rebroadcasting saved inventory transactions requires inventory permission in terminal setup.");
+        if (rebroadcast && !profile.policy.inventory) throw new TradingError("permission_required", "Rebroadcasting saved proved transactions requires inventory approval through request_permissions or terminal configure.");
         const journal = await reconcileJournal(session, { rebroadcast });
         // The saved proved transaction stays in encrypted state; report only that it exists.
         const entries = journal.map(entry => ({ id: entry.id, scope: entry.scope, records: entry.records, status: entry.status,

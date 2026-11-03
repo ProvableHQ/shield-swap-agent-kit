@@ -45,7 +45,9 @@ Show all four menu choices for introductory prompts, even when accounts are alre
 
 Start with the available interface and an existing account; see [tool selection](../tools/SKILL.md). Never inspect or print secret file contents to fill the panel.
 
-For the AgentKit MCP, call `setup` with the selected `journey` and optional `profileId`. It performs local configuration inspection by default. `checks.account.status` distinguishes `missing`, `locked`, and `configured`; a configured profile is not yet verified signing access. Follow `nextAction` rather than rerunning account creation. A locked store does not reveal which profiles it contains.
+For the AgentKit MCP, call `setup` with the selected `journey` and optional `profileId`. It performs local configuration inspection by default. `checks.account.status` distinguishes `missing`, `locked`, and `configured`; a configured profile is not yet verified signing access. Choose the journey before acting on account setup guidance; do not provision just to show the welcome. For a journey requiring account access, follow `nextAction` rather than rerunning account creation. A locked store does not reveal which profiles it contains.
+
+Use `checks.execution.policy` and its access guidance to explain what the selected account can do. Reading and quoting need no execution grant. Once the user chooses an action that needs missing access, follow [execution access](safety/permissions.md#agentkit-mcp-execution-access): describe the minimum permissions and per-operation limits, then call `request_permissions` for client confirmation. Explain that approved grants persist until revoked; inventory access includes ongoing transactions by enabled maintenance jobs. Do not turn permission approval into a welcome-screen prerequisite or enable every action by default. In unattended mode, return the missing requirements to the caller instead of opening an approval prompt.
 
 When account access and holdings are relevant, call `setup` with `checkBalances: true`. It verifies signing/API access before reading balances. This may authenticate and initialize scanner state but never funds, signs a transaction, or grants execution permissions. Successful access is `usable`; failed access or scanning is `unavailable`, never a zero balance. Use `checkAccess: true` for account access alone.
 
@@ -53,9 +55,13 @@ If the required asset and amount are known, pass `funding: { tokenId, amount }`,
 
 Use the same distinctions with an SDK or CLI: inspect the configured session, authenticate when needed, and read private holdings through its existing recipes. An absent MCP server does not make an existing SDK/CLI setup unusable. [Configuration](shield-swap-setup/configure-shield-swap.md) and [funding](shield-swap-setup/bridge-funds.md) explain the effects of each interface.
 
-## Launch with local setup
+## Launch and choose account setup
 
-When the user wants the kit to handle local setup and the Claude connection, use the [one-command launcher](../README.md#start-with-claude-code): `npm start` from the complete kit checkout, in the user's own terminal. It prints this intro, collects protected account inputs locally, then starts Claude with the skill and a connected MCP server. Do not run it through an agent's captured tool input to collect secrets. It reuses the existing default or explicitly selected profile and does not move funds or grant execution permissions.
+When the user wants the kit to handle local setup and the Claude connection, use the [one-command launcher](../README.md#start-with-claude-code): `npm start` from the complete kit checkout, in the user's own terminal. It starts Claude with the skill and an unauthenticated MCP server: no passphrase prompt, profile creation, or automatic unlock from environment credentials. An existing store reports **Unlock required**; a missing store stays missing.
+
+First guide the chosen journey. If the user chooses account setup, have them exit Claude and run `npm start -- --connect` from the kit checkout in their own terminal. Prefer the exact launcher-supplied command, which preserves the project, state directory, profile and network selections. Explain that this opens a new connected session without automatically transferring the conversation. Give the user a short, non-secret summary of the selected task to paste into that session; reuse it rather than asking them to choose again. Do not run it through an agent's captured tool input to collect secrets. This explicit step reuses the existing default or selected profile; a missing profile offers import or creation locally. It does not move funds or grant execution permissions. Explicit `--generate` and `--key-env` also opt into setup.
+
+Code-only work can proceed without account access. This is not anonymous market access: the current MCP tools other than `setup` require an unlocked profile, including market reads and quotes. Guide account connection only when the selected work needs it.
 
 For a plain introductory question in an existing agent conversation, show the screen immediately using current checks or **Not checked**. It does not require account creation or launching another Claude session first. Continue the selected journey afterward.
 

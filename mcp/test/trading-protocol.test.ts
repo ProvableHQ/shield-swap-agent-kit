@@ -12,8 +12,8 @@ test("an unconfigured server supports discovery and setup without creating a wal
     await Promise.all([server.connect(a), client.connect(b)]);
     const tools = (await client.listTools()).tools;
     const names = tools.map(tool => tool.name);
-    assert.equal(names.length, 27);
-    for (const name of ["quote", "execute", "swap_history", "claim_unclaimed_swaps", "bridge_status", "recover_bridge_transactions", "get_record_inventory", "plan_record_inventory", "rebalance_record_inventory", "recover_record_inventory", "start_inventory_maintenance", "stop_inventory_maintenance", "get_inventory_maintenance_status"]) assert.ok(names.includes(name));
+    assert.equal(names.length, 28);
+    for (const name of ["request_permissions", "quote", "execute", "swap_history", "claim_unclaimed_swaps", "bridge_status", "recover_bridge_transactions", "get_record_inventory", "plan_record_inventory", "rebalance_record_inventory", "recover_record_inventory", "start_inventory_maintenance", "stop_inventory_maintenance", "get_inventory_maintenance_status"]) assert.ok(names.includes(name));
     for (const name of ["reconcile_record_inventory", "get_inventory_maintenance", "check_inventory_maintenance"]) assert.equal(names.includes(name), false);
     assert.equal(tools.find(tool => tool.name === "get_inventory_maintenance_status")?.annotations?.readOnlyHint, true);
     assert.equal(names.includes("rebalance_swap_inventory"), false);
