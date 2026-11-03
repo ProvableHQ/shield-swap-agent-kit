@@ -70,11 +70,13 @@ export function coordinateSession(store: TradingStore, profile: Profile, session
   const claim = client.claimSwapOutput.bind(client);
   client.reserveBlindedIdentity = params => withIdentityLock(store, profile, () => reserve(params));
   client.recordBlindedSwap = params => withIdentityLock(store, profile, () => record(params));
-  for (const method of ["syncBlindedIdentities", "getUnclaimedSwaps", "reconcileSwapHistory"] as const) {
+  for (const method of ["syncBlindedIdentities", "reconcileSwapHistory"] as const) {
     const original = client[method].bind(client);
     // These SDK methods all perform read-modify-save on the shared identity list.
     (client as unknown as Record<string, unknown>)[method] = (params: never) => withIdentityLock<unknown>(store, profile, () => original(params));
   }
+  // getUnclaimedSwaps only reads a snapshot and output mappings. Its network
+  // scan must not hold up identity allocation or claim bookkeeping.
   const managedSwap = async (params: Parameters<typeof client.swap>[0]) => {
     const identity = await client.reserveBlindedIdentity();
     const handle = await swap({ ...params, blindedIdentity: identity });

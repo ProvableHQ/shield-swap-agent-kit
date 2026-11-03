@@ -157,11 +157,16 @@ export class TradingRuntime {
               return;
             }
           }
-          this.assertWalletAvailable(quote, op.id);
-          this.authorize(quote);
-          if (!resuming && quote.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired before execution began.");
+          // Registration in another process must observe this start atomically.
+          // The operation lock alone does not exclude a different operation ID.
+          op = this.store.transaction(() => {
+            const current = this.store.get<Operation>("operation:" + id)!;
+            this.assertWalletAvailable(quote, current.id);
+            this.authorize(quote);
+            if (!resuming && quote.expiresAt <= Date.now()) throw new TradingError("quote_expired", "Quote expired before execution began.");
+            return this.save(current, { status: "running", result: current.result });
+          });
           entered = true;
-          op = this.save(op, { status: "running", result: op.result });
           ready?.resolve(this.publicOperation(op));
           operationContext.getStore()!.submitted = () => { op = this.save(op, { status: "submitted", result: op.result }); };
           const context = { operationId: id, checkpoint: (checkpoint: unknown) => {

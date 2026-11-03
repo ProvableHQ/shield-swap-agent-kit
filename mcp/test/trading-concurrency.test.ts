@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TradingStore } from "../src/trading/store";
 import { TradingRuntime } from "../src/trading/runtime";
-import type { TradingBackend, Profile, SavedQuote } from "../src/trading/types";
+import { TradingError, type TradingBackend, type Profile, type SavedQuote, type Operation } from "../src/trading/types";
 
 const profile: Profile = { id: "alice", network: "testnet", address: "aleo1test", key: { type: "env", name: "TEST_KEY" },
   policy: { swaps: true, claims: true, bridges: true, inventory: true, inventoryFeeLimit: "1000", maxSlippageBps: 100,
@@ -86,6 +86,58 @@ test("legacy uncertainty still blocks managed trades and input caps remain per o
 
 import { fork } from "node:child_process";
 import { once } from "node:events";
+for (const order of ["legacy-first", "managed-first"]) test(`legacy claim resume and managed registration exclude each other: ${order}`, { timeout: 15000 }, async () => {
+  const f = fixture();
+  let child: ReturnType<typeof fork> | undefined;
+  let exited: Promise<unknown[]> | undefined;
+  let legacySubmissions = 0;
+  const wait = (name: string) => {
+    const deadline = Date.now() + 10_000;
+    while (!existsSync(join(f.root, name))) {
+      if (Date.now() >= deadline) throw Error("Timed out waiting for " + name);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+    }
+  };
+  try {
+    const legacy = await f.runtime.quote("claim", "alice", { swapIds: ["one"] });
+    const managed = await f.runtime.quote("claim", "alice", { swapIds: ["one"] });
+    const checkpoint = { claims: [{ swapId: "one", status: "pending" }] };
+    f.store.set("operation:legacy", { id: "legacy", kind: "claim", profileId: "alice", scope: f.runtime.scope(profile),
+      quoteId: legacy.quoteId, requestKey: "legacy", status: "pending", createdAt: 1, updatedAt: 1,
+      result: { nextAction: "resume" }, checkpoint }); // Pre-upgrade state has no managedRecords flag.
+    f.backend.reconcile = async () => ({ status: "pending", result: { nextAction: "resume" } });
+    f.backend.resume = async () => { legacySubmissions++; return { status: "uncertain", result: { transactionId: "legacy-claim" } }; };
+    const set = f.store.set.bind(f.store);
+    if (order === "legacy-first") f.store.set = (id, value) => {
+      if (id === "operation:legacy" && (value as Operation).status === "running") {
+        writeFileSync(join(f.root, "legacy-starting"), "");
+        wait("competitor-attempted");
+      }
+      set(id, value);
+    };
+    child = fork(new URL("./fixtures/claim-race-worker.ts", import.meta.url), [f.root, String(managed.quoteId), order],
+      { execArgv: ["--import", "tsx"], stdio: ["ignore", "ignore", "pipe", "ipc"] });
+    let stderr = ""; child.stderr!.on("data", chunk => stderr += chunk);
+    exited = once(child, "exit");
+    wait(order === "legacy-first" ? "competitor-ready" : "competitor-result");
+    if (order === "managed-first") {
+      await assert.rejects(f.runtime.resume("legacy"), (error: unknown) => error instanceof TradingError && error.code === "operation_pending");
+    } else await f.runtime.resume("legacy");
+    await f.runtime.drain();
+    writeFileSync(join(f.root, "legacy-finished"), "");
+    assert.deepEqual(await exited, [0, null], stderr);
+    const managedSubmitted = existsSync(join(f.root, "managed-submitted"));
+    assert.equal(legacySubmissions + Number(managedSubmitted), 1, "only one claimant may reach submission");
+    assert.equal(readFileSync(join(f.root, "competitor-result"), "utf8"), order === "legacy-first" ? "operation_pending" : "submitted");
+    assert.deepEqual(f.store.get<Operation>("operation:legacy")!.checkpoint, checkpoint);
+    assert.equal(f.store.get<Operation>("operation:legacy")!.managedRecords, undefined, "legacy state remains readable without migration");
+  } finally {
+    writeFileSync(join(f.root, "legacy-finished"), "");
+    if (child?.exitCode === null) child.kill("SIGKILL");
+    await exited; await f.close();
+  }
+});
+
 test("two OS processes and profile aliases prove different trades concurrently without losing identities", { timeout: 15000 }, async () => {
   const f = fixture();
   const children: ReturnType<typeof fork>[] = [];
