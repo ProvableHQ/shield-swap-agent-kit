@@ -144,7 +144,8 @@ async function call(runtime: TradingRuntime, name: ToolName, args: Summary, laun
       if (!profile.policy.inventory) throw new TradingError("permission_required", "Inventory maintenance permission must be enabled in terminal setup.");
       if (!launcher) throw new TradingError("unavailable", "This server cannot launch a maintainer process.");
       const existing = runtime.store.get<MaintenanceState>(Maintainer.stateKey(profileId));
-      if (existing?.running && processAlive(existing.pid)) throw new TradingError("maintainer_running", `A maintainer for this profile is already running as pid ${existing.pid}; stop it first.`);
+      // A stopped maintainer may still be finishing an inventory operation; its record stays its own until it exits.
+      if (existing && processAlive(existing.pid)) throw new TradingError("maintainer_running", `A maintainer for this profile is still alive as pid ${existing.pid}${existing.running ? "; stop it first" : " and is stopping; wait for it to exit"}.`);
       const targets = (args.targets as MaintenanceTarget[]).map(target => ({ token: String(target.token), records: Number(target.records), minRecordAmount: String(target.minRecordAmount) }));
       const intervalSeconds = Number(args.intervalSeconds ?? 120);
       const { pid } = launcher.launch({ profileId, targets, intervalSeconds });

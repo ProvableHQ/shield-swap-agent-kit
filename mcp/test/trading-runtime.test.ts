@@ -234,3 +234,14 @@ test("execute enforces the profile's batch cap and persists count on the operati
     assert.equal(f.store.get<{ count: number }>("operation:" + op.operationId)!.count, 50);
   } finally { await f.close(); }
 });
+
+test("the same idempotency key with a different count is a conflict", async () => {
+  const f = fixture(async () => ({ transactionId: "at1test" }));
+  try {
+    const quote = await f.runtime.quote("swap", "alice", { from: "tokenA", to: "tokenB", amount: "0.001" });
+    await f.runtime.execute(quote.quoteId as string, "k", 1);
+    await assert.rejects(f.runtime.execute(quote.quoteId as string, "k", 2), (error: { code: string }) => error.code === "idempotency_conflict");
+    const same = await f.runtime.execute(quote.quoteId as string, "k", 1);
+    assert.ok(same.operationId);
+  } finally { await f.close(); }
+});

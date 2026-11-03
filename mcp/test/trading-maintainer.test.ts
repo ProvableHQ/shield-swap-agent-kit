@@ -7,6 +7,8 @@ import { TradingStore } from "../src/trading/store";
 import { TradingRuntime } from "../src/trading/runtime";
 import { Maintainer } from "../src/trading/maintainer";
 import { createTradingServer } from "../src/trading/server";
+import { createMaintenanceLauncher } from "../src/trading/maintenance-launcher";
+import { withWalletLocks } from "../src/trading/coordination";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { MaintenanceState, Operation, Profile, TradingBackend } from "../src/trading/types";
@@ -132,4 +134,40 @@ test("maintain_inventory needs inventory permission, launches once, and status a
     const idle = await call("get_maintenance_status", { profileId: "alice" });
     assert.equal(idle.running, false);
   } finally { await client.close(); await server.close(); await f.close(); }
+});
+
+test("a pass while a worker holds the wallet lock records operation_pending and submits nothing", async () => {
+  const f = fixture(["100000"]);
+  try {
+    const pass = await withWalletLocks(f.store, [profile], () => f.maintainer.runPass());
+    assert.equal(pass?.action, "skipped");
+    assert.equal(pass?.error, "operation_pending");
+    assert.equal(f.executions(), 0);
+  } finally { await f.close(); }
+});
+
+test("maintain_inventory refuses while a stopped maintainer is still alive, and a stale maintainer never overwrites a newer record", async () => {
+  const f = fixture(["100000"]);
+  const launcher = { launch: () => ({ pid: 2 ** 22 + 13 }), stop: () => {} };
+  const server = createTradingServer(f.runtime, { stateExists: true, launcher });
+  const client = new Client({ name: "test", version: "1" });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  try {
+    await Promise.all([server.connect(a), client.connect(b)]);
+    const other = { profileId: "alice", pid: process.ppid, startedAt: 1, intervalSeconds: 120, targets: [], running: false };
+    f.store.set(Maintainer.stateKey("alice"), other);
+    const refused = (await client.callTool({ name: "maintain_inventory", arguments: { profileId: "alice", targets: [{ token: "USDCx", records: 3, minRecordAmount: "0.1" }] } })).structuredContent as Record<string, unknown>;
+    assert.equal((refused.error as { code: string }).code, "maintainer_running", "a live process still winding down blocks a relaunch");
+    f.store.set(Maintainer.stateKey("alice"), { ...other, running: true });
+    await f.maintainer.stop();
+    assert.deepEqual(f.store.get(Maintainer.stateKey("alice")), { ...other, running: true }, "a maintainer that does not own the record leaves it alone");
+  } finally { await client.close(); await server.close(); await f.close(); }
+});
+
+test("a maintainer that cannot spawn is reported as unavailable without crashing the server", async () => {
+  const launcher = createMaintenanceLauncher("/nonexistent/cli.js", process.env, undefined, { execPath: "/nonexistent/node-for-this-test" });
+  assert.throws(() => launcher.launch({ profileId: "alice", targets: [{ token: "USDCx", records: 1, minRecordAmount: "1" }], intervalSeconds: 60 }),
+    (error: { code: string }) => error.code === "unavailable");
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.ok(true, "the spawn error did not surface as an uncaught exception");
 });

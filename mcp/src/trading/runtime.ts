@@ -87,6 +87,7 @@ export class TradingRuntime {
       if (existingId) {
         const existing = this.store.get<Operation>("operation:" + existingId)!;
         if (existing.quoteId !== quoteId) throw new TradingError("idempotency_conflict", "This idempotency key belongs to another quote.");
+        if (quote.kind === "swap" && (existing.count ?? 1) !== count) throw new TradingError("idempotency_conflict", "This idempotency key was already used with a different count.");
         return existing;
       }
       const current = this.store.get<SavedQuote>("quote:" + quoteId)!;

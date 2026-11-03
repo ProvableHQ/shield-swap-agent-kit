@@ -34,9 +34,12 @@ export class Maintainer {
     return { token: match[1]!, records: Number(match[2]), minRecordAmount: match[3]! };
   }
   state(): MaintenanceState | undefined { return this.runtime.store.get<MaintenanceState>(Maintainer.stateKey(this.profileId)); }
-  private save(patch: Partial<MaintenanceState>): MaintenanceState {
+  private save(patch: Partial<MaintenanceState>, takeOver = false): MaintenanceState {
+    const existing = this.state();
+    // A record another process owns is never overwritten by a stale one winding down.
+    if (existing && existing.pid !== process.pid && !takeOver) return existing;
     const next: MaintenanceState = { profileId: this.profileId, pid: process.pid, startedAt: this.now(), intervalSeconds: this.intervalSeconds,
-      targets: this.targets, running: false, ...this.state(), ...patch };
+      targets: this.targets, running: false, ...existing, ...patch };
     this.runtime.store.set(Maintainer.stateKey(this.profileId), next);
     return next;
   }
@@ -49,7 +52,7 @@ export class Maintainer {
     if (existing?.running && existing.pid !== process.pid && processAlive(existing.pid)) {
       throw new TradingError("maintainer_running", `A maintainer for this profile is already running as pid ${existing.pid}; stop it first.`);
     }
-    this.save({ pid: process.pid, startedAt: this.now(), intervalSeconds: this.intervalSeconds, targets: this.targets, running: true });
+    this.save({ pid: process.pid, startedAt: this.now(), intervalSeconds: this.intervalSeconds, targets: this.targets, running: true }, true);
   }
   async stop(): Promise<void> { this.save({ running: false }); }
   /** One pass over every target. Never throws: outcomes land in lastPass. */
@@ -79,7 +82,7 @@ export class Maintainer {
         await this.awaitOperation(operationId);
       } catch (failure) {
         // A trade in flight owns the wallet; try again next pass rather than queue behind it.
-        error = failure instanceof TradingError ? failure.code : "pass_failed";
+        error = failure instanceof TradingError ? failure.code : /busy/.test(String((failure as Error).message)) ? "operation_pending" : "pass_failed";
         if (action !== "rebalanced") action = "skipped";
         break;
       }

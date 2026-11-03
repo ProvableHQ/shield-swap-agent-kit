@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import type { MaintenanceTarget } from "./types";
+import { TradingError, type MaintenanceTarget } from "./types";
 
 /** Starts and stops maintainer processes; the server records their state. */
 export type MaintenanceLauncher = {
@@ -13,7 +13,7 @@ export type MaintenanceLauncher = {
  * maintenance never outlives the session that asked for it. Operators who
  * want a maintainer that survives the server run the same command themselves.
  */
-export function createMaintenanceLauncher(entry: string, env: NodeJS.ProcessEnv, stateDir?: string): MaintenanceLauncher & { stopAll(): void } {
+export function createMaintenanceLauncher(entry: string, env: NodeJS.ProcessEnv, stateDir?: string, options: { execPath?: string } = {}): MaintenanceLauncher & { stopAll(): void } {
   const children = new Set<ChildProcess>();
   return {
     launch: ({ profileId, targets, intervalSeconds }) => {
@@ -21,10 +21,13 @@ export function createMaintenanceLauncher(entry: string, env: NodeJS.ProcessEnv,
         ...(stateDir ? ["--state-dir", stateDir] : []),
         ...targets.flatMap(target => ["--target", `${target.token}=${target.records}:${target.minRecordAmount}`])];
       // The child inherits the passphrase through the environment, never through arguments.
-      const child = spawn(process.execPath, args, { env, stdio: "ignore" });
+      const child = spawn(options.execPath ?? process.execPath, args, { env, stdio: "ignore" });
       children.add(child);
+      // A spawn failure is reported on the next tick; without a listener it
+      // would take the whole server down.
+      child.once("error", () => children.delete(child));
       child.once("exit", () => children.delete(child));
-      if (child.pid === undefined) throw new Error("The maintainer process did not start.");
+      if (child.pid === undefined) throw new TradingError("unavailable", "The maintainer process could not be started.");
       return { pid: child.pid };
     },
     stop: pid => { try { process.kill(pid, "SIGTERM"); } catch { /* already gone */ } },
