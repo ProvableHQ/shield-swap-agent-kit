@@ -41,6 +41,29 @@ test('the source repository name need not match the installed skill name', async
   assert.equal(result.skills[0].name, 'shield-swap')
 })
 
+test('the account setup skill works when installed without the rest of the kit', async (t) => {
+  const result = await validateRepository(repository)
+  assert.deepEqual(result.skills.map((skill) => skill.name), ['shield-swap', 'shield-swap-setup'])
+  const parent = await temporaryDirectory(t)
+  const destination = join(parent, 'shield-swap-setup')
+  await cp(join(repository, 'shield-swap-setup'), destination, { recursive: true })
+  assert.equal((await validateSkillDirectory(destination)).name, 'shield-swap-setup')
+})
+
+test('a bundled skill cannot link to the rest of the kit', async (t) => {
+  const parent = await temporaryDirectory(t)
+  await writeFile(join(parent, 'SKILL.md'), metadata)
+  // The target exists, so the link is valid in the kit and only fails for the skill alone.
+  await mkdir(join(parent, 'context'))
+  await writeFile(join(parent, 'context', 'funding.md'), 'Funding\n')
+  await mkdir(join(parent, 'shield-swap-setup'))
+  await writeFile(
+    join(parent, 'shield-swap-setup', 'SKILL.md'),
+    metadata.replace('name: fixture', 'name: shield-swap-setup') + '[Funding](../context/funding.md)\n',
+  )
+  await assert.rejects(validateRepository(parent), /link escapes package/)
+})
+
 test('the root install entrypoint cannot refer to a missing journey guide', async (t) => {
   const { directory } = await fixture(t, '[Start](AGENTS.md)\n')
   await assert.rejects(validateSkillDirectory(directory), /AGENTS\.md/)

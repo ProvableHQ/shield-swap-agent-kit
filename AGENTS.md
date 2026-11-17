@@ -8,7 +8,7 @@ Each operational page explains the shared behavior, then gives interface-specifi
 
 ## Setup and trading are separate journeys
 
-For an account that needs setup, follow [configure account](context/shield-swap-setup/configure-account.md), then [configure Shield Swap](context/shield-swap-setup/configure-shield-swap.md). Configuration ends by linking to [funding](context/shield-swap-setup/bridge-funds.md).
+For an account that needs setup, follow the [account setup skill](shield-swap-setup/SKILL.md) to create or import it, connect the chosen interface through [configure account](context/shield-swap-setup/configure-account.md), then [configure Shield Swap](context/shield-swap-setup/configure-shield-swap.md). Configuration ends by linking to [funding](context/shield-swap-setup/bridge-funds.md).
 
 For inspection without execution, use [discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md). For an authorized trade, [swap](context/shield-swap-setup/swap.md) keeps the complete discovery-to-claim flow. Neither is a setup gate. Funding does not select a trade or start a strategy. The `shield-swap-setup/` folder holds operational runbooks; do not execute every file in directory order.
 

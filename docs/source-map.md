@@ -53,6 +53,14 @@ Use the installed dependency's reference when writing executable code. The Pytho
 | Veil has no public record-provider progress API; Python's Shield facade has no public scanner-status accessor. | Do not invent scanner heights or use private members in portable recipes. Distinguish DEX indexer freshness from record visibility. |
 | Wallet-based Veil claims can return before chain confirmation. | Verify confirmation separately; neither local nor wallet claim return implies records are already scanner-visible. |
 
+## Account setup evidence
+
+On 2026-11-17, the [account setup skill](../shield-swap-setup/SKILL.md) and the account recipes in `configure-account.md` were checked against local builds of Veil `f59affa` (`main`) and python-sdk `156df8e` (`master`). Those revisions carry the shared account file and were **not published** on that date: npm had `@provablehq/shield-swap-cli` and `@provablehq/veil-aleo-sdk` 0.16.2, and PyPI had `aleo-sdk` 0.8.0. The versions the kit names, 0.17.0 and 0.9.0, are the next releases those repositories declare, not observed releases.
+
+With throwaway accounts in a temporary home directory and no terminal attached: `shield-swap account show` reported `ACCOUNT_NOT_FOUND` with exit status 2; `account create` saved an unencrypted account and with `--storage keychain` a macOS Keychain account, printing no key; `python -m aleo.keystore show` read both; `python -m aleo.keystore protect --storage keychain` moved an unencrypted account into Keychain; `account import` stopped with exit status 2 until `--key-file` named a file, which it left in place; `--storage encrypted` stopped with `PASSWORD_REQUIRED` until `ALEO_ACCOUNT_PASSWORD` was set; Veil `saveAccount` then `loadAccount({ name })` returned the saved account; and `Profile.load_or_create(account=..., create=False)` opened a profile on a Keychain account with only the address, account name, network, and endpoint in `profile.json`. The Keychain entries were removed afterwards.
+
+Not run: `shield-swap setup --name`, `ShieldSwap.from_profile()`, a hidden-prompt import at a real terminal, Linux, Windows, and any live transaction.
+
 ## Standalone MCP implementation evidence
 
 On 2026-10-14, all six direct Provable/Veil dependencies in `mcp/` were aligned to published **0.12.1**: `aleo-bridge-sdk`, `sdk`, `shield-swap-sdk`, `veil-aleo-devnode`, `veil-aleo-sdk`, and `veil-core`. The lockfile also resolves `@provablehq/wasm` to 0.12.1. Validation passed with pnpm 10.33.2: frozen-lockfile installation, 77 offline MCP tests, TypeScript checking, build, and 25 repository tests. A tarball installed in a fresh consumer project passed SDK key import, encrypted persistence, guided profile reuse, structured readiness, twenty stdio tools, testnet bridge discovery, and two process restarts. These checks made no live transactions; the mainnet evidence below remains specific to 0.12.0.

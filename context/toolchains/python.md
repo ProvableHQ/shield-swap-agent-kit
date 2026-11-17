@@ -23,7 +23,7 @@ That command prints documentation. It does not construct a client or create an a
 
 [Configure account](../shield-swap-setup/configure-account.md) supplies `session.py`, which exports a profile-bound `dex`. [Configure Shield Swap](../shield-swap-setup/configure-shield-swap.md) supplies `authenticate.py`. Later scripts import `dex` from that module and run with `python filename.py`.
 
-Choose the profile directory before constructing a client. `ShieldSwap.from_profile()` creates a profile if it is missing, attempts scanner registration, and attaches a durable journal. The supplied session recipe checks the profile first so an existing-account request cannot silently generate a new key.
+Choose the profile directory before constructing a client. `ShieldSwap.from_profile()` creates a profile if it is missing, attempts scanner registration, and attaches a durable journal. When no account exists either, it generates one and saves the key unencrypted. The supplied session recipe opens the profile with `create=False` first, so an existing-account request cannot silently generate a new key. From 0.9.0 the key lives in the shared account file, not in `profile.json`; see the [account setup skill](../../shield-swap-setup/SKILL.md).
 
 Profiles default to `SHIELD_SWAP_HOME` or `~/.shield-swap`. Existing profiles retain their stored network and endpoint; a `network=` argument does not migrate them. Keep each account/network in its own profile directory, outside the installed kit.
 

@@ -24,6 +24,7 @@ Run commands from the same trading directory: state is relative to the working d
 
 | Command | Behavior |
 | --- | --- |
+| `account create`, `import`, `show`, `protect`, `migrate` | Creates, imports, inspects, or changes the storage of the shared account file. No network access. Requires CLI 0.17.0 or later; see the [account setup skill](../../shield-swap-setup/SKILL.md). |
 | `setup --network testnet` | Loads an account, authenticates, creates an API token if needed, and can request testnet funding. Not configuration-only. |
 | `balances --network testnet --all --json` | Reads public and private holdings. |
 | `pools --network testnet --json` | Lists pools and checks their on-chain liquidity and trading status. |
@@ -61,6 +62,6 @@ Use this path after setup has saved the account, including when the obsolete inv
 
 ## Persistent state
 
-The current CLI keeps the key and API credentials in `.shield-swap/<network>/state.json`, and swap identities and handles in `.shield-swap/<network>/blinded.json`. Keep the directory private and exclude it from version control. Changing the working directory can make an existing account look unconfigured.
+From 0.17.0 the CLI keeps the account's name and address and the API credentials in `.shield-swap/<network>/state.json`, and swap identities and handles in `.shield-swap/<network>/blinded.json`. The key is in the shared account file `~/.aleo/accounts/<name>.json` or in macOS Keychain. A state file written by an earlier release still holds the key until `shield-swap account migrate` moves it. Keep the directory private and exclude it from version control. Changing the working directory can make an existing account look unconfigured.
 
 Continue with [configure account](../shield-swap-setup/configure-account.md), or go directly to the requested [swap](../shield-swap-setup/swap.md) if setup and funding are already complete.

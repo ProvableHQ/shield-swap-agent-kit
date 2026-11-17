@@ -11,6 +11,8 @@ The guide covers the shared account and funding steps, then routes to the chosen
 
 Use the MCP `setup` response’s `welcome` text when available. Otherwise use the template in the intro guide. Keep paths, network rows, SDK choices, journals and protocol explanations out of this opening screen. Old notes about funding mean **Not checked** until current holdings are read.
 
+When a journey reaches account setup, follow the bundled [account setup skill](shield-swap-setup/SKILL.md). It guides the user through creating or importing the Aleo account that the CLI, Veil, and Python share, saves the key unencrypted by default, and strongly recommends macOS Keychain, or password encryption where Keychain is not available. It is also installable on its own as `shield-swap-setup`.
+
 For a concrete task already supplied, retain the heading and status panel and continue that task without making the user select a menu option again. After the introduction, read [AGENTS.md](AGENTS.md) and the relevant [tool-use guide](tools/SKILL.md) to carry out the chosen journey. A broad introductory question is not a selected trade or spending authorization.
 
 This file is the installation entrypoint for the whole repository. Keep journey instructions in `AGENTS.md` and the supporting context files. Installing context does not configure tools, create an account, or authorize transactions.

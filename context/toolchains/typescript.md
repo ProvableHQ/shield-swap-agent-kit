@@ -29,7 +29,7 @@ npx tsx filename.mts
 
 ## Client and runbook conventions
 
-[Configure account](../shield-swap-setup/configure-account.md) supplies a complete `session.mts` that exports `client`, `account`, and `network`. Subsequent recipes import that module. It loads the selected key and network and attaches a persistent `swapFileStore`; it does not authenticate, fund, or trade.
+[Configure account](../shield-swap-setup/configure-account.md) supplies a complete `session.mts` that exports `client`, `account`, and `network`. Subsequent recipes import that module. It resolves the account with `loadAccount()` from `@provablehq/veil-aleo-sdk/node`, selects the network, and attaches a persistent `swapFileStore`; it does not authenticate, fund, or trade.
 
 [Configure Shield Swap](../shield-swap-setup/configure-shield-swap.md) adds an `authenticate.mts` module. Funding and trading scripts import that module so a new process establishes its own DEX session.
 

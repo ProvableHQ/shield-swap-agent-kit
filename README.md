@@ -49,6 +49,8 @@ The [draft standalone MCP server](mcp/README.md) provides terminal wallet setup,
 ```text
 AGENTS.md                    # Start the builder or trader journey
 SKILL.md                     # Intro-first entrypoint for skill installers
+shield-swap-setup/
+  SKILL.md                   # Guided Aleo account setup; also installable on its own
 context/
   getting-started.md          # Welcome, status panel, and canonical journeys
   decisions/                 # Choose the task and stack before provisioning
@@ -67,7 +69,7 @@ CONTRIBUTING.md              # Instructions for working on this repository
 
 Keep context and tools at the top level. Executable JS/Python scripts, CLI/MCP code, and examples belong in their corresponding directories when implemented. Integration context is not a working connector, and strategy guidance is not a running strategy. The draft MCP README records supported wallet adapters, live validation, and route-specific recovery limits.
 
-Setup follows account configuration, then Shield Swap authentication with optional referrals, then a link to funding. [Discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md) supports standalone inspection; [swap](context/shield-swap-setup/swap.md) retains its complete discovery-to-claim flow. The `shield-swap-setup/` folder is a collection of runbooks, not a sequence that starts trading automatically.
+Setup starts with the [account setup skill](shield-swap-setup/SKILL.md), which guides the user through creating or importing the Aleo account shared by the CLI, Veil, and Python. It saves the key unencrypted by default and strongly recommends macOS Keychain. Setup then follows account configuration for the chosen interface, then Shield Swap authentication with optional referrals, then a link to funding. [Discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md) supports standalone inspection; [swap](context/shield-swap-setup/swap.md) retains its complete discovery-to-claim flow. The `shield-swap-setup/` folder is a collection of runbooks, not a sequence that starts trading automatically.
 
 Its operational guides are:
 
@@ -101,6 +103,14 @@ To test an unpublished checkout, run the following from a separate consuming pro
 npx skills add /path/to/shield-swap-agent-kit --skill shield-swap
 ```
 
+The root package includes the account setup skill, and the root skill follows it when a journey reaches account setup. To install that skill on its own, as `shield-swap-setup`, ask the installer to search below the root:
+
+```sh
+npx skills add ProvableHQ/shield-swap-agent-kit --full-depth --skill shield-swap-setup
+```
+
+It is self-contained: it links to nothing outside its directory. The account commands it runs need Shield Swap CLI or Veil 0.17.0 or later, or the Python packages at 0.9.0 or later.
+
 See the [skills installer documentation](https://github.com/vercel-labs/skills) for agent selection and installation scope. Consumers that do not use the installer start directly from [AGENTS.md](AGENTS.md).
 
 ## Start a task
@@ -129,4 +139,4 @@ Requires Node.js 22 or newer. No package installation, credentials, or network a
 npm test
 ```
 
-Validation checks skill metadata, local links, and packaging boundaries, then repeats the skill checks on a copy in a temporary directory. It does not execute the SDKs, contact a chain, or establish that a trading journey succeeds.
+Validation checks skill metadata, local links, and packaging boundaries for the root skill and the account setup skill, then repeats the skill checks on copies in a temporary directory. It does not execute the SDKs, contact a chain, or establish that a trading journey succeeds.

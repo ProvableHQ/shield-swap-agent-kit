@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url'
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ignoredDirectories = new Set(['.git', 'node_modules', '.agents', '.claude', '.codex', '.superpowers'])
+// Skills below the root that installers can also select on their own.
+export const bundledSkills = ['shield-swap-setup']
 
 function inside(root, target) {
   const path = relative(root, target)
@@ -87,11 +89,17 @@ export async function validateSkillDirectory(directory, { sourceRepository = fal
   return { name, markdownFiles }
 }
 
-/** Check the root skill and its context in a source checkout of any directory name. */
+/**
+ * Check the root skill and its context in a source checkout of any directory name.
+ * Each bundled skill is checked as it would be installed alone: its name must
+ * match its directory and its links must stay inside that directory.
+ */
 export async function validateRepository(root = repository) {
   root = await realpath(root)
   const skill = await validateSkillDirectory(root, { sourceRepository: true })
-  return { markdownFiles: skill.markdownFiles, skills: [skill] }
+  const bundled = []
+  for (const name of bundledSkills) bundled.push(await validateSkillDirectory(join(root, name)))
+  return { markdownFiles: skill.markdownFiles, skills: [skill, ...bundled] }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
