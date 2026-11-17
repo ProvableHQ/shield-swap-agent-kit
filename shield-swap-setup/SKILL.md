@@ -10,7 +10,7 @@ Walk the user through getting an Aleo account that every Shield Swap tool can us
 ## How to guide
 
 - **Do the work.** Run every command that involves no secret yourself and tell the user what it did. Hand the user a command only when it has to read a key, a recovery phrase, or a password from them.
-- **Ask only what is open**, with the recommended answer first. When both questions below are open, ask them in one short message so the user answers once.
+- **Ask only what is open.** Step 2 holds one message with both choices, what each one means, and what happens next, so the user answers once.
 - **Say where things stand** after each step: what exists now, and what comes next.
 - **Keep secrets out of the conversation.** The user types a key, phrase, or password at a hidden prompt in their own terminal, or saves it in a file there. If one is pasted into the chat anyway, do not use or repeat it. Explain that the conversation history now holds it, suggest a new account if it protects real funds, and carry on with the import in their terminal.
 
@@ -34,31 +34,48 @@ It prints the name, address, storage type, and file path, never the key. Add `--
 
 A key supplied through `ALEO_PRIVATE_KEY` or `ALEO_PRIVATE_KEY_FILE` is used for that run in place of the account file and is never saved. A user whose key already arrives that way, for example from a secret manager, needs no account file.
 
-## 2. New account or an existing one?
+## 2. Ask the two choices
 
-Ask unless the request already says. Suggested wording:
+When both choices are open on a Mac, send this message as written. The variations under it give the exact wording for every other case.
 
-> Do you already have an Aleo account you want to trade from, or shall I create a new one? A new account starts empty. An existing one keeps its address and funds.
+> **Set up your Aleo account**
+>
+> Your account is the address that holds your funds and the key that signs your trades. Nothing exists yet. Two choices from you and it's ready.
+>
+> **1. Which account?**
+> - **New**: I create a fresh account now. It starts empty, and funding it is the next step.
+> - **Existing**: you already have an Aleo account. You paste its key at a hidden prompt in your own terminal, so it never passes through this chat. Its address and funds stay as they are.
+>
+> **2. Where should the key be kept?**
+> - **Keychain** (strongly recommended): in your Mac's Keychain. No password to remember and nothing extra to type, and the key never sits in a file that a backup, a synced folder, or another program could copy.
+> - **File**: unencrypted, in a file only your user account can read. Anyone who gets a copy of that file can spend from the account. You can move it into Keychain later with one command.
+>
+> Reply with one of each, for example **new, keychain**. If you only answer the first, I'll use the file.
+>
+> After that I'll show you the account's address, then we sign in to Shield Swap and fund it.
 
-An empty machine does not show that the user has no account elsewhere, so wait for the answer.
+Variations:
 
-## 3. Recommend Keychain
+- **The request already answered one question.** Leave that question out, drop the numbers, and write "One choice" for "Two choices". Where the question stood, name the answer taken: "Creating a new account, as you asked." or "Importing your existing account, as you asked. You paste its key at a hidden prompt in your own terminal, so it never passes through this chat." Close with "Reply **keychain** or **file**. If you don't choose, I'll use the file." or with "Reply **new** or **existing**."
+- **Off macOS** (when unsure, `uname -s` prints `Darwin` on a Mac), Keychain is not available. Replace that option with "**Encrypted** (recommended): locked with a password you choose, so a copy or backup of the file stays locked. The password is needed on every run, typed at a prompt or supplied through `ALEO_ACCOUNT_PASSWORD`." End the File option with "You can encrypt it later with one command." The reply words become **encrypted** and **file**.
 
-The key is saved unencrypted unless the user chooses otherwise. Before creating or importing, recommend protection once, strongly, and then go with the answer.
+Rules:
 
-**On macOS** (when unsure, `uname -s` prints `Darwin`), urge Keychain. It costs the user nothing: no password, nothing to type on later runs, and on a logged-in Mac no dialog appears when these tools save or read the key. Suggested wording:
+- **Wait for the account answer.** An empty machine does not show that the user has no account elsewhere, so never choose New for them.
+- **Recommend once.** A wish stated before this message, such as "whatever is fastest" or "no passwords", does not answer the storage question: still show it. On a Mac, Keychain meets both wishes. If the user then picks File, answers only the first question, or repeats that they want the fastest path, use the file and move on. Do not ask again.
+- **When nobody is present to answer**, create nothing unless the caller already chose New. Use the storage the caller specified, otherwise the file, and include the recommendation in the result.
 
-> I strongly recommend keeping the key in your Mac's Keychain. There is no password to remember and nothing changes in how you run things, but the key never sits in a readable file that a backup, a synced folder, or another program could copy. Shall I use Keychain? If not, I'll save it unencrypted in a file only your user account can read, and you can move it to Keychain later with one command.
+## 3. What the storage choices mean
 
-**On Linux and Windows**, Keychain is not available. Recommend password encryption instead and say what it costs: the password is needed on every run, from a prompt or from `ALEO_ACCOUNT_PASSWORD`. For an unattended service, say what that buys: a copy or backup of the account file stays locked, but someone who can read the service's environment can read the password too.
+The key is saved unencrypted unless the user chooses otherwise. Use this table to answer follow-up questions and to pick the `--storage` value in step 4.
 
-| Storage | Where the key is kept | What each later run needs |
-| --- | --- | --- |
-| `keychain` (strongly recommended on macOS) | In macOS Keychain. The account file holds a reference, so copying the file does not copy the key. | Nothing. |
-| `encrypted` (recommended elsewhere) | Encrypted in the account file. A copy or backup stays locked. | The password: a hidden prompt, or `ALEO_ACCOUNT_PASSWORD`. |
-| `plaintext` (the default) | Readable in the account file, which only its owner can open. | Nothing. Anyone who can read the file can spend from the account. |
+| Choice | `--storage` | Where the key is kept | What each later run needs |
+| --- | --- | --- | --- |
+| Keychain (strongly recommended on macOS) | `keychain` | In macOS Keychain. The account file holds a reference, so copying the file does not copy the key. On a logged-in Mac no dialog appears when these tools save or read it. | Nothing. |
+| Encrypted (recommended elsewhere) | `encrypted` | Encrypted in the account file. A copy or backup stays locked. | The password: a hidden prompt, or `ALEO_ACCOUNT_PASSWORD`. |
+| File (the default) | `plaintext`, or no flag | Readable in the account file, which only its owner can open. | Nothing. Anyone who can read the file can spend from the account. |
 
-A wish stated before the recommendation, such as "whatever is fastest" or "no passwords", does not answer it: make the recommendation once anyway. On a Mac, Keychain meets both wishes. If the user then says no, skips the question, or repeats that they want the fastest path, use the default and move on. Do not ask again. When nobody is present to answer, use the storage the caller specified, otherwise the default, and include the recommendation in the result.
+An unattended service cannot answer a prompt. With an encrypted account it reads `ALEO_ACCOUNT_PASSWORD`, set from the service's secret store. That keeps copies and backups of the account file locked, but someone who can read the service's environment can read the password too.
 
 ## 4. Create or import the account
 
