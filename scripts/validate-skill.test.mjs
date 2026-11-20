@@ -59,6 +59,16 @@ test('the root install entrypoint cannot refer to a missing journey guide', asyn
   await assert.rejects(validateSkillDirectory(directory), /AGENTS\.md/)
 })
 
+test('funding installs independently with its balance, wallet, and recovery helpers', async (t) => {
+  const parent = await temporaryDirectory(t)
+  const destination = join(parent, 'aleo-funding')
+  await cp(join(repository, 'aleo-funding'), destination, { recursive: true })
+  const result = await validateSkillDirectory(destination)
+  assert.equal(result.name, 'aleo-funding')
+  for (const file of ['source-balances.mjs', 'local-wallet.mjs', 'transfer-state.mjs']) await access(join(destination, 'scripts', file))
+  await assert.rejects(access(join(parent, 'aleo-account-setup')))
+})
+
 test('a missing bundled reference fails with its target', async (t) => {
   const { directory } = await fixture(t, '[Setup](missing.md)\n')
   await assert.rejects(validateSkillDirectory(directory), /missing\.md/)
