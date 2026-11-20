@@ -72,11 +72,11 @@ The standalone server's locks coordinate profiles and processes using its state 
 The Python SDK has a stdio entrypoint. Its package documents installation and launch as:
 
 ```sh
-python -m pip install 'shield-swap-sdk[mcp]'
+python -m pip install --upgrade --only-binary=aleo-sdk aleo-sdk 'shield-swap-sdk[mcp]'
 python -m aleo_shield_swap.mcp
 ```
 
-These commands describe the existing SDK server, not an AgentKit server or a required setup step. Evaluate and pin the dependency version before using it with an account.
+These commands install the latest SDK releases from PyPI and launch the existing SDK server. This is not an AgentKit server or a required setup step. Check the installed capabilities and record the resolved versions in the application's lockfile before using it with an account.
 
 The inspected server binds `ALEO_PRIVATE_KEY` when supplied, otherwise creates/loads a signing profile through `ShieldSwap.from_profile()`. Omitting the environment key does not make it read-only. Resolve the profile before launch. Its fallback does not forward the initially read network/endpoint settings into `from_profile()`; inspect the profile's stored configuration.
 

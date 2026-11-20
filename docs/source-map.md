@@ -4,6 +4,16 @@ Rechecked on 2026-10-01 for the cross-surface context and operational documentat
 
 ## Sources
 
+### Shared account setup
+
+The [Aleo account setup skill](../aleo-account-setup/SKILL.md) and account connection recipes were checked against Veil `main` at [`f59affa8`](https://github.com/ProvableHQ/veil/commit/f59affa8ce4a13e58ecb357e06ad4d449af02d38) and Python SDK source at [`156df8e7`](https://github.com/ProvableHQ/python-sdk/commit/156df8e78689c05af9c4ddffbcca23e253dde8cb) on 2026-11-17. Those are source-validation records, not Python installation instructions. Python setup installs the latest `aleo-sdk` and `shield-swap-sdk` releases from PyPI and checks the installed account interfaces. Veil setup uses `main`.
+
+Account behavior comes from Veil's `packages/provable-sdk/src/keystore/`, `packages/shield-swap-cli/src/commands/account.ts`, and `site/docs/api/provable-sdk/accountKeystore.md`; Python's `sdk/python/aleo/keystore/` and `shield-swap-sdk/python/aleo_shield_swap/profile.py`. Both source implementations use the version 1 account schema in `~/.aleo/accounts`. Account files are shared; trading state and recovery stores are separate. The PyPI macOS wheel inspected on 2026-11-19 contains both native network extensions. At that check, both published SDKs were `0.8.0`, which lacks the shared-keystore and account-aware profile interfaces used by these recipes. The setup capability check reports that gap without substituting a source build.
+
+The standalone skill also bundles public balance inspection and basic application setup. Its balance helper reads each network's public `/tokens` registry and the underlying and wrapper programs' address-keyed `balances` mappings. On 2026-11-19, read-only checks against both live registries and deployed programs verified these shapes; BAT, ZEC, and USDG were absent from the testnet registry and are reported as not listed. The helper keeps failed reads distinct from zero. Veil's `createRemoteScanner({ waitForSync: true })` and Python's `records.register()`/`records.status()` supply registration and synchronization; both helpers use native API challenge authentication and durable recovery stores without calling funding helpers. Their source behavior was checked at the revisions above. Basic setup ends with trading/funding choices; bridging and airdrop execution are outside the standalone skill.
+
+### Trading interfaces
+
 | Source | Inspected revision / package version | Reuse |
 | --- | --- | --- |
 | [Veil Shield Swap SDK](https://github.com/ProvableHQ/veil/tree/main/packages/shield-swap) | `044fdcdede0adc53ef4d49836707bbbf9f12cd82`; SDK `0.11.1` | `skills/` runbooks, quote/swap/claim methods, identity persistence, `/agent` schemas and handlers, `/mcp` dispatcher. |

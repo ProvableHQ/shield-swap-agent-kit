@@ -40,6 +40,8 @@ An introductory prompt shows the screen again even after account setup. The skil
 
 ## Current contents
 
+The standalone [basic setup skill](aleo-account-setup/SKILL.md) guides named-account creation or import, private key storage, public balances on mainnet and testnet, and connection of a Python, JavaScript, or existing trading setup. It authenticates with Shield Swap, registers with the record scanner, checks private balances, and offers the next step based on the holdings. Its scripts and instructions are bundled together. The main Shield Swap skill loads it when setup is selected.
+
 This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows.
 
 The [draft standalone MCP server](mcp/README.md) provides terminal wallet setup, encrypted state, stdio transport, and 20 swap, bridge, and recovery tools. Its README distinguishes completed live checks from remaining validation. The kit does not include its own trading CLI, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. CLI recipes assume the CLI is installed and use `shield-swap` directly; selecting an SDK or MCP path does not require installing the CLI.
@@ -49,6 +51,7 @@ The [draft standalone MCP server](mcp/README.md) provides terminal wallet setup,
 ```text
 AGENTS.md                    # Start the builder or trader journey
 SKILL.md                     # Intro-first entrypoint for skill installers
+aleo-account-setup/          # Standalone basic setup, balance checks, and connection helpers
 context/
   getting-started.md          # Welcome, status panel, and canonical journeys
   decisions/                 # Choose the task and stack before provisioning
@@ -94,6 +97,14 @@ npx skills add ProvableHQ/shield-swap-agent-kit --skill shield-swap
 ```
 
 The installer discovers the root `SKILL.md` and copies the root package, including `AGENTS.md`, `context/`, and `tools/`, to the selected agent. It does not install SDK dependencies, connect an MCP server, create an account, or authorize transactions.
+
+To install account setup on its own from a local checkout, run this in a separate consuming project, replacing the source path:
+
+```sh
+npx skills add /path/to/shield-swap-agent-kit --skill aleo-account-setup
+```
+
+Invoke `/aleo-account-setup` in Claude Code or `$aleo-account-setup` in Codex. It covers basic setup through API access, scanner registration, and balance checks, then offers trading or funding choices. It does not execute funding or a trade. Its [dependency instructions](aleo-account-setup/references/dependencies.md) use Veil `main` and the latest Python SDK releases from PyPI. The skill name remains `aleo-account-setup` for existing installations.
 
 To test an unpublished checkout, run the following from a separate consuming project, replacing the path with the checkout location. Keep the destination outside the source checkout because the root package is copied:
 

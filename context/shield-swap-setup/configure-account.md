@@ -1,6 +1,6 @@
 # Configure an account
 
-Select the account, network, and persistent state before authenticating or trading. Reuse an existing account unless the user requests a new one. An explicit code-only/read-only milestone can defer this page; an operational trading-tool connection includes this step and funding.
+For initial setup, use [basic Shield Swap setup](../../aleo-account-setup/SKILL.md) through its public balance check, language or existing-project choice, API/scanner setup, private balance check, and next-step menu. This page supplies connection recipes for an already selected operational integration; it is not the next step after creating a private key. Reuse an existing account unless the user requests a new one. An explicit code-only/read-only milestone can defer this page; an operational trading-tool connection includes account setup and funding.
 
 The examples use **testnet**. Keep the account's state outside the installed kit, exclude it from version control, and use a private working directory. On macOS/Linux, `umask 077` before running scripts makes newly created state owner-only. See [private keys and state](../safety/private-key-handling.md) for custody boundaries.
 
@@ -12,49 +12,36 @@ MCP `setup` reports the selected profile’s account and funding checks. For gui
 
 ## CLI
 
-Install the [CLI](../toolchains/cli.md) and run from the directory where trading state should live. The current `setup` command also authenticates, can create an API token, and requests testnet funds when it finds no holdings. Use it when that combined setup is wanted. For account configuration without those effects, use the SDK path below.
+Follow [Aleo account setup](../../aleo-account-setup/SKILL.md) first if the account is not selected and verified. The account commands create or import the shared account without signing in or moving funds. Use the [CLI dependencies](../../aleo-account-setup/references/dependencies.md#veil-and-the-shield-swap-cli) from Veil `main`.
 
-Choose **one**:
+For an explicitly requested CLI session with authentication, API-token creation, and testnet funding, the combined command below can perform those effects. Basic onboarding uses the standalone skill's separate checks instead. Verify the selected public identity and existing recovery state in the working directory before running this command; do not infer an account mismatch from the directory name:
 
 ```sh
-# Reuse the account already configured in this directory.
-shield-swap setup --network testnet
-
-# Import an existing key from a file supplied outside the conversation.
-shield-swap setup --network testnet --private-key-file /absolute/path/private-key.txt
-
-# Create an account only when the user chose a new account.
-shield-swap setup --network testnet --new
+npx --no-install shield-swap setup --network testnet
 ```
 
-The command prints the account address and state directory. Check the address against the requested account. It stores account credentials in `.shield-swap/testnet/state.json` and swap recovery data in `.shield-swap/testnet/blinded.json`. Reuse that directory across sessions; do not print either file.
+Retain `ALEO_ACCOUNT` or add `--name` with the selected account name. Keep `ALEO_ACCOUNTS_DIR` if a custom location was used. The command records the address and account name in `.shield-swap/testnet/state.json`, alongside DEX credentials. Swap recovery data stays in `.shield-swap/testnet/blinded.json`. The private key stays in the shared account storage or comes from the environment; older state files can still contain a legacy private key.
 
-If `NEEDS_CONFIG_DECISION` appears, the directory has no configured account. Choose import or new rather than assuming the user has no account elsewhere. A different imported key is rejected when state already belongs to another account; choose a separate working directory instead of overwriting it.
+Check the printed address against the selected account. If it differs, resolve the selection without overwriting existing trading state. The CLI's obsolete invite-code check can still block setup after authentication; use the [CLI session fallback](../toolchains/cli.md#reuse-a-cli-account-from-a-script). Authentication grants access; no invite code is needed.
 
-The inspected CLI still has an obsolete invite-code check after authentication. If it blocks setup, use the [CLI session fallback](../toolchains/cli.md#reuse-a-cli-account-from-a-script), which reuses the saved account. Authentication grants access; no invite code is needed.
+## Veil local applications
 
-## Veil — local-key applications
-
-Install the [TypeScript dependencies](../toolchains/typescript.md). Have the user supply `SHIELD_SWAP_PRIVATE_KEY_FILE` or `SHIELD_SWAP_PRIVATE_KEY` outside chat. Do not put a key literal in a script.
-
-Save this as `session.mts` in the application. If extending an existing CLI account, use the CLI's `session.mts` recipe instead so its recovery store is retained.
+Install the [TypeScript dependencies](../toolchains/typescript.md) and complete [Aleo account setup](../../aleo-account-setup/SKILL.md). Save this as `session.mts` in the application. It loads the account selected by `ALEO_ACCOUNT`, or `default`, from the shared storage or environment:
 
 ```ts
-import { readFile, mkdir } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { loadNetwork } from '@provablehq/veil-aleo-sdk'
+import { loadAccount } from '@provablehq/veil-aleo-sdk/node'
 import { shieldSwapActions } from '@provablehq/shield-swap-sdk'
 import { swapFileStore } from '@provablehq/shield-swap-sdk/node'
 
 export const network = 'testnet'
-const keyPath = process.env.SHIELD_SWAP_PRIVATE_KEY_FILE
-const privateKey = (keyPath
-  ? await readFile(keyPath, 'utf8')
-  : process.env.SHIELD_SWAP_PRIVATE_KEY)?.trim()
-if (!privateKey) throw new Error('Configure an existing key before loading the session')
-
+const loaded = await loadAccount()
 const aleo = await loadNetwork(network)
-export const { walletClient, account } = aleo.createAleoClient({ privateKey })
+export const { walletClient, account } = aleo.createAleoClient({
+  privateKey: loaded.account.privateKey,
+})
 const stateDir = join('.shield-swap', network, account.address)
 await mkdir(stateDir, { recursive: true, mode: 0o700 })
 
@@ -64,60 +51,37 @@ export const client = walletClient.extend(shieldSwapActions({
 }))
 ```
 
-`api: {}` selects the DEX API for the client's network. The file store retains blinded identities and swap handles across restarts. It is not a wallet backup: retain the original key too. This module does not authenticate, request funds, or submit a transaction.
+Keep the selected account and password source in the application's runtime configuration. `loadAccount()` never creates an account. `api: {}` selects the DEX API for the client's network. The file store retains swap recovery material across restarts. This module does not authenticate, request funds, or submit a transaction.
 
-To verify the selected account, save as `check-account.mts` and run `npx tsx check-account.mts`:
+To verify the selected account, save as `check-account.mts` and run `npx --no-install tsx check-account.mts`:
 
 ```ts
 import { account, network } from './session.mts'
 console.log({ address: account.address, network })
 ```
 
-For an explicitly requested **new** account, run this separate script once, then point `SHIELD_SWAP_PRIVATE_KEY_FILE` at the resulting file:
+If extending a CLI account, use the [CLI session recipe](../toolchains/cli.md#reuse-a-cli-account-from-a-script) to retain its recovery store. A browser application uses its connected wallet; do not embed this Node module in frontend code.
 
-```ts
-import { writeFile } from 'node:fs/promises'
-import { loadNetwork } from '@provablehq/veil-aleo-sdk'
+## Python profiles
 
-const aleo = await loadNetwork('testnet')
-const generated = aleo.generateAccount()
-await writeFile('new-account.key', generated.privateKey, { flag: 'wx', mode: 0o600 })
-console.log({ address: aleo.privateKeyToAccount(generated.privateKey).address })
-```
-
-`flag: 'wx'` refuses to overwrite an existing key file. Exclude `new-account.key` and `.shield-swap/` from version control before running it.
-
-A browser application uses its connected wallet instead. Do not embed this local-key module in frontend code; use the [wallet toolchain](../toolchains/typescript.md).
-
-## Python — existing profile or key import
-
-Install the [Python dependencies](../toolchains/python.md). Select `SHIELD_SWAP_HOME` if the account uses a non-default profile directory. Otherwise the SDK uses `~/.shield-swap`.
+Install the [Python dependencies](../toolchains/python.md) and complete [Aleo account setup](../../aleo-account-setup/SKILL.md). Select `SHIELD_SWAP_HOME` for an existing profile or a separate account/network; the default is `~/.shield-swap`. Keep `ALEO_ACCOUNT` and any custom account directory or secret source available to this process.
 
 Save this as `session.py` in the application:
 
 ```python
-import os
-from pathlib import Path
 from aleo_shield_swap import Profile, ShieldSwap
 
 network = "testnet"
-home = Profile.default_home()
-has_profile = (home / "profile.json").is_file()
-if not has_profile:
-    imported_key = (os.environ.get("SHIELD_SWAP_PRIVATE_KEY") or "").strip()
-    key_file = os.environ.get("SHIELD_SWAP_PRIVATE_KEY_FILE")
-    if not imported_key and key_file:
-        imported_key = Path(key_file).read_text().strip()
-    if not imported_key:
-        raise RuntimeError("Select an existing profile or supply a nonempty key before loading the session")
-
-profile = Profile.load_or_create(home, network=network)
+profile = Profile.load_or_create(network=network, create=False)
 if profile.network != network:
     raise RuntimeError("The profile belongs to another network; select its matching profile directory")
-dex = ShieldSwap.from_profile(home=home)
+# An existing profile can be read before its private key is available.
+# Resolve it now to verify the signing account, without printing it.
+_ = profile.private_key
+dex = ShieldSwap.from_profile(home=profile.home)
 ```
 
-For an existing profile, this retains its key, endpoint, credentials, and journal. For a new profile directory with an imported key, it writes that key to the protected profile. An existing profile takes precedence over import variables: verify its address instead of assuming the variable switched accounts.
+`create=False` prevents missing account material from generating a new private key. For a new profile, the SDK records the selected account name, address, and network in `profile.json`; an environment private key is not persisted. Existing profiles retain their network, credentials, and journal. Loading the private key checks that it matches the profile's address.
 
 `from_profile()` attaches `journal.jsonl` and attempts scanner registration. It does not request an airdrop or run `onboard()`. Scanner errors can surface later when balances are read.
 
@@ -128,22 +92,7 @@ from session import dex
 print({"address": dex.profile.address, "network": dex.profile.network})
 ```
 
-For a **new** account, choose a fresh `SHIELD_SWAP_HOME`, ensure neither key-import variable is set, and run this once before loading `session.py`:
-
-```python
-import os
-from aleo_shield_swap import Profile
-
-home = Profile.default_home()
-if (home / "profile.json").exists():
-    raise RuntimeError("A profile already exists here")
-if os.environ.get("SHIELD_SWAP_PRIVATE_KEY") or os.environ.get("SHIELD_SWAP_PRIVATE_KEY_FILE"):
-    raise RuntimeError("Key import is configured; resolve the account choice first")
-profile = Profile.load_or_create(home, network="testnet")
-print({"address": profile.address, "network": profile.network})
-```
-
-The profile's journal contains claim secrets. Keep the whole profile directory private. Python profiles and CLI state are different formats, not interchangeable files.
+Keep the whole profile directory private because the journal contains claim secrets. Shared account storage lets both SDKs use the same address; their trading profiles and recovery data remain separate.
 
 ## Verify and continue
 
