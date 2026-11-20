@@ -10,6 +10,8 @@ Each operational page explains the shared behavior, then gives interface-specifi
 
 For basic setup, load [basic Shield Swap setup](aleo-account-setup/SKILL.md). Its own resources cover account and storage choices, public balances on mainnet and testnet, a new Python/JavaScript setup or an existing project, API authentication, scanner registration, and private balances. Finish with its balance-based next-step menu. Do not route account creation into a combined setup/funding command or select testnet automatically. Funding is a separate choice after basic setup.
 
+When a funding option is chosen, load [fund an Aleo account](aleo-funding/SKILL.md), passing the verified Aleo address and setup context. For bridging, it separates a guided transfer now from building reusable funding scripts with Privy, Dynamic, a local account, or a deposit wallet. Script setup can finish without moving funds; preserve the actual funding status. A faucet selection goes directly to the testnet path. Keep an explicitly selected existing execution interface.
+
 For inspection without execution, use [discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md). For an authorized trade, [swap](context/shield-swap-setup/swap.md) keeps the complete discovery-to-claim flow. Neither is a setup gate. Funding does not select a trade or start a strategy. The `shield-swap-setup/` folder holds operational runbooks; do not execute every file in directory order.
 
 ## Select the relevant context

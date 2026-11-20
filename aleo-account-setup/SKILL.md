@@ -7,7 +7,7 @@ description: Use for basic Shield Swap setup, including creating or importing a 
 
 Guide someone from a named Aleo account to connected trading tools and a clear view of their balances. Start with account and storage choices, show public holdings on mainnet and testnet, then help connect their chosen application to Shield Swap and the Record Scanning Service. Finish by offering the next step that fits their funds. Keep the conversation to the choice in front of them.
 
-This skill includes its own account commands, balance check, and application setup recipes. Use these bundled resources through the whole setup. Do not hand account creation off to an older setup guide or run `shield-swap setup` or Python `onboard()` as a shortcut: those combine configuration with funding. Bridging, airdrops, and trading are separate actions after this skill.
+This skill includes its own account commands, balance check, and application setup recipes. Use these bundled resources through the whole setup. Do not hand account creation off to an older setup guide or run `shield-swap setup` or Python `onboard()` as a shortcut: those combine configuration with funding. When a funding option is selected, invoke `aleo-funding` with the setup context described below. Trading remains a separate action.
 
 Veil, the Python SDK, and the Shield Swap CLI share account files in `~/.aleo/accounts`. An account saved by one can be loaded by the others. An environment-supplied private key also works without saving an account file.
 
@@ -185,6 +185,8 @@ When testnet has funds and mainnet has none, offer **1. Bridge assets to Aleo ma
 
 If a balance check is incomplete, offer to finish that check or use a network with verified funds. Do not recommend another deposit merely because scanning is behind.
 
-Preserve a trading task already selected instead of asking for it again. These menus offer a next action; they do not execute it. This skill ends at that choice and includes no bridge or airdrop execution recipe. Do not load an external funding guide or trigger funding to complete basic setup.
+Preserve a trading task already selected instead of asking for it again. These menus offer a next action; displaying them does not execute it. When someone chooses bridging, the Aleo faucet, or receipt of existing funds, invoke the `aleo-funding` skill. Pass the verified Aleo address as the default recipient, account name, chosen funding option, requested network, project and signer, observed balances, scanner status, and original trading task. The funding skill should not ask them to recreate the account or re-enter that address. Selecting a faucet skips its EVM wallet menu.
+
+The main Shield Swap package bundles `aleo-funding/SKILL.md`; its calling agent can load that entrypoint directly. For independently installed account setup, discover the `aleo-funding` skill by name. If it is absent, install the companion from `ProvableHQ/shield-swap-agent-kit` with `npx skills add ProvableHQ/shield-swap-agent-kit --skill aleo-funding`, following the person's existing agent-installation scope. Do not assume a sibling file exists in a standalone install. Until the companion is available, retain the setup context and report that the selected funding journey still needs it; do not substitute the combined CLI setup command.
 
 Return the account name and address, project or connected tools, API and scanner status for each checked network, separate public and private holdings, and the chosen next action to the calling agent. Standalone use reports the same results and choices. Call basic setup complete only when the selected application can load the account, authenticate, and read private balances on the requested networks; describe any outstanding check otherwise.
