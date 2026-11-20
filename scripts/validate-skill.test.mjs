@@ -41,6 +41,19 @@ test('the source repository name need not match the installed skill name', async
   assert.equal(result.skills[0].name, 'shield-swap')
 })
 
+test('basic setup installs independently with all of its references and helpers', async (t) => {
+  const parent = await temporaryDirectory(t)
+  const destination = join(parent, 'aleo-account-setup')
+  await cp(join(repository, 'aleo-account-setup'), destination, { recursive: true })
+  const result = await validateSkillDirectory(destination)
+  assert.equal(result.name, 'aleo-account-setup')
+  assert.ok(result.markdownFiles > 1)
+  await access(join(destination, 'scripts/public-balances.mjs'))
+  await access(join(destination, 'scripts/setup-veil.mts'))
+  await access(join(destination, 'scripts/setup_python.py'))
+  await assert.rejects(access(join(parent, 'context')))
+})
+
 test('the root install entrypoint cannot refer to a missing journey guide', async (t) => {
   const { directory } = await fixture(t, '[Start](AGENTS.md)\n')
   await assert.rejects(validateSkillDirectory(directory), /AGENTS\.md/)

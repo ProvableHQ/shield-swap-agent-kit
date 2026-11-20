@@ -4,14 +4,9 @@ Use `shield-swap-sdk`, imported as `aleo_shield_swap`, for Python bots, notebook
 
 ## Install in the application
 
-```sh
-python -m venv .venv
-. .venv/bin/activate
-python -m pip install shield-swap-sdk
-python -m pip show shield-swap-sdk aleo-sdk
-```
+Follow [Python dependency setup](../../aleo-account-setup/references/dependencies.md#python) to install or upgrade `aleo-sdk` and `shield-swap-sdk` to the latest PyPI releases using prebuilt wheels. Retain an existing virtual environment when there is one. Run the [account and network capability check](../../aleo-account-setup/references/dependencies.md#check-account-support-and-both-networks) before account setup. Record the resolved release versions in the application. Missing capabilities should be reported; onboarding does not fall back to source builds.
 
-Record the resolved versions in the project's dependency lock or requirements file. These recipes were checked against the source version in the [source map](../../docs/source-map.md); the installed package can print its full API reference:
+The installed package can print its full API reference:
 
 ```sh
 python -m aleo_shield_swap
@@ -23,7 +18,7 @@ That command prints documentation. It does not construct a client or create an a
 
 [Configure account](../shield-swap-setup/configure-account.md) supplies `session.py`, which exports a profile-bound `dex`. [Configure Shield Swap](../shield-swap-setup/configure-shield-swap.md) supplies `authenticate.py`. Later scripts import `dex` from that module and run with `python filename.py`.
 
-Choose the profile directory before constructing a client. `ShieldSwap.from_profile()` creates a profile if it is missing, attempts scanner registration, and attaches a durable journal. The supplied session recipe checks the profile first so an existing-account request cannot silently generate a new key.
+Choose the profile directory before constructing a client. `ShieldSwap.from_profile()` creates a profile if it is missing, attempts scanner registration, and attaches a durable journal. The supplied session recipe first loads the selected account with `Profile.load_or_create(create=False)` and verifies access to its private key, so a missing account cannot silently generate a new one.
 
 Profiles default to `SHIELD_SWAP_HOME` or `~/.shield-swap`. Existing profiles retain their stored network and endpoint; a `network=` argument does not migrate them. Keep each account/network in its own profile directory, outside the installed kit.
 
