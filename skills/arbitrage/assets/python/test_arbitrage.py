@@ -7,7 +7,9 @@ from pathlib import Path
 
 # Installed projects put the two skills' modules together, or install the
 # trading modules as their own package. This source-tree test supplies that path.
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'trading-integration' / 'assets' / 'python'))
+companion = Path(__file__).resolve().parent / '../../../trading-integration/assets/python'
+if companion.is_dir():
+    sys.path.insert(0, str(companion))
 
 
 class ArbitrageTests(unittest.TestCase):

@@ -4,7 +4,9 @@ import unittest
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'trading-integration' / 'assets' / 'python'))
+companion = Path(__file__).resolve().parent / '../../../trading-integration/assets/python'
+if companion.is_dir():
+    sys.path.insert(0, str(companion))
 
 
 @unittest.skipUnless(importlib.util.find_spec('web3'), 'installed-package checks need web3')

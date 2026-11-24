@@ -5,7 +5,9 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'trading-integration' / 'assets' / 'python'))
+companion = Path(__file__).resolve().parent / '../../../trading-integration/assets/python'
+if companion.is_dir():
+    sys.path.insert(0, str(companion))
 
 
 class BotTests(unittest.TestCase):
