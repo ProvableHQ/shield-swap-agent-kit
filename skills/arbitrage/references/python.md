@@ -54,4 +54,27 @@ Supply an existing in-memory EVM signer only for execution. The adapter never ge
 
 After a Shield claim completes, the bot obtains a fresh Uniswap quote. The new purchase must still meet the threshold and cannot exceed the original reviewed maximum input. A lost opportunity leaves unmatched inventory and stops new cycles. It never widens slippage or changes the asset pair.
 
+## Connect the strategy to the project's workflow
+
+Construct the existing `Trading` and `UniswapV3` instances during explicit startup. Supply a complete `Strategy` from the caller's configuration, with verified IDs and addresses. This creates a callable strategy without inventing a command-line interface:
+
+```python
+from pathlib import Path
+from bot import ArbitrageBot, Strategy
+
+def build_strategy(shield_trading, uniswap, approved_settings, state_directory):
+    # approved_settings supplies every Strategy field listed above.
+    strategy = Strategy(**approved_settings)
+    return ArbitrageBot(shield_trading, uniswap, strategy,
+                        Path(state_directory) / 'arbitrage.sqlite')
+```
+
+An observation task calls `plan()` and stores or displays its decision. An execution task consumes the exact reviewed plan and a persistent cycle ID, then calls `execute`. A recovery task calls `resume` with that same ID and the original strategy configuration. Keep these actions separate in the application's scheduler or UI.
+
+Prepare the Shield input records before entering the execution window. Use the companion's inventory plan and exact-plan execution recipe, then obtain fresh trading quotes. `funding_ready=False` can mean a missing covering record, quote-asset balance, approval, gas allowance, or failed EVM preflight. Inspect these individually instead of offering a bridge whenever the boolean is false.
+
+The bot's configured `costs` is supplied by your application. It is not calculated from live gas or proving prices. Use the companion's fee guide to determine account-paid request and claim costs, then add EVM execution and any amortized rebalancing costs. Retain the rate and timestamp used to convert costs into quote-asset units. Do not report a net profit while treating unknown costs as zero.
+
+For another direction or venue, define its quote quantity, actual fill/receipt, authorization, and recovery contract first. Do not reverse ticker strings and assume an exact-output purchase is interchangeable with an exact-input sale. Reuse Shield execution and write tests for the added venue adapter independently.
+
 Tests use `python -m unittest discover -s . -p 'test_*.py'` after copying both sets of modules and tests. Run them with installed SDK dependencies so the native quote and ABI checks execute too.

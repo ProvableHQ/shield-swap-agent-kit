@@ -30,12 +30,22 @@ When the requested bot is an arbitrage bot, load the available `arbitrage` skill
 
 ## Build the integration
 
-Read [the execution contract](references/execution.md), then only the selected language:
+Read [the trade lifecycle and execution contract](references/execution.md) and [assets, balances, and quotes](references/markets.md), then the selected language:
 
 - [Python](references/python.md): native SDK adapter, callable workflow, and SDK-managed record inventory.
 - [TypeScript and JavaScript](references/typescript.md): Veil adapter, callable workflow, and a durable implementation of Veil's record-store interface.
 
-The examples target local server/bot signers. For a browser wallet, retain its existing signer and use Veil's wallet APIs, with browser-appropriate durable storage. Do not copy the Node SQLite module into a frontend or replace the connected wallet with a local private key. Keep the same operation and claim boundaries.
+The Python and Node examples target local server/bot signers. For a web application, read [the browser wallet integration](references/browser.md) instead of copying the Node adapter. It covers wallet grants, record requests, persistence across refresh, and confirmation of both transactions. Retain the connected wallet.
+
+Load these procedures when the integration needs them:
+
+| Work to implement | Required reference |
+| --- | --- |
+| Any live submission or claim | [Fees and proving](references/fees.md) |
+| Repeated trades, multiple writers, or fragmented holdings | [Record inventory and concurrency](references/concurrency.md) |
+| Startup with pending trades, a timeout, or an uncertain result | [Inspect and recover a trade](references/recovery.md) |
+
+Use the procedures and bundled examples to implement the requested behavior. A statement such as “use the SDK planner” is not a completed inventory feature. Provide the call, interpret its result, and connect it to the application's next action. Keep these details in the implementation and its documentation; the opening menu stays brief.
 
 Use the latest published dependencies from PyPI or npm. Copy the relevant modules into the consumer project or integrate their behavior into its existing services. SDKs own quoting, transaction construction, signing, record reservations, and transaction recovery. The application modules add stable request IDs and persist progress between those SDK calls.
 
@@ -43,7 +53,7 @@ A functioning setup is a prerequisite for execution, not for writing or testing 
 
 ## Verify the result
 
-Run the bundled tests after adapting the modules. In an installed copy, verify native SDK imports and quote shapes against the actual package versions. Test two different requests together, duplicate requests, restart before claim, and lost responses during submission and claim. Run a plain single-swap consumer as well as any strategy consumer.
+Run the bundled tests after adapting the modules. In an installed copy, verify native SDK imports and quote shapes against the actual package versions. Test two different requests together, duplicate requests, restart before claim, and lost responses during submission and claim. Run a plain single-swap consumer as well as any strategy consumer. Exercise the application entrypoints you added, not only the copied library tests. For a web application, test refresh after submission, wallet rejection, account switching, and a claim whose receipt is still pending.
 
 Before live execution, establish the account, network, allowed assets, size, fees, and spending authority. Set the application's record and operation limits to match. Missing limits are questions for the caller, not defaults to invent. Read [concurrency and recovery](references/concurrency.md) when more than one swap can be outstanding.
 

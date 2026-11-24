@@ -7,7 +7,7 @@ description: Build or integrate a Shield Swap arbitrage bot, starting with a Pyt
 
 Build a bot that compares the cost of buying an asset on one venue with the proceeds from selling it on another. It needs funds at both venues and a plan for what happens when only one trade completes.
 
-Use the `trading-integration` skill for Shield Swap execution. This skill adds the second venue, opportunity calculation, and cycle state. The agent helps create and configure the code; the resulting application runs without rereading a skill for each trade.
+Use the `trading-integration` skill for Shield Swap execution. Read its lifecycle, market, fee, and selected-language references before wiring the Shield leg. For repeated trading read its inventory procedure; for existing or interrupted cycles read its recovery procedure. Loading this file alone does not supply those mechanics. This skill adds the second venue, opportunity calculation, and cycle state. The resulting application runs without rereading a skill for each trade.
 
 ## Choose the first case
 

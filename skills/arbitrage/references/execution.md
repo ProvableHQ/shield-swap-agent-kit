@@ -22,3 +22,13 @@ Use one owner for the EVM signer while a cycle or approval is pending. Other app
 The configured `costs` are an input to the decision, not a live oracle. Include both legs' fees and quote-currency conversion, and use a conservative bound appropriate to the selected network. L2 fees can include components beyond execution gas. Do not label a result profitable when these costs are missing or stale.
 
 The strategy is not atomic across venues. A successful first trade can be followed by a failed or uneconomic second trade. The default recovery policy stops; it does not automatically bridge, hedge, or liquidate.
+
+## Build around settled amounts
+
+Keep the original plan, both child IDs, request/claim IDs, and EVM receipt with the cycle. `shield_complete` means the first claim was confirmed, not that the account has its original inventory back. A refund changes the sold quantity; the reference stops with unmatched exposure rather than buying the originally planned quantity blindly.
+
+After the first claim, check the new purchase against actual proceeds, fees, minimum net result, and the original maximum spend. A second quote that is executable but less favorable than the caller permitted cannot complete this cycle automatically. Show the held assets and the specific failed condition.
+
+After both legs confirm, calculate realized proceeds and costs from actual claims and receipts. Keep scanner availability separate from settlement before scheduling another cycle. Repeated cycles deplete prefunded inventory on opposite venues; bridging that inventory back is a separately configured funding workflow, with its own fees and authorization.
+
+For an uncertain Shield child, load the companion trading skill's recovery reference and inspect its original SDK state. For an uncertain EVM child, keep the stored nonce, signed bytes, and locally derived hash. An unrelated transaction with the same asset and amount is not evidence for this cycle. Do not mark the parent complete until both child outcomes have been established.

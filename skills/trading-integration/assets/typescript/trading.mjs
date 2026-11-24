@@ -1,5 +1,7 @@
 import { OperationStore } from './operations.mjs'
 
+const errorName = error => typeof error?.name === 'string' ? error.name : 'UnknownError'
+
 export function validateOffer(offer, scope) {
   if (offer.scope !== scope) throw Error('Quote scope does not match the account and network')
   const age = Date.now() - offer.quotedAt
@@ -29,7 +31,7 @@ export class Trading {
     try {
       const handle = await this.venue.submit(offer.native)
       this.store.transition(id, 'submitting', 'submitted', { handle })
-    } catch (error) { this.store.transition(id, 'submitting', 'submission_unknown', { errorType: error.name }) }
+    } catch (error) { this.store.transition(id, 'submitting', 'submission_unknown', { errorType: errorName(error) }) }
     return this.status(id)
   }
   async claim(id) {
@@ -41,7 +43,7 @@ export class Trading {
     try {
       const result = await this.venue.claim(row.handle)
       this.store.transition(id, 'claiming', 'complete', { result })
-    } catch (error) { this.store.transition(id, 'claiming', 'claim_unknown', { errorType: error.name }) }
+    } catch (error) { this.store.transition(id, 'claiming', 'claim_unknown', { errorType: errorName(error) }) }
     return this.status(id)
   }
   async execute(id, offer) {
@@ -58,7 +60,7 @@ export class Trading {
         catch (error) {
           let saved
           try { saved = this.status(requests[index][0]) } catch { /* Never expose another account's state. */ }
-          results[index] = { ...(saved ?? { id: requests[index][0], status: 'not_started' }), errorType: error.name }
+          results[index] = { ...(saved ?? { id: requests[index][0], status: 'not_started' }), errorType: errorName(error) }
         }
       }
     }))

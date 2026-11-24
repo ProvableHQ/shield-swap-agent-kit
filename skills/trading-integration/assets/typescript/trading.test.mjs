@@ -82,3 +82,18 @@ test('read failure after submission preserves the submitted batch result', async
   assert.equal(result.status, 'submitted')
   assert.equal(result.handle.transactionId, 'tx')
 })
+
+test('non-Error rejections retain unknown writes across restart', async t => {
+  let claims = 0
+  const f = await fixture(t, { submit: async () => { throw null } })
+  const lost = await f.trading.execute('submit-lost', f.offer())
+  assert.equal(lost.status, 'submission_unknown')
+  assert.equal(lost.errorType, 'UnknownError')
+  f.venue.submit = async () => ({ swapId: 'b' })
+  f.venue.claim = async () => { claims++; throw undefined }
+  assert.equal((await f.trading.execute('claim-lost', f.offer(2n))).status, 'claim_unknown')
+  const restarted = new f.Trading(f.venue, f.path, { executionEnabled: true })
+  t.after(() => restarted.close())
+  assert.equal((await restarted.claim('claim-lost')).status, 'claim_unknown')
+  assert.equal(claims, 1)
+})

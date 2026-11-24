@@ -22,4 +22,13 @@ test('the native adapter rejects a different account or network before writing',
   new ShieldVenue(client, account.address, 'testnet').checkSession()
   assert.throws(() => new ShieldVenue(client, 'different', 'testnet').checkSession())
   assert.throws(() => new ShieldVenue(client, account.address, 'mainnet').checkSession())
+  const existingStore = {
+    list: store.list.bind(store), acquire: store.acquire.bind(store), update: store.update.bind(store),
+  }
+  client.recordManagement!.store = existingStore
+  assert.throws(() => new ShieldVenue(client, account.address, 'testnet').checkSession())
+  const injected = new ShieldVenue(client, account.address, 'testnet', existingStore)
+  injected.checkSession()
+  client.recordManagement!.store = store
+  assert.throws(() => injected.checkSession(), /durable record management/)
 })

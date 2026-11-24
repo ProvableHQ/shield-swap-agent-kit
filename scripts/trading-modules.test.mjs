@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cp, mkdtemp, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { cp, mkdtemp, rm, symlink } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 import { execFile } from 'node:child_process'
@@ -26,3 +26,23 @@ test('JavaScript trading modules work independently of SDK workspaces', async t 
   const { stdout } = await exec(process.execPath, ['--test', 'trading.test.mjs', 'inventory.test.mjs'], { cwd: root, env })
   assert.match(stdout, /(?:fail 0|# fail 0)/)
 })
+
+for (const surface of ['typescript', 'browser']) {
+  test(`Native ${surface} trading examples typecheck and run in a copied consumer`, async t => {
+    if (!process.env.TRADING_TEST_NODE_MODULES) {
+      t.skip('Set TRADING_TEST_NODE_MODULES to installed published Veil, TypeScript, and tsx dependencies')
+      return
+    }
+    const root = await mkdtemp(join(tmpdir(), `trading-${surface}-consumer-`))
+    t.after(() => rm(root, { recursive: true, force: true }))
+    await cp(new URL(`../skills/trading-integration/assets/${surface}/`, import.meta.url), root, { recursive: true })
+    await symlink(resolve(process.env.TRADING_TEST_NODE_MODULES), join(root, 'node_modules'), 'dir')
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    await exec(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '--noEmit'], { cwd: root, env })
+    const files = surface === 'browser' ? ['browser-trading.test.ts']
+      : ['trading.test.mjs', 'inventory.test.mjs', 'shield.test.mts', 'workflow.test.mts']
+    const { stdout } = await exec(process.execPath, ['--import', 'tsx', '--test', ...files], { cwd: root, env })
+    assert.match(stdout, /(?:fail 0|# fail 0)/)
+  })
+}

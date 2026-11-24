@@ -6,7 +6,7 @@ A lost response is not a failed transaction. Pause new writes using the affected
 
 Preserve the same account, network, identity store/journal, transaction or proving-job ID, and failure stage. Keep an access-controlled backup before repair. Do not print raw handles or journals, reset counters, delete state, or create a new swap to recover the old one.
 
-Reopen the same account, network, and store that submitted the operation. Inspect that operation. Claim it only after its outcome is known; if the outcome stays unknown, stop. Veil's record is the configured blinded-identity file. Python's record is the profile journal. Keep that store when a transaction id is already known. This kit does not add an application database.
+Reopen the same account, network, and store that submitted the operation. Inspect that operation. Claim it only after its outcome is known; if the outcome stays unknown, stop. Veil's record is the configured blinded-identity file. Python's record is the profile journal. Keep that store when a transaction id is already known. Applications using the trading integration skill also retain an operation database; follow its [recovery procedure](../../skills/trading-integration/references/recovery.md) to correlate that checkpoint with SDK evidence.
 
 ## Establish what happened
 

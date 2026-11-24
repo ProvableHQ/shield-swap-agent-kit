@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { loadNetwork } from '@provablehq/veil-aleo-sdk'
 import { shieldSwapActions, type ShieldSwapActions, type SwapQuote, type SwapHandle, type MultiHopSwapHandle } from '@provablehq/shield-swap-sdk'
 import { swapFileStore } from '@provablehq/shield-swap-sdk/node'
-import type { RecordManagementConfig } from '@provablehq/veil-core'
+import type { RecordManagementConfig, RecordInventoryStore } from '@provablehq/veil-core'
 import { InventoryStore } from './inventory.mjs'
 import { validateOffer, type Offer } from './trading.mjs'
 
@@ -16,8 +16,10 @@ type Handle = SwapHandle | MultiHopSwapHandle
 
 export class ShieldVenue {
   readonly scope: string
-  constructor(readonly client: Client, readonly address: string, readonly network: 'mainnet' | 'testnet') {
+  private readonly expectedStore: RecordInventoryStore | undefined
+  constructor(readonly client: Client, readonly address: string, readonly network: 'mainnet' | 'testnet', durableStore?: RecordInventoryStore) {
     this.scope = `aleo:${network}:${address}`
+    this.expectedStore = durableStore ?? (client.recordManagement?.store instanceof InventoryStore ? client.recordManagement.store : undefined)
   }
   async quote(from: string, to: string, amountIn: string, slippageBps: number, maxAgeMs: number): Promise<Offer<SwapQuote>> {
     const native = await this.client.quote({ from, to, amountIn, slippageBps })
@@ -27,7 +29,7 @@ export class ShieldVenue {
     return offer
   }
   checkSession() {
-    if (this.client.account?.type !== 'local' || this.client.account.address !== this.address || this.client.transport.config.network !== this.network || !this.client.recordManagement?.enabled || !(this.client.recordManagement.store instanceof InventoryStore)) {
+    if (this.client.account?.type !== 'local' || this.client.account.address !== this.address || this.client.transport.config.network !== this.network || !this.client.recordManagement?.enabled || !this.expectedStore || this.client.recordManagement.store !== this.expectedStore) {
       throw Error('Reuse the selected local account and network with enabled durable record management')
     }
   }
@@ -59,7 +61,7 @@ export async function openSession(options: {
   const { walletClient, account } = sdk.createAleoClient({ privateKey,
     recordManagement: { enabled: true, store: inventory, chainId: `aleo:${network}` } })
   if (account.address !== address) { inventory.close(); throw Error('Account address does not match the selected recipient') }
-  const client = walletClient.extend(shieldSwapActions({ api: {}, blindedIdentities: swapFileStore(join(directory, 'swaps.json')) }))
+  const client = walletClient.extend(shieldSwapActions({ api: { autoReauthenticate: false }, blindedIdentities: swapFileStore(join(directory, 'swaps.json')) }))
   await client.authenticateShieldSwap()
   return { venue: new ShieldVenue(client, address, network), client, inventory }
 }

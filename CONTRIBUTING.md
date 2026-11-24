@@ -34,6 +34,8 @@ The funding tests also require `python3` (Python 3.10 or newer). Their wallet-st
 
 The trading tests copy the Python and JavaScript modules into temporary consumer projects. Use Node 22.13 or newer for SQLite. To include the native SDK, Web3 ABI, and cross-language reservation checks, install the latest `shield-swap-sdk` and `web3` in an isolated Python environment, then run `TRADING_TEST_PYTHON=/absolute/path/to/venv/bin/python npm test`. Without those dependencies, the Python boundary checks are skipped. Typecheck the copied TypeScript assets with their package's `npm run check` after installing dependencies. These checks do not sign or send live transactions.
 
+Set `TRADING_TEST_NODE_MODULES=/absolute/path/to/consumer/node_modules` to include copied Node TypeScript and browser-wallet typechecks and native SDK tests in `npm test`. That environment needs the published dependencies and development tools listed in the trading skill's asset packages. Browser tests use mocked wallet, API, chain, storage, and lock interfaces; they do not establish real wallet permissions, CORS, or funded execution. Keep independent agent-generated evaluation projects outside the repository.
+
 For executable additions, verify the affected workflow from an installed copy outside SDK workspaces. Exercise the relevant failure paths, including process restart and uncertain submission results. Live transactions require authorization for the account, network, and intended action; a development task alone does not authorize them.
 
 Before committing, inspect `git diff --check` and the staged files. Keep changes to upstream SDKs in their owning repositories.

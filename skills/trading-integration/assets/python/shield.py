@@ -61,11 +61,24 @@ class ShieldVenue:
         result = self.dex.claim_swap_output(SwapHandle.from_json(json.dumps(handle))).delegate(wait=True)
         return {key: str(value) for key, value in asdict(result).items()}
 
+    def record_asset(self, token):
+        """Resolve the on-chain address or an unambiguous symbol to its funding program."""
+        from aleo.inventory import RecordAsset
+        tokens = self.dex.api.get_tokens()
+        matches = [info for info in tokens if info.address == token]
+        if not matches:
+            matches = [info for info in tokens if info.symbol.casefold() == token.casefold()]
+        if len(matches) != 1:
+            raise ValueError('Choose one registered token by its on-chain address or unambiguous symbol')
+        info = matches[0]
+        program = info.underlying_program or info.amm_token_program
+        if not program:
+            raise ValueError('Token registry does not identify a record program')
+        return RecordAsset(program)
+
     def inventory(self, token):
         """SDK inventory excludes held records; aggregate private balance alone does not."""
-        from aleo.inventory import RecordAsset
-        info = self.dex.api.get_token(token)
-        return self.aleo.inventory.get_record_inventory(RecordAsset(info.underlying_program))
+        return self.aleo.inventory.get_record_inventory(self.record_asset(token))
 
 
 def open_session(*, private_key, address, network, state_root, endpoint='https://edge.provable.com/api'):
