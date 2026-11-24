@@ -5,20 +5,20 @@ import { banner, renderInspection, renderWelcome } from '../tools/welcome.mjs';
 
 function assertIntro(screen) {
   assert.ok(screen.startsWith('```text\n' + banner + '\n\nPrivate asset trading'));
-  for (const label of ['Tools', 'Aleo account', 'Funding', 'GET STARTED', 'STRATEGIES', 'INTEGRATIONS [Coming Soon]', 'CHECK YOUR SETUP']) {
+  for (const label of ['Tools', 'Aleo account', 'Funding', 'GET STARTED', 'STRATEGIES', 'INTEGRATIONS [Coming Soon]']) {
     assert.ok(screen.includes(label), label);
   }
   assert.deepEqual([...screen.matchAll(/^(\d+)\. \*\*([^*]+)\*\*(.*)$/gm)].map(match => [match[1], (match[2] + match[3]).replace(/\\$/, '').trimEnd()]), [
-    ['1', 'Configure an Aleo account for Shield Swap'],
-    ['2', 'Fund an account'],
-    ['3', 'Explore markets'],
-    ['4', 'Setup a private trading integration'],
-    ['5', 'Create an arbitrage bot'],
-    ['6', 'Hummingbot: Add a privacy layer to hummingbot.'],
-    ['7', 'Hyperliquid: Trade perpetual futures privately on Hyperliquid.'],
-    ['8', 'Prediction Markets: Create a private vault around prediction market trades.'],
-    ['9', 'Check existing accounts'],
-    ['10', 'Check existing setup'],
+    ['1', 'Check existing accounts'],
+    ['2', 'Check existing setup'],
+    ['3', 'Configure an Aleo account for Shield Swap'],
+    ['4', 'Fund an account'],
+    ['5', 'Explore markets'],
+    ['6', 'Setup a private trading integration'],
+    ['7', 'Create an arbitrage bot'],
+    ['8', 'Hummingbot: Add a privacy layer to hummingbot.'],
+    ['9', 'Hyperliquid: Trade perpetual futures privately on Hyperliquid.'],
+    ['10', 'Prediction Markets: Create a private vault around prediction market trades.'],
   ]);
   const box = screen.split('\n').filter(line => /^[╭│╰]/u.test(line));
   assert.deepEqual(box.map(line => [...line].length), [60, 60, 60, 60, 60]);
@@ -26,13 +26,15 @@ function assertIntro(screen) {
   assert.ok(menu.startsWith('**GET STARTED**'));
   assert.doesNotMatch(menu, /```/);
   assert.match(menu, /^   Setup an Aleo account to trade privately on Shield Swap\.$/m);
+  assert.match(screen, /```\n\n\*\*GET STARTED\*\*\n\n1\. \*\*Check existing accounts\*\*/);
+  assert.doesNotMatch(screen, /\*\*ACCOUNTS\*\*|\*\*TOOLS\*\*|CHECK YOUR SETUP/);
 }
 
 test('new users see the unchanged heading and setup box with the full numbered menu', () => {
   const screen = renderWelcome({ checks: { account: { status: 'missing' } } });
   assertIntro(screen);
-  assert.match(screen, /1\. \*\*Configure an Aleo account for Shield Swap\*\*/);
-  assert.match(screen, /2\. \*\*Fund an account\*\*/);
+  assert.match(screen, /3\. \*\*Configure an Aleo account for Shield Swap\*\*/);
+  assert.match(screen, /4\. \*\*Fund an account\*\*/);
 });
 
 test('the renderer and installed agent guide show the same menu', async () => {
@@ -65,21 +67,26 @@ test('historical notes and backend details cannot turn unchecked funding into a 
 test('narrow displays retain a plain heading, tagline, status and choices', () => {
   const screen = renderWelcome({}, { width: 80 });
   assert.ok(screen.startsWith('```text\nSHIELD SWAP\n\nPrivate asset trading'));
-  assert.match(screen, /4\. \*\*Setup a private trading integration\*\*/);
-  assert.match(screen, /5\. \*\*Create an arbitrage bot\*\*/);
+  assert.match(screen, /6\. \*\*Setup a private trading integration\*\*/);
+  assert.match(screen, /7\. \*\*Create an arbitrage bot\*\*/);
   assert.doesNotMatch(screen, /\u001b/);
-  assert.match(screen, /\*\*Aleo\*\* · Not checked/);
-  assert.match(screen, /Local tools not checked/);
+  assert.match(screen, /Aleo account\s+Not checked/);
+  assert.match(screen, /Tools\s+Not checked/);
   assert.doesNotMatch(screen, /None found in checked locations/);
 });
 
-test('inventory keeps the setup box and menu while showing account access and exact tool locations', () => {
-  const screen = renderWelcome({ checks: { account: { status: 'configured' } }, accounts: [
+test('welcome keeps discovered account and tool details in explicit reports', () => {
+  const report = { checks: { account: { status: 'configured' } }, accounts: [
     { family: 'aleo', name: 'trading', address: 'aleo1' + 'q'.repeat(58), storage: 'encrypted', status: 'saved', privateKey: 'SECRET' },
     { family: 'evm', name: 'browser', address: '0x' + '1'.repeat(40), status: 'locked' },
   ], tools: [{ name: 'shield-swap', version: '0.16.2', path: '/opt/bin/shield-swap', stderr: 'SECRET' }],
     connections: [{ name: 'Shield', status: 'setup_required', error: 'SECRET',
-      location: 'https://user:SECRET@example.com/mcp?token=SECRET#SECRET' }] });
+      location: 'https://user:SECRET@example.com/mcp?token=SECRET#SECRET' }] };
+  const welcome = renderWelcome(report);
+  assertIntro(welcome);
+  assert.match(welcome, /Configured · access not checked/);
+  assert.doesNotMatch(welcome, /aleo1|0x1111|browser|Encrypted file|0\.16\.2|\/opt\/bin\/shield-swap|example\.com|SECRET/);
+  const screen = renderInspection(report, 'setup');
   assert.match(screen, /Encrypted file · Access not checked/);
   assert.match(screen, /Unlock required/);
   assert.match(screen, /\*\*Solana\*\* · None found in checked locations/);
@@ -88,17 +95,14 @@ test('inventory keeps the setup box and menu while showing account access and ex
   assert.match(screen, /Connection setup required · Version not reported/);
   assert.match(screen, /https:\/\/example\.com\/mcp/);
   assert.doesNotMatch(screen, /SECRET/);
-  assert.deepEqual([...screen.matchAll(/^(\d+)\. \*\*/gm)].map(match => match[1]), ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
-  const box = screen.split('\n').filter(line => /^[╭│╰]/u.test(line));
-  assert.deepEqual(box.map(line => [...line].length), [60, 60, 60, 60, 60]);
 });
 
 test('merging the same address retains each connection access status', () => {
   const address = '0x' + '1'.repeat(40);
-  const screen = renderWelcome({ accounts: [
+  const screen = renderInspection({ accounts: [
     { family: 'evm', name: 'local', address, storage: 'encrypted', status: 'saved' },
     { family: 'evm', name: 'browser', address, status: 'usable' },
-  ], tools: [] });
+  ], tools: [] }, 'accounts');
   assert.equal(screen.match(/\*\*EVM ·/g).length, 1);
   assert.match(screen, /local: Access not checked; browser: Access verified/);
 });

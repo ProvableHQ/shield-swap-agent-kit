@@ -17,7 +17,7 @@ Opening the root skill without a concrete task starts this onboarding guide imme
 Private asset trading
 ```
 
-Use the layout below with verified facts, or the shared [welcome renderer](../tools/welcome.mjs). Keep **Tools**, **Aleo account**, and **Funding** as the three row labels. Put the discovered accounts and installed tool versions/locations in separate **ACCOUNTS** and **TOOLS** sections below the box, following [setup inspection](shield-swap-setup/inspect-setup.md). Keep journals and signer implementation details out of the introduction.
+Use the layout below with verified facts, or the shared [welcome renderer](../tools/welcome.mjs). Keep **Tools**, **Aleo account**, and **Funding** as the three row labels. Use [setup inspection](shield-swap-setup/inspect-setup.md) to populate this summary. Keep detailed account and tool listings in the explicit check reports. Keep journals and signer implementation details out of the introduction.
 
 Follow it with the status panel. This example is illustrative: replace every value with observed facts. Use ✓ for a verified check, ○ for missing or unchecked, and ! for a failed check. Do not invent percentages or show a check as running unless it is actually running.
 
@@ -31,47 +31,45 @@ Keep the banner and setup box in fenced text blocks. Render the menus below them
 ╰───────────────────────────────────────────────────╯
 ```
 
-Insert **ACCOUNTS** and **TOOLS** here using the current inspection. Show Aleo, EVM, and Solana account names, known public addresses, and access status. List each detected tool with its installed version and location. These sections precede the unchanged menu below; never replace them with only “Available” or “Configured.”
+Go directly from the setup box to the menu below. The first two options show account and setup details on request. Do not automatically print account names, addresses, storage details, tool versions, install paths, or separate account/tool sections.
 
 **GET STARTED**
 
-1. **Configure an Aleo account for Shield Swap**\
+1. **Check existing accounts**\
+   List your Aleo, EVM, and Solana accounts, addresses, and access status.
+
+2. **Check existing setup**\
+   Check your project, installed tools, versions, locations, and connections.
+
+3. **Configure an Aleo account for Shield Swap**\
    Setup an Aleo account to trade privately on Shield Swap.
 
-2. **Fund an account**\
+4. **Fund an account**\
    Bridge assets from Ethereum or Solana privately to Aleo
 
-3. **Explore markets**\
+5. **Explore markets**\
    Explore market opportunities on Shield Swap
 
-4. **Setup a private trading integration**\
+6. **Setup a private trading integration**\
    Integrate trading on Shield Swap into your application
 
 **STRATEGIES**
 
-5. **Create an arbitrage bot**
+7. **Create an arbitrage bot**
 
 **INTEGRATIONS [Coming Soon]**
 
-6. **Hummingbot:** Add a privacy layer to hummingbot.
-7. **Hyperliquid:** Trade perpetual futures privately on Hyperliquid.
-8. **Prediction Markets:** Create a private vault around prediction market trades.
-
-**CHECK YOUR SETUP**
-
-9. **Check existing accounts**\
-   List your Aleo, EVM, and Solana accounts, addresses, and access status.
-
-10. **Check existing setup**\
-    Check your project, installed tools, versions, locations, and connections.
+8. **Hummingbot:** Add a privacy layer to hummingbot.
+9. **Hyperliquid:** Trade perpetual futures privately on Hyperliquid.
+10. **Prediction Markets:** Create a private vault around prediction market trades.
 
 You can also type `check accounts` or `check setup`.
 
-Show all four menu sections and keep options 1–10 in this order, even when accounts are already configured. Preserve the menu wording above. Options 1–5 and 9–10 have routes; 6–8 stay under **INTEGRATIONS [Coming Soon]**. Do not omit or renumber options based on setup status. Skip completed setup work within the selected route. Only a concrete task (a specified swap, an identified tool to connect, a strategy to build, or an explicit check) replaces the menu with that task and its result or next missing step. Do not ask them to select it again. Report current unchecked funding as **Not checked**; historical funding notes do not prove present holdings. Show tool installation paths in **TOOLS**; keep network choices, storage questions, and protocol details out of this introduction. Account storage is handled by the setup skill; resolve a real configuration conflict only when encountered.
+Show all three menu sections and keep options 1–10 in this order, even when accounts are already configured. Preserve the menu wording above. Options 1–7 have routes; 8–10 stay under **INTEGRATIONS [Coming Soon]**. Do not omit or renumber options based on setup status. Skip completed setup work within the selected route. Only a concrete task (a specified swap, an identified tool to connect, a strategy to build, or an explicit check) replaces the menu with that task and its result or next missing step. Do not ask them to select it again. Report current unchecked funding as **Not checked**; historical funding notes do not prove present holdings. Show tool installation paths only in an explicit setup report; keep network choices, storage questions, and protocol details out of this introduction. Account storage is handled by the setup skill; resolve a real configuration conflict only when encountered.
 
 ## Check the existing setup
 
-Run [setup inspection](shield-swap-setup/inspect-setup.md) against the working project, then add current agent connection facts. This provides the existing account inventory and tool versions/locations for the main screen. See [tool selection](../tools/SKILL.md) when a journey is chosen. Never print secret file contents to fill the panel.
+Run [setup inspection](shield-swap-setup/inspect-setup.md) against the working project, then add current agent connection facts. Use the result only for the compact status box on the main screen. Detailed inventory appears when a check is requested. See [tool selection](../tools/SKILL.md) when a journey is chosen. Never print secret file contents to fill the panel.
 
 Inspect the configured account and session without provisioning a replacement. Distinguish a missing account, a locked account, and a configured account whose access has not yet been checked. When access and holdings are relevant, follow [configuration](shield-swap-setup/configure-shield-swap.md) and [funding](shield-swap-setup/bridge-funds.md) using the selected interface. Authentication and scanner registration can change session state; they do not authorize funding or trading. Failed access or scanning is an unavailable check, never a zero balance.
 
@@ -93,22 +91,22 @@ Preserve a supplied intent instead of forcing a menu choice. Interpret a number 
 
 | Main-menu option | Journey ID | Destination and result |
 | --- | --- | --- |
-| 1 · Configure an Aleo account for Shield Swap | `configure_account` | [Account setup](../skills/aleo-account-setup/SKILL.md): create/import or reuse the selected account, choose storage, authenticate, register the scanner, and inspect balances. |
-| 2 · Fund an account | `fund_account` | [Funding](../skills/aleo-funding/SKILL.md): continue with the selected account and funding path. |
-| 3 · Explore markets | `explore_markets` | [Discover pools and get quotes](shield-swap-setup/discover-pools-and-get-quotes.md#explore-markets-from-the-main-menu): show available pairs, liquidity and recent activity, then quote a requested pair and amount without executing. |
-| 4 · Setup a private trading integration | `trading_integration` | [Trading integration](../skills/trading-integration/SKILL.md): build callable trading code in the user's project, retaining its language and account setup. |
-| 5 · Create an arbitrage bot | `arbitrage` | [Arbitrage](../skills/arbitrage/SKILL.md): build and test the strategy using the shared trading integration. |
-| 6 · Hummingbot | `hummingbot` | Coming soon; no executable route. |
-| 7 · Hyperliquid | `hyperliquid` | Coming soon; no executable route. |
-| 8 · Prediction Markets | `prediction_markets` | Coming soon; no executable route. |
-| 9 · Check existing accounts | `check_accounts` | [Account inspection](shield-swap-setup/inspect-setup.md#explicit-check-commands): refresh known Aleo/EVM/Solana accounts and report full public addresses, saved locations, storage, and access status. Also accepts `check accounts`. |
-| 10 · Check existing setup | `check_setup` | [Setup inspection](shield-swap-setup/inspect-setup.md#explicit-check-commands): refresh the current project's account/tool inventory, installed versions/locations, and current host connection readiness. Also accepts `check setup`. |
+| 1 · Check existing accounts | `check_accounts` | [Account inspection](shield-swap-setup/inspect-setup.md#explicit-check-commands): refresh known Aleo/EVM/Solana accounts and report full public addresses, saved locations, storage, and access status. Also accepts `check accounts`. |
+| 2 · Check existing setup | `check_setup` | [Setup inspection](shield-swap-setup/inspect-setup.md#explicit-check-commands): refresh the current project's account/tool inventory, installed versions/locations, and current host connection readiness. Also accepts `check setup`. |
+| 3 · Configure an Aleo account for Shield Swap | `configure_account` | [Account setup](../skills/aleo-account-setup/SKILL.md): create/import or reuse the selected account, choose storage, authenticate, register the scanner, and inspect balances. |
+| 4 · Fund an account | `fund_account` | [Funding](../skills/aleo-funding/SKILL.md): continue with the selected account and funding path. |
+| 5 · Explore markets | `explore_markets` | [Discover pools and get quotes](shield-swap-setup/discover-pools-and-get-quotes.md#explore-markets-from-the-main-menu): show available pairs, liquidity and recent activity, then quote a requested pair and amount without executing. |
+| 6 · Setup a private trading integration | `trading_integration` | [Trading integration](../skills/trading-integration/SKILL.md): build callable trading code in the user's project, retaining its language and account setup. |
+| 7 · Create an arbitrage bot | `arbitrage` | [Arbitrage](../skills/arbitrage/SKILL.md): build and test the strategy using the shared trading integration. |
+| 8 · Hummingbot | `hummingbot` | Coming soon; no executable route. |
+| 9 · Hyperliquid | `hyperliquid` | Coming soon; no executable route. |
+| 10 · Prediction Markets | `prediction_markets` | Coming soon; no executable route. |
 
 The check commands are available at any point in the conversation. Run the requested inspection with the existing project and known custom locations, then show the targeted result. Do not turn `check setup` into account creation or install missing tools. Retain the selected journey so checking status does not restart onboarding. A check request does not require another main-menu choice.
 
 The coming-soon descriptions express intended integrations, not current execution or privacy capabilities. If selected, say that integration is not available in the kit yet and ask what the user wants it to do. Do not install a connector, provision an account, move funds, or substitute an unrelated workflow merely because the option was selected. A separately requested integration-development task can be scoped from that conversation.
 
-Direct requests remain supported without adding them to the main menu. `trade_now` follows [swap](shield-swap-setup/swap.md) through claim and verified output. Existing `connect_trading_tools` requests identify the actual stack and use [terminal](decisions/trade/terminal-integration.md), [bot](decisions/trade/bot-integration.md), or [application integration](decisions/build/what-are-you-building.md#extend-an-existing-system) guidance as appropriate. Existing `build_strategy` requests use [strategy requirements](decisions/trade/what-is-your-strategy.md); route arbitrage specifically to option 5's skill. Preserve these identifiers for callers already using them.
+Direct requests remain supported without adding them to the main menu. `trade_now` follows [swap](shield-swap-setup/swap.md) through claim and verified output. Existing `connect_trading_tools` requests identify the actual stack and use [terminal](decisions/trade/terminal-integration.md), [bot](decisions/trade/bot-integration.md), or [application integration](decisions/build/what-are-you-building.md#extend-an-existing-system) guidance as appropriate. Existing `build_strategy` requests use [strategy requirements](decisions/trade/what-is-your-strategy.md); route arbitrage specifically to option 7's skill. Preserve these identifiers for callers already using them.
 
 Verify integration support before moving funds. Building a strategy does not authorize starting it; apply [unattended limits](safety/unattended-trading.md) when execution is requested. Do not promise a profitable opportunity.
 

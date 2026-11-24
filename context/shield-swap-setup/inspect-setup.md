@@ -1,6 +1,6 @@
 # Inspect accounts and installed tools
 
-Before showing the main menu, check the current project and known account locations. Show the accounts found and each tool's installed version and location below **YOUR SETUP**. Keep the menu and its numbering unchanged. An installed package, saved account, and working signer are separate facts.
+Before showing the main menu, check the current project and known account locations to populate the compact **YOUR SETUP** box. Display detailed accounts and tool versions/locations only when **Check existing accounts** or **Check existing setup** is selected. The menu starts immediately below the box. An installed package, saved account, and working signer are separate facts.
 
 ## Run the local inspection
 
@@ -10,7 +10,7 @@ Use the bundled [setup inspector](../../tools/inspect-setup.mjs). Replace `KIT_D
 node KIT_DIRECTORY/tools/inspect-setup.mjs --project PROJECT_DIRECTORY
 ```
 
-This prints the welcome, setup box, account inventory, tool inventory, and main menu as Markdown. Preserve the output's fenced banner and box; render the remaining Markdown normally. `--width 80` uses the compact heading. Use `--json` to obtain public fields for the host's own presentation. The report includes full public addresses; the welcome abbreviates them. Funding and execution summaries still show the full destination.
+This prints the welcome, compact setup box, and main menu as Markdown. It does not print account or tool listings. Preserve the output's fenced banner and box; render the remaining Markdown normally. `--width 80` uses the compact heading. Use `--json` to obtain public fields for the host's own presentation. The JSON report includes full public addresses; the welcome does not display them. Funding and execution summaries still show the full destination.
 
 The inspector needs Node.js, with no package installation. It probes installed command versions with a timeout and reads package metadata. It does not contact a chain, create accounts, authenticate, register scanners, or load private keys. Aleo's metadata APIs can tighten account-file permissions to owner-only. It never invokes wallet `check`, account `export`, or profile constructors to populate the menu.
 
@@ -18,12 +18,12 @@ For known custom locations, add `--accounts-dir DIRECTORY`, `--wallet-dir DIRECT
 
 ## Explicit check commands
 
-The agent's main menu exposes both checks under **CHECK YOUR SETUP**. Recognize the number only when the main menu is active; recognize the command words directly at any point.
+The agent's main menu exposes both checks under **GET STARTED**, as the first two options. Recognize the number only when the main menu is active; recognize the command words directly at any point.
 
 | Menu | Agent command | Result |
 | --- | --- | --- |
-| 9 · Check existing accounts | `check accounts` | Refresh the Aleo, EVM, and Solana account inventory. Show full known public addresses, saved locations, storage, and current access status. |
-| 10 · Check existing setup | `check setup` | Refresh the current project's accounts, installed tools/SDKs, versions, locations, and current agent connections. |
+| 1 · Check existing accounts | `check accounts` | Refresh the Aleo, EVM, and Solana account inventory. Show full known public addresses, saved locations, storage, and current access status. |
+| 2 · Check existing setup | `check setup` | Refresh the current project's accounts, installed tools/SDKs, versions, locations, and current agent connections. |
 
 These are arguments or requests to the main Shield Swap skill, not separate globally installed slash commands. A direct command skips the onboarding menu and returns the requested report. Keep the selected account, project, and journey. Never turn an inspection request into creating an account, installing tools, unlocking a wallet, or authenticating a new session.
 
@@ -66,7 +66,7 @@ When using [the renderer](../../tools/welcome.mjs) directly, append host facts a
 
 ## Present the result
 
-Keep **Tools**, **Aleo account**, and **Funding** in the existing box. Put **ACCOUNTS** and **TOOLS** immediately below it, before **GET STARTED**:
+Keep the welcome limited to the heading, **YOUR SETUP** box, and menu. For explicit check results, use **ACCOUNTS** for an account check or **EXISTING SETUP** with **ACCOUNTS** and **TOOLS** for a setup check:
 
 - Account rows show the chain family, saved name or source, public address when known, storage, and access status. Combine aliases for the same address, preserving different identities even when names match. A configured environment source with an unknown address remains its own unchecked source.
 - Tool rows show the name, installed version, and location. For Python packages, also identify the interpreter. For a failed version probe, show **Version unavailable**, preserving the detected executable path.

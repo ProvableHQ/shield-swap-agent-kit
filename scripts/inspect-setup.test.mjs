@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { inspectSetup, runProbe } from '../tools/inspect-setup.mjs';
-import { renderWelcome } from '../tools/welcome.mjs';
+import { renderInspection } from '../tools/welcome.mjs';
 
 const aleo = 'aleo1' + 'q'.repeat(58);
 const evm = '0x' + '1'.repeat(40);
@@ -59,10 +59,10 @@ test('discovers saved accounts across families without exposing credentials or c
   assert.ok(calls.some(([, args]) => args.join(' ').startsWith('account show --name trading --dir ')));
   assert.equal(await readFile(accountFile, 'utf8'), JSON.stringify({ privateKey: secret }));
   assert.doesNotMatch(JSON.stringify(report), new RegExp(secret));
-  const screen = renderWelcome(report);
+  const screen = renderInspection(report, 'setup');
   assert.doesNotMatch(screen, new RegExp(secret));
   assert.ok(screen.indexOf('**ACCOUNTS**') < screen.indexOf('**TOOLS**'));
-  assert.ok(screen.indexOf('**TOOLS**') < screen.indexOf('**GET STARTED**'));
+  assert.doesNotMatch(screen, /GET STARTED/);
   assert.equal(screen.match(/\*\*EVM ·/g).length, 2); // One merged saved address and one unverified key source.
   assert.match(screen, /Version|0\.16\.2/);
   assert.match(screen, /Access not checked/);
@@ -79,7 +79,7 @@ test('retains saved names when no compatible SDK exists and distinguishes bad me
   assert.equal(report.accounts[0].status, 'metadata_unavailable');
   assert.equal(report.checks.account.status, 'unavailable');
   assert.ok(report.issues.some(i => i.code === 'entry_skipped'));
-  const screen = renderWelcome(report);
+  const screen = renderInspection(report, 'setup');
   assert.match(screen, /Account file found; details unavailable/);
   assert.match(screen, /Could not check all account locations/);
   assert.doesNotMatch(screen, /Not configured|PRIVATE_TEST_SENTINEL/);
@@ -136,7 +136,7 @@ test('failed probes retain installation evidence without printing their output',
   const node = await command(f.bin, 'node');
   const report = await inspectSetup({ ...f, probe: async () => ({ ok: false, stdout: secret, stderr: secret }) });
   assert.deepEqual(report.tools, [{ name: 'node', kind: 'runtime', path: node, version: null }]);
-  assert.match(renderWelcome(report), /Version unavailable/);
+  assert.match(renderInspection(report, 'setup'), /Version unavailable/);
   assert.doesNotMatch(JSON.stringify(report), new RegExp(secret));
   const timed = await runProbe(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { timeout: 30 });
   assert.equal(timed.ok, false);
@@ -227,6 +227,10 @@ test('explicit accounts/setup commands work from an installed copy and help perf
   });
   const run = args => runProbe(process.execPath, [join(copied, 'inspect-setup.mjs'), ...args],
     { cwd: f.project, env: { HOME: f.home, PATH: f.bin }, timeout: 10000 });
+  const welcome = await run(['--project', f.project]);
+  assert.ok(welcome.ok, welcome.stderr);
+  assert.match(welcome.stdout, /\*\*GET STARTED\*\*\n\n1\. \*\*Check existing accounts\*\*/);
+  assert.doesNotMatch(welcome.stdout, /\*\*ACCOUNTS\*\*|\*\*TOOLS\*\*|0x1111|funding-wallets|OS credential store/);
   const accounts = await run(['accounts', '--project', f.project]);
   assert.ok(accounts.ok, accounts.stderr);
   assert.ok(accounts.stdout.includes(evm));

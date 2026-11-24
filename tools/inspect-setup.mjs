@@ -271,7 +271,7 @@ if (process.argv[1] && await realpath(process.argv[1]).catch(() => '') === fileU
 
   accounts       List existing Aleo, EVM, and Solana accounts and key sources.
   setup          Report the current project, accounts, tools, and versions.
-  (no command)   Show the welcome, inventory, and main menu.
+  (no command)   Show the welcome, setup summary, and main menu.
 
   --project DIRECTORY      Inspect this project (default: working directory).
   --accounts-dir DIRECTORY Include a known Aleo account directory; repeatable.

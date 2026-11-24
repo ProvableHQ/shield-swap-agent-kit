@@ -7,7 +7,7 @@ export const banner = `███████╗██╗  ██╗██╗█�
 
 /**
  * Render Markdown with a fenced banner/setup box and bold menu titles.
- * Render the inspector's public inventory, plus current host connection facts.
+ * Keep detailed account and tool reports behind the explicit check commands.
  * Never interpolate key material, raw errors, or historical funding notes.
  * @param {object} report
  * @param {{width?: number}} options
@@ -30,27 +30,25 @@ export function renderWelcome(report = {}, { width = 100 } = {}) {
     '╭─ YOUR SETUP '.padEnd(59, '─') + '╮',
     row('Tools', labels.tools[tools]), row('Aleo account', labels.account[account]), row('Funding', labels.funding[funding]),
     '╰──────────────────────────────────────────────────────────╯', '```', '',
-    ...renderInventory(report),
     '**GET STARTED**', '',
-    '1. **Configure an Aleo account for Shield Swap**\\',
+    '1. **Check existing accounts**\\',
+    '   List your Aleo, EVM, and Solana accounts, addresses, and access status.', '',
+    '2. **Check existing setup**\\',
+    '   Check your project, installed tools, versions, locations, and connections.', '',
+    '3. **Configure an Aleo account for Shield Swap**\\',
     '   Setup an Aleo account to trade privately on Shield Swap.', '',
-    '2. **Fund an account**\\',
+    '4. **Fund an account**\\',
     '   Bridge assets from Ethereum or Solana privately to Aleo', '',
-    '3. **Explore markets**\\',
+    '5. **Explore markets**\\',
     '   Explore market opportunities on Shield Swap', '',
-    '4. **Setup a private trading integration**\\',
+    '6. **Setup a private trading integration**\\',
     '   Integrate trading on Shield Swap into your application', '',
     '**STRATEGIES**', '',
-    '5. **Create an arbitrage bot**', '',
+    '7. **Create an arbitrage bot**', '',
     '**INTEGRATIONS [Coming Soon]**', '',
-    '6. **Hummingbot:** Add a privacy layer to hummingbot.',
-    '7. **Hyperliquid:** Trade perpetual futures privately on Hyperliquid.',
-    '8. **Prediction Markets:** Create a private vault around prediction market trades.', '',
-    '**CHECK YOUR SETUP**', '',
-    '9. **Check existing accounts**\\',
-    '   List your Aleo, EVM, and Solana accounts, addresses, and access status.', '',
-    '10. **Check existing setup**\\',
-    '    Check your project, installed tools, versions, locations, and connections.', '',
+    '8. **Hummingbot:** Add a privacy layer to hummingbot.',
+    '9. **Hyperliquid:** Trade perpetual futures privately on Hyperliquid.',
+    '10. **Prediction Markets:** Create a private vault around prediction market trades.', '',
     'You can also type `check accounts` or `check setup`.',
   ].join('\n');
 }
