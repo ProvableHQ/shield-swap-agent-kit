@@ -4,7 +4,7 @@ This file guides contributors. [AGENTS.md](AGENTS.md) starts the agent journey; 
 
 ## Scope
 
-Maintain the user's layout: journey entrypoint in `AGENTS.md`, runbooks in top-level `context/`, deterministic tools in `tools/`, and executable scripts and examples in their respective top-level directories. Keep local references inside the repository so the root package works after installation. Do not move the source context under a `skills/` wrapper.
+Keep the main journey entrypoints in root `AGENTS.md` and `SKILL.md`, runbooks in top-level `context/`, and deterministic tools in `tools/`. Standalone installable skills belong in `skills/<skill-name>/`, with their references and helpers bundled inside each skill. Keep local references inside the repository so the root package works after installation. Do not move the shared `context/` tree under `skills/`.
 
 SDKs own protocol logic, transaction construction, persistence, and signing. Use their public interfaces. Reuse the existing Shield Swap CLI when adding the kit's CLI integration. Add wrappers only when they provide a concrete workflow or validation benefit.
 

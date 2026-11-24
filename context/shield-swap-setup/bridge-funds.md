@@ -1,6 +1,6 @@
 # Fund the account
 
-For guided funding, funding scripts, or a choice from account setup, load [fund an Aleo account](../../aleo-funding/SKILL.md) and pass the selected address, network, project, and funding option. It offers guided bridging and script setup as separate paths and distinguishes the Aleo testnet faucet from Shield Swap test-asset requests. The recipes below remain available for an explicitly selected operational interface; they are not a substitute for the funding menu.
+For guided funding, funding scripts, or a choice from account setup, load [fund an Aleo account](../../skills/aleo-funding/SKILL.md) and pass the selected address, network, project, and funding option. It offers guided bridging and script setup as separate paths and distinguishes the Aleo testnet faucet from Shield Swap test-asset requests. The recipes below remain available for an explicitly selected operational interface; they are not a substitute for the funding menu.
 
 Check existing private holdings before requesting or transferring funds. Authentication does not fund an account, and a bridge receipt does not prove that the destination scanner can see spendable records.
 

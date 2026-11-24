@@ -34,6 +34,8 @@ test('the real skill works when copied outside the repository', async (t) => {
   await access(join(destination, 'AGENTS.md'))
   await access(join(destination, 'context/shield-swap-setup/bridge-funds.md'))
   await access(join(destination, 'tools/SKILL.md'))
+  await access(join(destination, 'skills/aleo-account-setup/SKILL.md'))
+  await access(join(destination, 'skills/aleo-funding/SKILL.md'))
 })
 
 test('the source repository name need not match the installed skill name', async () => {
@@ -44,7 +46,7 @@ test('the source repository name need not match the installed skill name', async
 test('basic setup installs independently with all of its references and helpers', async (t) => {
   const parent = await temporaryDirectory(t)
   const destination = join(parent, 'aleo-account-setup')
-  await cp(join(repository, 'aleo-account-setup'), destination, { recursive: true })
+  await cp(join(repository, 'skills', 'aleo-account-setup'), destination, { recursive: true })
   const result = await validateSkillDirectory(destination)
   assert.equal(result.name, 'aleo-account-setup')
   assert.ok(result.markdownFiles > 1)
@@ -62,7 +64,7 @@ test('the root install entrypoint cannot refer to a missing journey guide', asyn
 test('funding installs independently with its balance, wallet, and recovery helpers', async (t) => {
   const parent = await temporaryDirectory(t)
   const destination = join(parent, 'aleo-funding')
-  await cp(join(repository, 'aleo-funding'), destination, { recursive: true })
+  await cp(join(repository, 'skills', 'aleo-funding'), destination, { recursive: true })
   const result = await validateSkillDirectory(destination)
   assert.equal(result.name, 'aleo-funding')
   for (const file of ['source-balances.mjs', 'local-wallet.mjs', 'local_wallet.py', 'transfer-state.mjs']) await access(join(destination, 'scripts', file))

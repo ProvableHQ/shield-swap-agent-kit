@@ -30,9 +30,9 @@ An introductory prompt shows the screen again even after account setup. The skil
 
 ## Current contents
 
-The standalone [basic setup skill](aleo-account-setup/SKILL.md) guides named-account creation or import, private key storage, public balances on mainnet and testnet, and connection of a Python, JavaScript, or existing trading setup. It authenticates with Shield Swap, registers with the record scanner, checks private balances, and offers the next step based on the holdings. Its scripts and instructions are bundled together. The main Shield Swap skill loads it when setup is selected.
+The standalone [basic setup skill](skills/aleo-account-setup/SKILL.md) guides named-account creation or import, private key storage, public balances on mainnet and testnet, and connection of a Python, JavaScript, or existing trading setup. It authenticates with Shield Swap, registers with the record scanner, checks private balances, and offers the next step based on the holdings. Its scripts and instructions are bundled together. The main Shield Swap skill loads it when setup is selected.
 
-The standalone [funding skill](aleo-funding/SKILL.md) picks up the chosen funding option and Aleo address. Choose a guided bridge transfer or reusable funding scripts using Privy, Dynamic, a local account, or a deposit wallet. Script setup ends with files and run commands; it does not require a live transfer. The skill also covers source balances on Base, Ethereum, Arbitrum, and Arc, bridge recovery, receipt on Aleo, and the Aleo testnet faucet. Its local-wallet helper keeps credentials in the OS credential store. Transfer helpers retain an unresolved attempt after a timeout instead of submitting a replacement.
+The standalone [funding skill](skills/aleo-funding/SKILL.md) picks up the chosen funding option and Aleo address. Choose a guided bridge transfer or reusable funding scripts using Privy, Dynamic, a local account, or a deposit wallet. Script setup ends with files and run commands; it does not require a live transfer. The skill also covers source balances on Base, Ethereum, Arbitrum, and Arc, bridge recovery, receipt on Aleo, and the Aleo testnet faucet. Its local-wallet helper keeps credentials in the OS credential store. Transfer helpers retain an unresolved attempt after a timeout instead of submitting a replacement.
 
 This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows.
 
@@ -43,8 +43,9 @@ The kit does not include its own trading CLI, terminal connectors, or strategy i
 ```text
 AGENTS.md                    # Start the builder or trader journey
 SKILL.md                     # Intro-first entrypoint for skill installers
-aleo-account-setup/          # Standalone basic setup, balance checks, and connection helpers
-aleo-funding/                # Standalone funding, source wallets, and bridge recovery
+skills/
+  aleo-account-setup/        # Standalone basic setup, balance checks, and connection helpers
+  aleo-funding/              # Standalone funding, source wallets, and bridge recovery
 context/
   getting-started.md          # Welcome, status panel, and canonical journeys
   decisions/                 # Choose the task and stack before provisioning
@@ -60,7 +61,7 @@ tools/
 CONTRIBUTING.md              # Instructions for working on this repository
 ```
 
-Keep context and tools at the top level. Executable JS/Python scripts and examples belong in their corresponding directories. Integration context is not a working connector, and strategy guidance is not a running strategy.
+Keep context and tools at the top level. Standalone skills live under `skills/`, with their own references, scripts, and examples. Integration context is not a working connector, and strategy guidance is not a running strategy.
 
 Setup follows account configuration, then Shield Swap authentication with optional referrals, then a link to funding. [Discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md) supports standalone inspection; [swap](context/shield-swap-setup/swap.md) retains its complete discovery-to-claim flow. The `shield-swap-setup/` folder is a collection of runbooks, not a sequence that starts trading automatically.
 
@@ -88,7 +89,7 @@ Install the version published to GitHub:
 npx skills add ProvableHQ/shield-swap-agent-kit --skill shield-swap
 ```
 
-The installer discovers the root `SKILL.md` and copies the root package, including `AGENTS.md`, `context/`, and `tools/`, to the selected agent. It does not install SDK dependencies, connect an MCP server, create an account, or authorize transactions.
+The installer discovers the root `SKILL.md` and copies the root package, including `AGENTS.md`, `skills/`, `context/`, and `tools/`, to the selected agent. It does not install SDK dependencies, connect an MCP server, create an account, or authorize transactions.
 
 To install account setup on its own from a local checkout, run this in a separate consuming project, replacing the source path:
 
@@ -96,7 +97,7 @@ To install account setup on its own from a local checkout, run this in a separat
 npx skills add /path/to/shield-swap-agent-kit --skill aleo-account-setup
 ```
 
-Invoke `/aleo-account-setup` in Claude Code or `$aleo-account-setup` in Codex. It covers basic setup through API access, scanner registration, and balance checks, then offers trading or funding choices. A selected funding option invokes `aleo-funding` with the verified address. Its [dependency instructions](aleo-account-setup/references/dependencies.md) use Veil `main` and the latest Python SDK releases from PyPI. The skill name remains `aleo-account-setup` for existing installations.
+Invoke `/aleo-account-setup` in Claude Code or `$aleo-account-setup` in Codex. It covers basic setup through API access, scanner registration, and balance checks, then offers trading or funding choices. A selected funding option invokes `aleo-funding` with the verified address. Its [dependency instructions](skills/aleo-account-setup/references/dependencies.md) use Veil `main` and the latest Python SDK releases from PyPI. The skill name remains `aleo-account-setup` for existing installations.
 
 To install the funding skill independently, use `npx skills add /path/to/shield-swap-agent-kit --skill aleo-funding` from the consuming project. Invoke `/aleo-funding` in Claude Code or `$aleo-funding` in Codex. Installing the root `shield-swap` package includes both setup and funding; installing just `aleo-account-setup` needs the funding companion when a funding option is selected.
 
