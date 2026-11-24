@@ -4,7 +4,7 @@ Use the chosen application's environment, outside the installed skill. Install p
 
 ## Check releases before repairing an installation
 
-Shared account support is available in Veil and Shield Swap CLI **0.17.0+**, and Python SDK **0.9.0+**. These are feature baselines, not install pins. Check the registry for the latest stable release each time an installed version is outdated or an account command/import is missing. An older installation is not evidence that the feature needs a source build.
+Shared account support is available in Veil and Shield Swap CLI **0.17.0 or higher**, and Python SDK **0.9.0 or higher**. These are feature baselines, not install pins. Check the registry for the latest stable release each time an installed version is outdated or an account command/import is missing. An older installation is not evidence that the feature needs a source build.
 
 1. Identify the executable or package the selected project actually uses, including its version and location. A global CLI upgrade does not update a project-local CLI; a different Python environment does not update this project's SDK.
 2. Compare it with npm or PyPI using the commands below. If outdated, upgrade that installation to the latest release, retaining the package manager, project, account, network, and recovery state. Do this as part of setup or repair without another approval question unless the environment requires one. For an explicitly read-only request, report the available upgrade instead.
@@ -119,4 +119,4 @@ print("Account setup and both networks are available")
 PY
 ```
 
-If a required module or interface is missing, check PyPI, upgrade an outdated installation, and rerun this check before declaring a capability gap. Python account setup needs the 0.9.0+ interfaces; if the available release is still older, report that concrete blocker. Keep the published dependencies and existing account intact; do not work around the gap with a source build, a profile constructor that creates a replacement account, or a network change.
+If a required module or interface is missing, check PyPI, upgrade an outdated installation, and rerun this check before declaring a capability gap. Python account setup requires SDK 0.9.0 or higher; if the available release is still older, report that concrete blocker. Keep the published dependencies and existing account intact; do not work around the gap with a source build, a profile constructor that creates a replacement account, or a network change.

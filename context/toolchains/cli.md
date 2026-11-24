@@ -10,7 +10,7 @@ The runbooks assume `shield-swap` is already installed and on `PATH`:
 shield-swap --help
 ```
 
-If it is missing or outdated, follow [Veil and CLI dependency setup](../../skills/aleo-account-setup/references/dependencies.md#veil-and-the-shield-swap-cli) to check npm and install or upgrade to `@latest`. Update the installation actually selected by the project or PATH, then retry the command. Account features are available in 0.17.0+; they do not require a local Veil build. For a project-local installation, use `npx --no-install shield-swap` wherever the runbooks say `shield-swap`.
+If it is missing or outdated, follow [Veil and CLI dependency setup](../../skills/aleo-account-setup/references/dependencies.md#veil-and-the-shield-swap-cli) to check npm and install or upgrade to `@latest`. Update the installation actually selected by the project or PATH, then retry the command. Account features are available in 0.17.0 or higher; they do not require a local Veil build. For a project-local installation, use `npx --no-install shield-swap` wherever the runbooks say `shield-swap`.
 
 For repeatable bot deployments, pin the dependency version and expose its binary through the application's runtime environment. The recipes were checked against the source versions in the [source map](../../docs/source-map.md), not every published release. Check the installed command's help when its flags differ.
 

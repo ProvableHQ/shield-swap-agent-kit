@@ -60,7 +60,7 @@ Only installed packages count. Dependency declarations and lockfiles are not ins
 
 The local inspector only reports installed state; it does not query registries or install packages. For an explicit check or a selected setup task, the calling agent compares the relevant versions with npm/PyPI using [dependency setup](../../skills/aleo-account-setup/references/dependencies.md#check-releases-before-repairing-an-installation). Upgrade an outdated Veil SDK, Shield Swap CLI, or Python SDK in the selected environment, then rerun inspection and any failed account metadata check. Report the old and new version and the installation updated. For an explicitly read-only request, report the available update without applying it.
 
-Shared account features ship in Veil/CLI 0.17.0+ and Python 0.9.0+. Missing `accountInfo`, `aleo.keystore`, or the CLI `account` command should trigger this registry-and-upgrade path before a capability-gap conclusion. Use the latest published release; do not build a local SDK or replace an account. If an upgrade fails or the needed release is unavailable, retain the account-file finding and report the blocker. Merely rendering the welcome does not trigger installations or upgrades.
+Shared account features ship in Veil/CLI 0.17.0 or higher and Python 0.9.0 or higher. Missing `accountInfo`, `aleo.keystore`, or the CLI `account` command should trigger this registry-and-upgrade path before a capability-gap conclusion. Use the latest published release; do not build a local SDK or replace an account. If an upgrade fails or the needed release is unavailable, retain the account-file finding and report the blocker. Merely rendering the welcome does not trigger installations or upgrades.
 
 ## Add agent connections
 

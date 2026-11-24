@@ -2,7 +2,7 @@
 
 Run helpers in the chosen application, outside the installed skill. Preserve its language, package manager, and existing accounts. Resolve the [working folder and language](working-context.md) before installing dependencies or copying helpers, including for a guided transfer. This skill's JavaScript helpers are not a requirement for a Python application.
 
-Check npm or PyPI before treating a missing account method as an SDK gap. Shared account support ships in Veil/CLI 0.17.0+ and Python 0.9.0+; install the latest stable release, not a pinned baseline. When the selected environment is outdated, upgrade it and retry the check without another approval question unless the environment requires one. Preserve accounts, wallet credentials, and transfer checkpoints. For explicitly read-only work, report the available upgrade instead. Do not clone or build an SDK locally to obtain these features.
+Check npm or PyPI before treating a missing account method as an SDK gap. Shared account support ships in Veil/CLI 0.17.0 or higher and Python 0.9.0 or higher; install the latest stable release, not a pinned baseline. When the selected environment is outdated, upgrade it and retry the check without another approval question unless the environment requires one. Preserve accounts, wallet credentials, and transfer checkpoints. For explicitly read-only work, report the available upgrade instead. Do not clone or build an SDK locally to obtain these features.
 
 ## Python
 
