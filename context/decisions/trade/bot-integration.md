@@ -6,19 +6,13 @@ For an operational **Connect trading tools** journey, verify the product support
 
 ## Build a one-account bot
 
-Use this route for a new bot with one account. Read it before copying a larger bot. Keep one signer and one writer that spends records. Submit one swap, claim that same operation, and recover an unknown result before another write. Choose the native SDK according to the selected runtime and signer. A refund or partial fill is the outcome of that operation. Report it as that outcome.
+For reusable functions or a running strategy, load [trading integration](../../../skills/trading-integration/SKILL.md). It supplies native Python and TypeScript/JavaScript modules with stable request IDs, SDK record coordination, and durable progress through claims. For a two-venue strategy, load [arbitrage](../../../skills/arbitrage/SKILL.md).
 
-Keep the SDK durable store: the Veil blinded-identity file or the Python journal. Continue with the [TypeScript](../../toolchains/typescript.md) or [Python](../../toolchains/python.md) client, then the [swap](../../shield-swap-setup/swap.md) recipe.
+Keep the selected signer, network, and existing SDK durable store. Start with one requested swap and finish its claim. Enable concurrent requests only with shared record reservations and explicit operation limits. Recover an unknown result through its original state before replacing that operation.
 
-Leave these production tactics out:
+A refund or partial fill is the outcome of that operation. Report the actual output and refund before deciding whether another trade is wanted.
 
-- an application database
-- provisional operation ids beyond the SDK store
-- a custom wallet lock
-- reservations across multiple strategies
-- race classification, plan reuse, or record-cap clipping
-- a deployment layout
-- execution on another venue
+A new one-account bot does not need a deployment framework, a distributed scheduler, or an inventory-maintenance daemon. Add those only when the application's workload requires them.
 
 ## Bind messages to operations
 

@@ -1,36 +1,60 @@
 # Install the account and trading tools
 
-Use the chosen application's environment, outside the installed skill. For Python, install the latest published `aleo-sdk` and `shield-swap-sdk` releases from PyPI. For Veil, use the `main` branch. Record the installed release versions or resolved source commit in the application's dependency records.
+Use the chosen application's environment, outside the installed skill. Install published releases from npm for Veil and the Shield Swap CLI, or PyPI for Python. Record the resolved versions in the application's dependency records.
+
+## Check releases before repairing an installation
+
+Shared account support is available in Veil and Shield Swap CLI **0.17.0 or higher**, and Python SDK **0.9.0 or higher**. These are feature baselines, not install pins. Check the registry for the latest stable release each time an installed version is outdated or an account command/import is missing. An older installation is not evidence that the feature needs a source build.
+
+1. Identify the executable or package the selected project actually uses, including its version and location. A global CLI upgrade does not update a project-local CLI; a different Python environment does not update this project's SDK.
+2. Compare it with npm or PyPI using the commands below. If outdated, upgrade that installation to the latest release, retaining the package manager, project, account, network, and recovery state. Do this as part of setup or repair without another approval question unless the environment requires one. For an explicitly read-only request, report the available upgrade instead.
+3. Recheck the resolved version/path and retry the failed metadata read or capability check. Replace old Git, tarball, linked, or local-path SDK dependencies with registry packages; preserve the original checkout and unrelated local work. Keep related Veil dependencies compatible and update the project's lockfile.
+
+Do not clone an SDK, build a local checkout, or change languages to obtain these account features. If the registry cannot be reached, installation fails, or the latest published release still lacks the required capability, report that specific blocker and preserve the existing account. Source development is a separate, explicitly requested task.
 
 ## Veil and the Shield Swap CLI
 
-Use Node.js 22 or newer and pnpm. Veil is a workspace with several packages, so install packages built from its `main` checkout together. Do not use the repository root as an npm package.
-
-From the consumer application's directory, use a fresh `.aleo-tools/veil` directory. If it already exists, inspect and reuse its checkout without overwriting local work. Exclude `.aleo-tools/` from the application's version control.
+Use Node.js 22 or newer. Check the packages needed by the selected interface:
 
 ```sh
-git clone --branch main --single-branch https://github.com/ProvableHQ/veil.git .aleo-tools/veil
-pnpm --dir .aleo-tools/veil install --frozen-lockfile
-pnpm --dir .aleo-tools/veil -r --workspace-concurrency=1 --filter '@provablehq/shield-swap-cli...' run build
-mkdir -p .aleo-tools/packages
+npm view @provablehq/veil-aleo-sdk@latest version
+npm view @provablehq/shield-swap-sdk@latest version
+npm view @provablehq/shield-swap-cli@latest version
+npm ls @provablehq/veil-aleo-sdk @provablehq/shield-swap-sdk @provablehq/shield-swap-cli
 ```
 
-Pack the related workspace packages into the consumer's `.aleo-tools/packages` directory:
+For a Veil application, install or upgrade its SDK dependencies in the application directory. Retain its existing package manager; these examples use npm:
 
 ```sh
-consumer_dir="$PWD"
-for package in core devnode provable-sdk shield-swap shield-swap-cli; do
-  pnpm --dir ".aleo-tools/veil/packages/$package" pack --pack-destination "$consumer_dir/.aleo-tools/packages"
-done
-npm install ./.aleo-tools/packages/*.tgz
+npm install @provablehq/veil-core@latest @provablehq/veil-aleo-sdk@latest @provablehq/shield-swap-sdk@latest
 npm install --save-dev tsx typescript @types/node
-git -C .aleo-tools/veil rev-parse HEAD
+```
+
+For a project-local CLI, install or upgrade it there and verify that binary:
+
+```sh
+npm install @provablehq/shield-swap-cli@latest
+npx --no-install shield-swap --version
 npx --no-install shield-swap account --help
 ```
 
-Keep these local package paths and the source checkout available for reinstalls. In a shared deployment, retain the built packages in its artifact store and lock those dependencies there. The commands reference local packages built from `main`; they do not substitute registry copies of the account SDK. Retain the application's existing package manager when adapting the install.
+For an existing global npm CLI, update the global installation instead:
 
-The account skill uses `npx --no-install shield-swap` to select this project's CLI. An existing `shield-swap` command on `PATH` can be used after checking that it is the intended installation. Veil scripts import `@provablehq/veil-aleo-sdk/node` from this same environment.
+```sh
+command -v shield-swap
+npm ls --global @provablehq/shield-swap-cli
+npm install --global @provablehq/shield-swap-cli@latest
+shield-swap --version
+shield-swap account --help
+```
+
+Use the package manager that owns the detected global installation. If the old command still resolves first, correct the selected invocation or PATH rather than repeatedly upgrading another copy. Do not remove unrelated installations. A CLI-only workflow does not need a separate SDK project; scripts that import SDKs do need those project dependencies.
+
+The account skill uses `npx --no-install shield-swap` for a project-local CLI. Use `shield-swap` instead when the verified global CLI was selected. Veil scripts import `@provablehq/veil-aleo-sdk/node` from the application environment. After an SDK upgrade, check the installed account exports without loading a key:
+
+```sh
+node --input-type=module -e 'import { accountInfo, loadAccount } from "@provablehq/veil-aleo-sdk/node"; console.log({ accountInfo: typeof accountInfo, loadAccount: typeof loadAccount })'
+```
 
 ## Python
 
@@ -39,6 +63,14 @@ Use Python 3.10 or newer. Keep the application's virtual environment, or create 
 ```sh
 python -m venv .venv
 . .venv/bin/activate
+```
+
+Check the installed versions and current PyPI releases using that same interpreter:
+
+```sh
+python -m pip show aleo-sdk shield-swap-sdk
+python -m pip index versions aleo-sdk
+python -m pip index versions shield-swap-sdk
 ```
 
 Install or upgrade both SDKs to the latest releases from PyPI:
@@ -87,4 +119,4 @@ print("Account setup and both networks are available")
 PY
 ```
 
-If a required module or interface is missing, report that specific capability gap before account creation or application setup. Keep the PyPI dependencies and existing account intact; do not work around the gap with a source build, a profile constructor that creates a replacement account, or a network change.
+If a required module or interface is missing, check PyPI, upgrade an outdated installation, and rerun this check before declaring a capability gap. Python account setup requires SDK 0.9.0 or higher; if the available release is still older, report that concrete blocker. Keep the published dependencies and existing account intact; do not work around the gap with a source build, a profile constructor that creates a replacement account, or a network change.

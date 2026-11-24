@@ -2,7 +2,7 @@
 
 Private balances live in spendable records. Two records containing 1 token each are not automatically one input containing 2 tokens. A pending swap also ties up its input until its change/output becomes available.
 
-The inspected SDKs do not provide a general split/join/autojoin helper. This page explains record readiness and coordination; it does not install an autojoin service.
+The published Python and Veil SDKs provide record inventory, planning, joins/splits, and reservations. For callable concurrent trading code, use [trading integration](../../skills/trading-integration/SKILL.md). This page explains record readiness; an ongoing maintenance service is a separate application choice.
 
 ## Check one-trade readiness
 
@@ -62,7 +62,7 @@ Start with one writer per account. A persistent blinding counter prevents identi
 
 To support concurrent swaps, reserve distinct records and budget in one shared coordinator before preparing requests. Keep reservations through unknown outcomes. Release them only after rejection or settled consumption is established, and wait for new change records before reuse. All processes sharing the account must participate.
 
-Python `swap_many()` avoids record reuse within its batch, not across unrelated workers. Veil's identity-store lock is not a cross-process record lock. A command named concurrent swaps is not evidence that an arbitrary account has enough independent inputs.
+Enable SDK record management with a durable reservation store shared by every writer. Python's SQLite store and the trading skill's Veil store coordinate records across local processes. An identity-store lock alone does not provide that coordination. A command named concurrent swaps is not evidence that an account has enough independent inputs.
 
 ## When records need reshaping
 

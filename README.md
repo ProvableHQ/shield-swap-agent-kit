@@ -2,23 +2,30 @@
 
 Give an agent the context and working recipes to build on Shield Swap or operate a trading account. Choose Veil, Python, the CLI, or available MCP tools according to the user's environment and task. The context explains account setup, authentication, private funding, and the swap/claim lifecycle directly.
 
-Start with the [guided welcome](context/getting-started.md): **Configure an Aleo account for Shield Swap**, then **Fund your account**, with routes to trade, connect trading tools, build a strategy, or explore markets. Account setup and funding are part of connecting a trading tool; existing accounts and funds are reused.
+Start with the [guided welcome](context/getting-started.md): **GET STARTED** offers account setup, funding, market exploration, and private trading integration. **STRATEGIES** opens arbitrage bot development. **INTEGRATIONS [Coming Soon]** lists planned Hummingbot, Hyperliquid, and prediction-market integrations. Existing accounts, funds, and project choices are reused.
 
 ## Open the onboarding guide
 
-The root `shield-swap` skill is the usual top-level guide. Once [installed](#install-the-context), invoke `/shield-swap` in Claude Code or `$shield-swap` in Codex. With no specific task attached, it immediately presents the welcome, setup status, shared account/funding steps, and four journeys. No extra “show the menu” prompt is needed. A concrete task continues directly through its relevant journey.
+The root `shield-swap` skill is the usual top-level guide. Once [installed](#install-the-context), invoke `/shield-swap` in Claude Code or `$shield-swap` in Codex. With no specific task attached, it immediately presents the welcome, setup status, and numbered menu. No extra “show the menu” prompt is needed. A concrete task continues directly through its relevant journey.
 
-To open the guide from this PR branch in a fresh agent session:
+To open the guide in a fresh agent session:
 
 ```sh
-npx --yes skills@latest use 'ProvableHQ/shield-swap-agent-kit#feat/guided-onboarding' --skill shield-swap --agent claude-code
+npx --yes skills@latest use ProvableHQ/shield-swap-agent-kit --skill shield-swap --agent claude-code
 ```
 
-Use `--agent codex` for Codex CLI. The selected agent must already be installed and signed in. After the onboarding changes merge to the default branch, the source can be shortened to `ProvableHQ/shield-swap-agent-kit`.
+Use `--agent codex` for Codex CLI. The selected agent must already be installed and signed in.
 
-This entrypoint works with SDK, CLI, or MCP paths. Opening the guide does not require a wallet or MCP connection; unknown setup facts start as **Not checked**.
+This entrypoint works with SDK, CLI, or MCP paths. Opening the guide checks local account metadata and installed tools to populate the compact **YOUR SETUP** box. Account and tool listings appear only when a check is selected. See [setup inspection](context/shield-swap-setup/inspect-setup.md) for the checked locations and custom project paths. It does not require a wallet or MCP connection; unknown access and funding remain **Not checked**.
 
-The opening screen shows **SHIELD SWAP**, **Private asset trading**, setup status, and four choices: **Trade now**, **Connect trading tools**, **Build a strategy**, and **Explore markets**. Funding and transaction permissions remain steps in the chosen journey.
+The opening screen preserves **SHIELD SWAP**, **Private asset trading**, and the **YOUR SETUP** box. **GET STARTED** contains options **1–4** for account setup, funding, market exploration, and trading integration. A separate **CHECK SETUP** section follows with **5 · Check existing accounts** and **6 · Check existing setup**. **STRATEGIES** contains **7 · Create an arbitrage bot**. Options **8–10** stay visibly marked **Coming Soon**; they do not install connectors or execute trades. You can also type `check accounts` or `check setup` while using the main skill. These commands refresh the requested report without starting setup. A direct request to make a swap still follows the complete swap-and-claim workflow.
+
+From a checkout, the same local checks are available directly. Replace `PROJECT_DIRECTORY` with your working project's path:
+
+```sh
+node tools/inspect-setup.mjs accounts --project PROJECT_DIRECTORY
+node tools/inspect-setup.mjs setup --project PROJECT_DIRECTORY
+```
 
 Already inside Claude with the skill installed? Invoke `/shield-swap`, or ask “How do I trade with Shield Swap?” To try a checkout without reinstalling an older copy, send this single prompt:
 
@@ -34,9 +41,11 @@ The standalone [basic setup skill](skills/aleo-account-setup/SKILL.md) guides na
 
 The standalone [funding skill](skills/aleo-funding/SKILL.md) picks up the chosen funding option and Aleo address. Choose a guided bridge transfer or reusable funding scripts using Privy, Dynamic, a local account, or a deposit wallet. Script setup ends with files and run commands; it does not require a live transfer. The skill also covers source balances on Base, Ethereum, Arbitrum, and Arc, bridge recovery, receipt on Aleo, and the Aleo testnet faucet. Its local-wallet helper keeps credentials in the OS credential store. Transfer helpers retain an unresolved attempt after a timeout instead of submitting a replacement.
 
-This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows.
+This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides explain how to extend those workflows.
 
-The kit does not include its own trading CLI, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. CLI recipes assume the CLI is installed and use `shield-swap` directly; selecting an SDK or an available MCP connection does not require installing the CLI.
+The [trading integration skill](skills/trading-integration/SKILL.md) includes worked guides for asset discovery, quotes, fees, record preparation, concurrent requests, claims, and recovery. Its callable Python and TypeScript/JavaScript modules serve local-account applications; a separate browser example retains the connected wallet and tracks both transaction confirmations. The [arbitrage skill](skills/arbitrage/SKILL.md) uses that execution guidance and provides a Python Shield Swap/Uniswap v3 reference bot with exact quote comparison, two-leg progress, and a stop policy for unmatched exposure. TypeScript applications retain their stack and adapt the native workflow; the included complete arbitrage reference is Python.
+
+The kit does not include its own trading CLI or terminal connectors. SDK and CLI implementations remain in their existing packages. CLI recipes assume the CLI is installed and use `shield-swap` directly; selecting an SDK or an available MCP connection does not require installing the CLI.
 
 ## Layout
 
@@ -46,6 +55,8 @@ SKILL.md                     # Intro-first entrypoint for skill installers
 skills/
   aleo-account-setup/        # Standalone basic setup, balance checks, and connection helpers
   aleo-funding/              # Standalone funding, source wallets, and bridge recovery
+  trading-integration/      # Callable Python and TypeScript/JavaScript trading modules
+  arbitrage/                # Strategy integration and a Python Uniswap v3 reference bot
 context/
   getting-started.md          # Welcome, status panel, and canonical journeys
   decisions/                 # Choose the task and stack before provisioning
@@ -61,7 +72,7 @@ tools/
 CONTRIBUTING.md              # Instructions for working on this repository
 ```
 
-Keep context and tools at the top level. Standalone skills live under `skills/`, with their own references, scripts, and examples. Integration context is not a working connector, and strategy guidance is not a running strategy.
+Keep context and tools at the top level. Standalone skills live under `skills/`, with their own references, scripts, and examples. Product integration guides describe their supported boundaries; installing a skill does not start a strategy.
 
 Setup follows account configuration, then Shield Swap authentication with optional referrals, then a link to funding. [Discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md) supports standalone inspection; [swap](context/shield-swap-setup/swap.md) retains its complete discovery-to-claim flow. The `shield-swap-setup/` folder is a collection of runbooks, not a sequence that starts trading automatically.
 
@@ -97,9 +108,18 @@ To install account setup on its own from a local checkout, run this in a separat
 npx skills add /path/to/shield-swap-agent-kit --skill aleo-account-setup
 ```
 
-Invoke `/aleo-account-setup` in Claude Code or `$aleo-account-setup` in Codex. It covers basic setup through API access, scanner registration, and balance checks, then offers trading or funding choices. A selected funding option invokes `aleo-funding` with the verified address. Its [dependency instructions](skills/aleo-account-setup/references/dependencies.md) use Veil `main` and the latest Python SDK releases from PyPI. The skill name remains `aleo-account-setup` for existing installations.
+Invoke `/aleo-account-setup` in Claude Code or `$aleo-account-setup` in Codex. It covers basic setup through API access, scanner registration, and balance checks, then offers trading or funding choices. A selected funding option invokes `aleo-funding` with the verified address. Its [dependency instructions](skills/aleo-account-setup/references/dependencies.md) check npm/PyPI and upgrade outdated Veil, CLI, or Python SDK installations to the latest published releases before retrying account checks. The skill name remains `aleo-account-setup` for existing installations.
 
 To install the funding skill independently, use `npx skills add /path/to/shield-swap-agent-kit --skill aleo-funding` from the consuming project. Invoke `/aleo-funding` in Claude Code or `$aleo-funding` in Codex. Installing the root `shield-swap` package includes both setup and funding; installing just `aleo-account-setup` needs the funding companion when a funding option is selected.
+
+For trading code and arbitrage, the root skill includes both new skills. To install them separately from a checkout, run these from the consuming project:
+
+```sh
+npx skills add /path/to/shield-swap-agent-kit --skill trading-integration
+npx skills add /path/to/shield-swap-agent-kit --skill arbitrage
+```
+
+Invoke `/trading-integration` or `/arbitrage` in Claude Code, or `$trading-integration` or `$arbitrage` in Codex. Arbitrage uses the trading integration as its execution companion. Pass the existing project and preferred language; the skills build code there without starting a strategy automatically.
 
 To test an unpublished checkout, run the following from a separate consuming project, replacing the path with the checkout location. Keep the destination outside the source checkout because the root package is copied:
 
@@ -129,10 +149,10 @@ The installed skill contains task explanations, commands, SDK code examples, ver
 
 ## Validate
 
-Requires Node.js 22 or newer. No package installation, credentials, or network access are needed for these checks.
+Requires Node.js 22.13 or newer and Python 3.10 or newer. No credentials or network access are needed for these checks.
 
 ```sh
 npm test
 ```
 
-Validation checks skill metadata, local links, and packaging boundaries, then repeats the skill checks on a copy in a temporary directory. It does not execute the SDKs, contact a chain, or establish that a trading journey succeeds.
+Validation checks skill metadata, local links, packaging, and the bundled workflow modules in temporary consumer projects. Native SDK boundary tests run when their dependencies are installed; see [verification instructions](CONTRIBUTING.md#verification). The tests do not contact a chain or establish funded execution. Dated live checks are recorded in the [source map](docs/source-map.md).

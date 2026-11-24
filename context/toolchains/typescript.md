@@ -11,7 +11,7 @@ Use Veil for TypeScript applications and custom trading scripts. Choose the clie
 
 ## Install for a local-key application
 
-Use Node.js 22 or newer. Follow the [Veil source dependency setup](../../skills/aleo-account-setup/references/dependencies.md#veil-and-the-shield-swap-cli) to build and install the related packages from `main` in the application's directory. Then check the selected installation:
+Use Node.js 22 or newer. Follow [Veil dependency setup](../../skills/aleo-account-setup/references/dependencies.md#veil-and-the-shield-swap-cli) to check npm and install or upgrade the application's related packages to `@latest`. Account features are available in 0.17.0 or higher; use registry packages instead of building `main`. Then check the selected installation:
 
 ```sh
 npm ls @provablehq/veil-aleo-sdk @provablehq/shield-swap-sdk

@@ -4,6 +4,12 @@ Start with [getting started](context/getting-started.md): show the branded intro
 
 Choose [Veil](context/toolchains/typescript.md), [Python](context/toolchains/python.md), the [CLI](context/toolchains/cli.md), or available [MCP tools](context/toolchains/mcp.md) according to the user's stack, custody model, and required operations. Preserve an explicitly selected interface. When none is specified, use the existing setup and verified capabilities to choose a suitable surface; read [tool selection](tools/SKILL.md) for the options and supported fallbacks.
 
+Before the main menu, run [setup inspection](context/shield-swap-setup/inspect-setup.md) to populate the compact **YOUR SETUP** summary. Retain the heading and box, then go directly to **GET STARTED**. Show detailed account and tool listings only when a check is requested. Saved metadata does not prove signing access; unavailable checks remain visible in the summary.
+
+Main-menu options **5 · Check existing accounts** and **6 · Check existing setup** under **CHECK SETUP** run the [explicit inspection commands](context/shield-swap-setup/inspect-setup.md#explicit-check-commands). Also accept `check accounts` and `check setup` directly. Show their targeted results, preserve the selected journey, and do not route an inspection request into account creation or installing missing tools.
+
+For outdated existing tools, follow [release checks and upgrades](skills/aleo-account-setup/references/dependencies.md#check-releases-before-repairing-an-installation): query npm/PyPI, upgrade the selected installation to the latest stable release, and retry the account check. Veil/CLI 0.17.0 or higher and Python 0.9.0 or higher provide shared account support. Do not build local SDK sources to obtain it. Keep the welcome lightweight; apply updates during explicit checks or the selected task, and leave explicitly read-only requests unchanged.
+
 Each operational page explains the shared behavior, then gives interface-specific recipes. Read the section for the chosen interface, not every implementation. The examples use testnet and run in the consumer's project, outside this installed kit. Change networks only to match the user's request. The kit does not bundle its own trading CLI.
 
 ## Setup and trading are separate journeys
@@ -34,7 +40,8 @@ For inspection without execution, use [discover pools and get quotes](context/sh
 | Diagnose a broken environment or operation | [Diagnostics](context/shield-swap-setup/diagnose-environment.md) / [error handling](context/shield-swap-setup/error-handling.md) |
 | Integrate a terminal or chat bot | [Terminal integration](context/decisions/trade/terminal-integration.md) / [bot integration](context/decisions/trade/bot-integration.md) |
 | Build a one-account bot from scratch | [One-account bot](context/decisions/trade/bot-integration.md#build-a-one-account-bot): native SDK |
-| Set up an arbitrage bot | [Arbitrage setup](context/decisions/trade/arbitrage-setup.md) |
+| Add reusable trading code or concurrent swaps to an application | [Trading integration](skills/trading-integration/SKILL.md) |
+| Set up an arbitrage bot | [Arbitrage](skills/arbitrage/SKILL.md), using the trading integration for execution |
 | Configure access or submit an operation | [Permissions](context/safety/permissions.md) |
 | Select an account, signer, or state location | [Private keys and state](context/safety/private-key-handling.md) |
 | Run recurring strategies | [Unattended trading](context/safety/unattended-trading.md) |

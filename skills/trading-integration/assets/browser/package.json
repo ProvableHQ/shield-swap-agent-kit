@@ -1,0 +1,8 @@
+{
+  "name": "shield-connected-wallet-example",
+  "private": true,
+  "type": "module",
+  "scripts": { "check": "tsc --noEmit", "test": "node --import tsx --test *.test.ts" },
+  "dependencies": { "@provablehq/veil-core": "latest", "@provablehq/shield-swap-sdk": "latest" },
+  "devDependencies": { "typescript": "latest", "tsx": "latest", "@types/node": "latest" }
+}

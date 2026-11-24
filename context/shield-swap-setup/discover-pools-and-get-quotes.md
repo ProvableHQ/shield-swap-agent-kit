@@ -6,6 +6,14 @@ Discovery answers which pools and assets are available. A quote prices a particu
 
 These recipes reuse the selected account/network and [authenticated session](configure-shield-swap.md). They do not request funding, reserve input records, or submit a swap. Authentication may still involve an account signature. The examples use **1.5 USDCx → ETH on testnet with 50 bps (0.5%) slippage**; replace those values with the requested terms.
 
+## Explore markets from the main menu
+
+For menu option 3, begin with a market overview using the existing network and interface. Show the pairs found, current trading availability, and liquidity or recent activity where the selected interface exposes them. Report the scope of the query and unavailable data; do not present an incomplete pool page as every market or turn missing reads into zero. Market activity alone does not establish a profitable opportunity.
+
+If the user already named an asset or pair, start there. Otherwise show the overview before asking which market interests them. Ask for a direction and amount only when they want a quote, then show expected output, minimum output, route, and freshness. Use the recipes below for the selected interface. Do not ask for a project directory or build scripts as a prerequisite for browsing.
+
+Funding is not required. Configure access only if the chosen interface needs it, preserving existing account choices. End with the requested market information or quote. A subsequent request to trade follows [swap](swap.md); a request to build an application follows [trading integration](../../skills/trading-integration/SKILL.md). Neither starts automatically from exploration.
+
 ## CLI — discovery and plan-only quoting
 
 Assume `shield-swap` is installed and run from the existing trading directory:

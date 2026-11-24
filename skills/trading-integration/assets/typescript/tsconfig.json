@@ -1,0 +1,5 @@
+{
+  "compilerOptions": { "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "skipLibCheck": true, "allowJs": true, "types": ["node"] },
+  "include": ["*.mts", "*.mjs"],
+  "exclude": ["*.test.mjs"]
+}

@@ -4,7 +4,7 @@ Use the language and project chosen in the conversation. These recipes authentic
 
 Before registration, explain that the Record Scanning Service receives the account's view key so it can find and read its records. The private key stays in the selected storage. A new-project choice made after this explanation is enough to proceed. Preserve prior authorization and custom scanner choices.
 
-Use [dependencies](dependencies.md) for Veil `main` or the latest Python SDK releases from PyPI. Run application code from the person's project, outside this installed skill. Keep a new project in its own directory. Inspect an existing project before deciding that it needs another directory or account.
+Use [dependencies](dependencies.md) to check npm/PyPI and install or upgrade to the latest published Veil or Python SDK releases. Run application code from the person's project, outside this installed skill. Keep a new project in its own directory. Inspect an existing project before deciding that it needs another directory or account.
 
 ## New JavaScript or TypeScript project
 
