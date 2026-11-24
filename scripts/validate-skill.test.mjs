@@ -65,7 +65,7 @@ test('funding installs independently with its balance, wallet, and recovery help
   await cp(join(repository, 'aleo-funding'), destination, { recursive: true })
   const result = await validateSkillDirectory(destination)
   assert.equal(result.name, 'aleo-funding')
-  for (const file of ['source-balances.mjs', 'local-wallet.mjs', 'transfer-state.mjs']) await access(join(destination, 'scripts', file))
+  for (const file of ['source-balances.mjs', 'local-wallet.mjs', 'local_wallet.py', 'transfer-state.mjs']) await access(join(destination, 'scripts', file))
   await assert.rejects(access(join(parent, 'aleo-account-setup')))
 })
 

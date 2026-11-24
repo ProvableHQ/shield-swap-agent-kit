@@ -30,6 +30,8 @@ No roadmap document is maintained here. Describe current functionality in the RE
 
 Run `npm test` after changing context or validation. The validator supports this repository's inline Markdown links and single-line skill metadata; extend it deliberately if authoring conventions change.
 
+The funding tests also require `python3` (Python 3.10 or newer). Their wallet-storage tests use the standard library and a mock credential store; they do not install SDK dependencies or access the OS keychain.
+
 For executable additions, verify the affected workflow from an installed copy outside SDK workspaces. Exercise the relevant failure paths, including process restart and uncertain submission results. Live transactions require authorization for the account, network, and intended action; a development task alone does not authorize them.
 
 Before committing, inspect `git diff --check` and the staged files. Keep changes to upstream SDKs in their owning repositories.

@@ -2,6 +2,8 @@
 
 Use a hosted wallet when the application already has a provider account or wants server signing without keeping a raw wallet private key locally. Ask **Privy or Dynamic?** only if a provider has not been selected. Keep an existing wallet. Creating a provider account, configuring ownership, and provisioning a wallet are separate from the bridge SDK adapter.
 
+For Python, use the [native hosted-wallet adapters](python-funding.md#connect-privy-or-dynamic). The modules and provider calls below are JavaScript/TypeScript recipes. Preserve the chosen provider and wallet identity across languages; do not provision another wallet to match an example.
+
 Credentials and authorization keys go into the existing secrets manager or trusted terminal, never chat, command arguments, checkpoints, or logs. Explain who can authorize transactions under the chosen provider policy. Configure the relevant chains, contracts, and spending limits before depositing. Do not infer that an API credential gives permission to spend from every wallet.
 
 ## Privy

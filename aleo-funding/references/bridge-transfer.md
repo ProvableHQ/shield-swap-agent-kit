@@ -1,5 +1,7 @@
 # Quote, bridge, and verify delivery
 
+For Python, use [native Python funding](python-funding.md#quote-execute-and-recover). The route and funding constraints here apply to both SDKs; code examples and `transfer-state.mjs` are JavaScript/TypeScript implementations.
+
 Use the installed bridge SDK for routing, transaction construction, approvals, signing, and recovery. This guide supplies the funding sequence. Prepare the [dependencies](dependencies.md) and copy [transfer-state.mjs](../scripts/transfer-state.mjs) into the application. Keep its state outside the installed skill, under a private persistent directory.
 
 These are execution instructions for the agent. In guided funding, explain the selected transfer through its effect on the person's funds: what leaves the sending wallet, what arrives on Aleo, fees, any intermediate stop, and public or confidential delivery. Keep registry and SDK mechanics out of the conversation unless requested or needed to resolve a problem.
@@ -7,6 +9,8 @@ These are execution instructions for the agent. In guided funding, explain the s
 ## Choose the route
 
 Read `DEFAULT_BRIDGE_REGISTRY.getRoutes({ environment: 'mainnet', sourceChainId })` and retain only `availability === 'active'`. Resolve both asset IDs through the same registry. Do not hand-construct route IDs or token contracts. The source balance helper's `routesToAleo` finds direct routes and the supported two-transfer USDC paths.
+
+Use these routes to populate **Assets you can send** in the combined Step 4 menu. For Python, use `DEFAULT_REGISTRY.routes(environment="mainnet", source_chain=SOURCE_CHAIN)` from the installed SDK. Include supported pairs across Ethereum, Base, Arbitrum, Arc, and Solana even when no source address is known. Only include a path through Arc when both legs are supported. Name the source asset, source network, and destination asset; show an intermediate network as “via Arc.” Group by network if needed, retaining asset-to-asset mappings. Keep route IDs and protocol names out of this menu. Omit routes known to be paused or unavailable; confirm the chosen pair's current availability and fees with a live quote before requesting funds.
 
 The reviewed catalog offers:
 

@@ -2,7 +2,17 @@
 
 Offer a reusable EVM wallet or a dedicated EVM/Solana wallet for one funding journey. Both need persistent credentials. The bridge SDK supplies signing adapters; it does not secure or back up a new private key for the application.
 
+Use the [working folder and language](working-context.md) chosen earlier for wallet helpers and bridge execution. If either is unresolved, ask before creating the wallet or its scripts. Choosing a temporary EVM wallet does not select JavaScript.
+
 For guided funding, explain the deposit wallet as a temporary wallet created on this computer, with keys the person retains and an address shown in the conversation. Temporary describes its purpose; keep the keys after the transfer. Sending to it and bridging to Aleo are separate transfers. Its saved network and asset describe this funding task; they do not make an EVM wallet address exclusive to that network or asset. Give the exact sending instructions for the selected transfer.
+
+## Reuse a saved wallet
+
+When the person chooses a saved bridge wallet, keep its address and storage directory. Load it with the existing project's integration, `load_local_client` for Python, or `loadLocalClient` for JavaScript/TypeScript. Verify that the loaded signer matches the displayed address. Do not run wallet creation or replace an inaccessible key. Retain existing backup arrangements.
+
+Check the original transfer state before preparing a new transfer. A submitted or uncertain operation keeps its original recipient and follows [recovery](bridge-transfer.md#submit-once-and-retain-recovery-state). A historical recipient alone does not prevent using the wallet for a new transfer: when no unresolved operation remains, prepare it for the currently selected Aleo account with separate transfer state. Preserve the old manifest and history; show the new recipient in the transfer review.
+
+Use funds already present rather than asking for the token deposit again. If gas is missing, give instructions to fund that same wallet with the required fee asset on the selected network. Estimate the amount from the chosen route, then recheck balances and quote before the transfer review. Choosing this wallet does not approve spending its full balance; retain the selected asset, amount, and transfer authorization.
 
 ## Choose storage
 
@@ -13,6 +23,8 @@ For a server without that store, retain an existing secrets manager or choose a 
 Explain the scope plainly: a process permitted to unlock the stored key can spend from this wallet. Keychain protects storage; it does not impose a bridge-only spending policy. Use a dedicated funding wallet, keep only the intended transfer and gas there, and retain a backup outside this machine before depositing.
 
 ## Create and check
+
+For Python, use [native wallet creation](python-funding.md#create-or-reuse-the-source-wallet) with `local_wallet.py`, keeping the storage and backup requirements above. The commands and connection module below are for JavaScript/TypeScript. Do not install Node or create a JavaScript project for a Python wallet.
 
 Install the [local-wallet dependencies](dependencies.md), then copy [local-wallet.mjs](../scripts/local-wallet.mjs) into the application. Choose a new directory under a persistent private parent such as `~/.aleo/funding-wallets`. Create the parent with owner-only permissions first. Keep this storage separate from `~/.aleo/accounts`, whose schema is for Aleo accounts.
 

@@ -19,7 +19,13 @@ Once the transfer is selected, name the asset they will receive on Aleo, includi
 
 ## Keep the setup context
 
-When account setup calls this skill, retain the verified Aleo address, account name, network, chosen funding option, project, signer, scanner status, and intended trading task. Also retain whether the person wants a guided transfer or funding scripts. Show the destination address and allow a correction without making someone type it again. Preserve an existing wallet connection and authorization.
+When account setup calls this skill, retain the verified Aleo address, account name, network, chosen funding option, project, programming language, execution interface, signer, scanner status, latest public and private balances, and intended trading task. Also retain whether the person wants a guided transfer or funding scripts. Show the destination address and allow a correction without making someone type it again. Preserve an existing wallet connection and authorization.
+
+Use the selected language for both guided funding and script setup. Python uses [native Python funding](references/python-funding.md) and the latest `aleo-bridge-sdk` from PyPI; JavaScript/TypeScript uses the Veil recipes and `.mjs` helpers. An EVM or Solana account has no programming language: changing the tool must not generate a replacement account. Keep the selected Aleo account and any existing source wallet.
+
+For another language, first check the project's existing bridge integration and supported SDK capabilities. If a required capability is missing, explain that specific gap and let the person choose a supported integration before adding another runtime. Do not automatically create a JavaScript project, Node wrapper, or new Aleo profile because this skill includes JavaScript examples. Reuse a previously accepted fallback.
+
+As soon as bridging is selected, [establish the working project and language](references/working-context.md) for either a guided transfer or funding scripts. Reuse a confirmed setup; otherwise suggest relevant projects from the conversation or available history and ask for the missing folder or language. Resolve this before installing dependencies, writing or copying scripts, creating a bridge wallet, or asking for a deposit. A wallet or transfer choice does not select a JavaScript runtime or a project folder.
 
 For standalone use, resolve the default through the SDK's account priority and enumerate other saved Aleo accounts using [account discovery](references/aleo-accounts.md). An address explicitly selected by the person or passed from setup stays selected. Show every discovered account by name and public address, with the selected account first, and offer another Aleo address. Ask for a public address only when none is available or the person chooses another one. Resolve the network before moving funds. Mainnet bridging and the Aleo testnet faucet are different paths.
 
@@ -66,7 +72,7 @@ I'll use **ACCOUNT_NAME** unless you choose another account.
 Reply **1**, **2**, **3**, or **4** to use the selected account, or include an account letter, such as **B4**.
 ```
 
-Option 4 selects the scripts path directly. Keep the selected Aleo account and project, then show [the funding-script wallet choices](#set-up-funding-scripts) as Step 3. Skip the guided-transfer-or-scripts question and the guided deposit instructions. Do not require a funded source wallet or a live transfer to complete script setup.
+Option 4 selects the scripts path directly. Keep the selected Aleo account, resolve any missing [working context](references/working-context.md), then show [the funding-script wallet choices](#set-up-funding-scripts) as Step 3. Skip the guided-transfer-or-scripts question and the guided deposit instructions. Do not require a funded source wallet or a live transfer to complete script setup.
 
 Populate the account list from the discovered accounts; the two rows above are examples, not a limit. Use consecutive letters and keep **Another Aleo address** last. Show full verified addresses, never invented alternatives or only a sentence saying other accounts exist. If several names share an address, show their names together without duplicating the destination. An account supplied by a connected wallet or the environment can be listed with that source as its label when it has no saved name. “Selected by default” marks the active choice; it does not mean the account must be named `default`.
 
@@ -74,7 +80,7 @@ If no account can be resolved, show Step 1 and ask, “Which Aleo address would 
 
 ## Choose a guided transfer or funding scripts
 
-After mainnet bridging is selected, offer this choice before wallet setup if the intent is still unclear. Choosing **Build programmatic funding** in the opening menu goes directly to the scripts path without this question. A request to write scripts or build a funding integration also selects the scripts path; an explicit request to carry out a transfer now selects the guided path. A general choice of “bridge” does not settle this question.
+After mainnet bridging is selected and the working context is resolved, offer this choice if the intent is still unclear. Choosing **Build programmatic funding** in the opening menu goes directly to the scripts path without this question. A request to write scripts or build a funding integration also selects the scripts path; an explicit request to carry out a transfer now selects the guided path. A general choice of “bridge” does not settle this question.
 
 ```markdown
 **Step 3: Choose how you'd like to bridge**
@@ -90,7 +96,7 @@ After mainnet bridging is selected, offer this choice before wallet setup if the
 Which option would you like to use?
 ```
 
-For scripts, continue to [set up funding scripts](#set-up-funding-scripts). For a guided transfer, continue to the optional balance check below. Keep these as separate paths; script setup does not require a deposit or live transfer. Number subsequent steps for the path actually shown, omitting questions already answered.
+For scripts, continue to [set up funding scripts](#set-up-funding-scripts). For a guided transfer, continue to [review funds and choose a wallet](#review-funds-and-choose-a-wallet). Keep these as separate paths; script setup does not require a deposit or live transfer. Number subsequent steps for the path actually shown, omitting questions already answered.
 
 ## Set up funding scripts
 
@@ -105,8 +111,8 @@ Offer these choices only on the scripts path, retaining a provider or custody ch
 2. **Use a local account**\
    Use an account you manage, or create one on this computer with its private key stored securely.
 
-3. **Create a wallet I can send funds to**\
-   Create an EVM or Solana wallet, send assets to it from your wallet or exchange, then run your scripts to bridge them to Aleo.
+3. **Create temporary wallet to complete the bridging**\
+   Create a temporary local EVM or Solana wallet, send assets to it from your wallet or exchange and use it to bridge funds to Aleo.
 
 ---
 
@@ -115,39 +121,58 @@ Which option would you like to use?
 
 Follow [build the funding scripts](references/funding-scripts.md). Use the existing project and language; ask where to put the scripts only if that is unknown. Ask Privy or Dynamic only after that choice is selected. A local account can already hold funds; the deposit-wallet path creates a dedicated receiving wallet and includes commands to check arrivals before bridging. Both retain credentials and recovery state across runs.
 
-Offer the public source balance check when an address is available, without making an existing funded wallet a requirement for writing scripts. Do not ask for a deposit as part of script setup. Finish with the created files, exact run commands, checks performed, and any remaining provider or credential setup. Return `funding scripts prepared` and the actual funding status to the calling skill; do not proceed through the guided transfer steps unless the person also asks to fund now.
+When a source address is already known, read its relevant public balances automatically; otherwise skip the check. An existing funded wallet is not a requirement for writing scripts. Do not ask for a deposit as part of script setup. Finish with the created files, exact run commands, checks performed, and any remaining provider or credential setup. Return `funding scripts prepared` and the actual funding status to the calling skill; do not proceed through the guided transfer steps unless the person also asks to fund now.
 
-## Check an existing source wallet
+## Review funds and choose a wallet
 
-Offer this optional step on the guided bridge path:
+On the guided bridge path, read the selected Aleo account's balances on the target network and automatically check relevant assets for any known source wallets before presenting Step 4. Follow [balance inspection](references/balances.md), preserving the selected language. Use public addresses already supplied in the conversation, available from the existing setup, or found in saved wallet metadata. Do not make these reads wait for “Check saved wallet.” If no source address is known, skip source balance checks and omit that section; do not stop to ask for an Ethereum address.
 
-```markdown
-**Step 4: Check an existing wallet · Optional**
+When the selected Aleo account has an existing trading setup, automatically read and show its private balances. Reuse the setup's account and record access, reconnecting through its saved configuration if needed. Balances just returned by setup can be shown directly if still current. Do not default a configured account to “Private balances: Not checked.”
 
-Share an Ethereum-style address to see its balances on **Base, Ethereum mainnet, Arbitrum, and Arc**. This only reads public balances; it doesn't connect your wallet or move funds.
+Show the balances, supported asset/network pairs, and funding-wallet options together in one Step 4 response. Use these separated sections, replacing the placeholders with observed results. Show only nonzero amounts, with public and private Aleo balances labeled separately. Keep failed or unchecked reads visible as status text. Repeat the saved-wallet section for each distinct wallet found. If a funding wallet has already been selected, retain it and continue to the next missing choice after showing the balances.
 
-Send an address, or reply **Skip**.
-```
-
-An EVM address must not fill the Aleo recipient field. Ask only for missing information; a supplied source address counts as choosing the public balance check.
-
-Run the [source balance check](references/balances.md) when an EVM address is supplied. Show all four networks, native gas, and the supported assets found, including zeros. Mark failed reads **Unavailable**. Explain the scope in one line: this checks assets supported by the bridge, not every asset in the wallet. Arc's USDC pays for both the transfer and gas; show it once.
-
-Show what a positive balance can fund, using the sending asset/network and the asset received on Aleo. For Base or Arbitrum USDC, explain that the funds pass through Arc before reaching Aleo as USDCx and that both transfers have fees. Keep the separate recovery state internally. Explain ETH on either L2 as money for that network's transaction fees; it cannot be sent to Aleo through this USDC path. An address supplied for inspection does not establish control of that wallet.
-
-If the check was skipped, continue to the wallet choice. Do not turn an optional address into a setup requirement.
-
-## Choose how to supply the funds
-
-For a guided transfer, reuse a configured signer when one has already been selected. Otherwise offer the following deposit-wallet path alongside any verified connections:
+Include **Assets you can send** even when no source wallet is known. Build the list from the [supported routes](references/bridge-transfer.md#choose-the-route), showing each sending asset and network and what arrives on Aleo. Put pairs matching known holdings first, then the other supported choices. This helps the person choose what to send from a wallet or exchange; it does not require sharing another address.
 
 ```markdown
-**Step 5: Choose a funding wallet**
+**Step 4: Choose a funding wallet**
 
-1. **Create a bridge address for me**\
+**Your Aleo account**
+
+Account: ACCOUNT_NAME\
+Network: Aleo TARGET_NETWORK\
+Address: ALEO_ADDRESS
+
+- AMOUNT ASSET · Private balance
+- AMOUNT ASSET · Public balance
+
+---
+
+**Saved bridge wallet**
+
+Address: SOURCE_ADDRESS
+
+- AMOUNT ASSET · SOURCE_NETWORK
+- GAS_AMOUNT GAS_ASSET · SOURCE_NETWORK · Available for network fees
+
+Previously set up to fund: SAVED_RECIPIENT_NAME_OR_ADDRESS
+
+---
+
+**Assets you can send**
+
+- **SOURCE_ASSET on SOURCE_NETWORK** → DESTINATION_ASSET on Aleo
+
+---
+
+**How to supply the funds**
+
+1. **Use the saved bridge wallet**\
+   Use SOURCE_ADDRESS to bridge funds to SELECTED_ALEO_ACCOUNT.
+
+2. **Create a bridge address for me**\
    A local EVM or Solana wallet that you own is created and stored locally and used to bridge funds to Aleo. I will use the funds you send to this wallet to bridge funds to Shield Swap.
 
-2. **Set up my own funding scripts**\
+3. **Set up my own funding scripts**\
    Set up funding from Privy or Dynamic, a local account, or a new deposit wallet.
 
 ---
@@ -155,9 +180,21 @@ For a guided transfer, reuse a configured signer when one has already been selec
 Which option would you like to use?
 ```
 
-When a usable wallet connection exists, add **Use CONNECTED_WALLET_NAME** before the deposit option, with its verified address and how approval happens. This can be a browser or hardware wallet through a supported integration, or an already configured local or hosted signer. Renumber the options. Never show “Keep your connected wallet” based only on a public address or a wallet mentioned in conversation. If someone asks to use a wallet without an available connection, explain the missing integration and offer sending from it to the deposit wallet or building that integration. Do not ask them to export its private key.
+This is a layout, not sample balance data. Omit zero-amount bullets. Summarize successful empty reads as “No nonzero private balances found in the checked assets” or “No nonzero public balances found in the checked assets,” as applicable. If private access is missing, locked, still syncing, or fails, state that reason in place of the private amounts. Public zeros do not establish that private balances are empty. Keep unavailable assets separate from verified holdings.
 
-Read [local wallets and deposit addresses](references/local-wallets.md) for a deposit wallet. Selecting this option asks the agent to create the wallet with the bundled helper after the network and asset are chosen. The person supplies funds to the resulting address; do not ask them to create the wallet themselves. The scripts choice switches to [set up funding scripts](#set-up-funding-scripts), preserving the account, source address, and any selected route. New provider integration belongs on that path. The bridge SDK connects signers; Privy and Dynamic provision their own wallets. Do not describe their server adapters as a consumer email-login flow.
+If a saved wallet's recipient differs from the selected Aleo account, say: “This wallet was previously set up to fund **SAVED_RECIPIENT**. Your selected receiving account is **SELECTED_RECIPIENT**.” Reading its balances does not change that recipient or reuse a pending transfer. Its saved status, such as “awaiting deposit,” is historical context, not evidence of current holdings. Keep technical state details out of the menu.
+
+Add one scope line after the results: “These checks cover supported assets and network fees, not every asset in a wallet.” For EVM wallets, check Base, Ethereum mainnet, Arbitrum, and Arc even when the saved task used only one. On Arc, show USDC once as both bridge funds and gas. Read an already supplied source address alongside saved wallets, deduplicating repeated addresses, and label it **Your source wallet** if it is not a saved bridge wallet. Omit the previous-recipient line when none is known. An address supplied for inspection does not establish control of that wallet.
+
+Repeat the asset-pair bullet for each supported choice, grouping pairs by source network when the list is long. For Base or Arbitrum USDC, add “via Arc” and explain once that both transfers have fees. Keep the separate recovery state internally. ETH on either L2 pays that network's transaction fees; do not list it as an asset that can be bridged through the USDC path.
+
+Ask only for the funding-wallet choice, without a separate **Continue**, **Skip**, or “Check another wallet” prompt. If the person supplies another source address, read its relevant balances and keep the selected Aleo recipient unchanged. Do not repeat a choice the person has already made.
+
+Every saved bridge wallet shown as a funding source needs a matching **Use the saved bridge wallet** choice before the new-address option. For several wallets, identify each choice by name or shortened address. Omit this choice when none is saved and renumber the menu. Missing gas does not remove the choice: add a short note such as “Needs ETH on Ethereum for network fees.” Selection proceeds to [reuse the saved wallet](references/local-wallets.md#reuse-a-saved-wallet); it does not create another address or submit a transfer. If access is known to be blocked, state what needs restoring. An unresolved transfer must be recovered before preparing another one.
+
+When another usable wallet connection exists, add **Use CONNECTED_WALLET_NAME** before the new-address option, with its verified address and how approval happens. This can be a browser or hardware wallet through a supported integration, or an already configured local or hosted signer. Deduplicate it against saved-wallet choices and renumber the options. Never call an inspected public address a connected wallet. If someone asks to use a wallet without an available connection, explain the missing integration and offer sending from it to the deposit wallet or building that integration. Do not ask them to export its private key.
+
+Read [local wallets and deposit addresses](references/local-wallets.md) when **Create a bridge address for me** is selected. This asks the agent to create the wallet with the helper for the selected language after the network and asset are chosen: `local_wallet.py` for Python, `local-wallet.mjs` for JavaScript/TypeScript. The person supplies funds to the resulting address; do not ask them to create the wallet themselves. The scripts choice switches to [set up funding scripts](#set-up-funding-scripts), preserving the account, source address, and any selected route. New provider integration belongs on that path. The bridge SDK connects signers; Privy and Dynamic provision their own wallets. Do not describe their server adapters as a consumer email-login flow.
 
 For a new deposit address, choose the **source network and asset first**. Use a supported [route](references/bridge-transfer.md#choose-the-route), then create the wallet. Keep its credential and recovery state through delivery and any return of leftover funds, even when it is used for only this transfer. Store it persistently across terminal sessions.
 
@@ -199,7 +236,7 @@ An exchange withdrawal must use the named chain and exact supported token. Do no
 
 ## Review and follow the transfer
 
-Use [bridge transfer and recovery](references/bridge-transfer.md). Present the source wallet, network, asset and amount, final Aleo address, route, estimated receipt, fees, gas reserve, and whether delivery is public or confidential. For a route through Arc, include its intermediate wallet and both transfers. Explain any required Aleo fee funding before a source deposit.
+Use [native Python funding](references/python-funding.md#quote-execute-and-recover) for Python, or [bridge transfer and recovery](references/bridge-transfer.md) for JavaScript/TypeScript. Present the source wallet, network, asset and amount, final Aleo address, route, estimated receipt, fees, gas reserve, and whether delivery is public or confidential. For a route through Arc, include its intermediate wallet and both transfers. Explain any required Aleo fee funding before a source deposit.
 
 Ask for approval of that concrete transfer unless it is already authorized with the same details and limits. Creating a wallet, reading balances, or selecting “bridge” does not authorize an unspecified amount. Keep an existing authorization instead of repeatedly asking for the same approval. Requote when the amount or fee limit changes materially; do not silently increase it.
 
