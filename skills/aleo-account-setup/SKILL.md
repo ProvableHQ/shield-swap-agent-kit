@@ -13,7 +13,7 @@ Veil, the Python SDK, and the Shield Swap CLI share account files in `~/.aleo/ac
 
 ## Start with what is already there
 
-Keep the chosen language, account, and storage preference. Check the selected tool and any existing account before asking someone to start over. Read [setup commands](references/commands.md) for the interface you need; use [dependencies](references/dependencies.md) when installation is needed. Inspect public account details and whether environment variables are set, without printing their values or opening private key files in tool output.
+Keep the chosen language, account, and storage preference. Check the selected tool and any existing account before asking someone to start over. Read [setup commands](references/commands.md) for the interface you need. Follow [dependencies](references/dependencies.md) to check npm or PyPI and upgrade an outdated installation before retrying a missing account command or import. Shared account features ship in Veil/CLI 0.17.0+ and Python 0.9.0+; use the latest published release, not a local SDK build. Inspect public account details and whether environment variables are set, without printing their values or opening private key files in tool output.
 
 If no tool was selected, use the existing Python or Node project. Outside a project, choose an available account command that needs the least additional setup and say which one you are using. Ask about a runtime only if the choice affects their application.
 

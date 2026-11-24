@@ -25,7 +25,7 @@ The agent's main menu exposes both checks in a separate **CHECK SETUP** section,
 | 5 · Check existing accounts | `check accounts` | Refresh the Aleo, EVM, and Solana account inventory. Show full known public addresses, saved locations, storage, and current access status. |
 | 6 · Check existing setup | `check setup` | Refresh the current project's accounts, installed tools/SDKs, versions, locations, and current agent connections. |
 
-These are arguments or requests to the main Shield Swap skill, not separate globally installed slash commands. A direct command skips the onboarding menu and returns the requested report. Keep the selected account, project, and journey. Never turn an inspection request into creating an account, installing tools, unlocking a wallet, or authenticating a new session.
+These are arguments or requests to the main Shield Swap skill, not separate globally installed slash commands. A direct command skips the onboarding menu and returns the requested report. Keep the selected account, project, and journey. Never turn an inspection request into creating an account, installing missing tools, unlocking a wallet, or authenticating a new session. Handle an outdated existing installation as described below.
 
 With the same `KIT_DIRECTORY` and `PROJECT_DIRECTORY` as above, run the matching shell command:
 
@@ -55,6 +55,12 @@ After the local command, add relevant current host facts using [agent connection
 | JavaScript/TypeScript | Installed Shield Swap, bridge, Veil, viem, and Solana Kit packages found through the project's `node_modules` lookup paths and npm/pnpm global package directories. Reports package locations and distinguishes global installs. |
 
 Only installed packages count. Dependency declarations and lockfiles are not installation evidence. Different versions in different environments remain separate entries. Python aliases pointing to the same environment appear once. The first command found on PATH is the command this session would use; the inspector is not a search for every executable on the machine.
+
+## Update outdated account tools
+
+The local inspector only reports installed state; it does not query registries or install packages. For an explicit check or a selected setup task, the calling agent compares the relevant versions with npm/PyPI using [dependency setup](../../skills/aleo-account-setup/references/dependencies.md#check-releases-before-repairing-an-installation). Upgrade an outdated Veil SDK, Shield Swap CLI, or Python SDK in the selected environment, then rerun inspection and any failed account metadata check. Report the old and new version and the installation updated. For an explicitly read-only request, report the available update without applying it.
+
+Shared account features ship in Veil/CLI 0.17.0+ and Python 0.9.0+. Missing `accountInfo`, `aleo.keystore`, or the CLI `account` command should trigger this registry-and-upgrade path before a capability-gap conclusion. Use the latest published release; do not build a local SDK or replace an account. If an upgrade fails or the needed release is unavailable, retain the account-file finding and report the blocker. Merely rendering the welcome does not trigger installations or upgrades.
 
 ## Add agent connections
 

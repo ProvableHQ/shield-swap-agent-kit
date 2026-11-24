@@ -6,7 +6,7 @@ The examples use **testnet**. Keep the account's state outside the installed kit
 
 ## CLI
 
-Follow [Aleo account setup](../../skills/aleo-account-setup/SKILL.md) first if the account is not selected and verified. The account commands create or import the shared account without signing in or moving funds. Use the [CLI dependencies](../../skills/aleo-account-setup/references/dependencies.md#veil-and-the-shield-swap-cli) from Veil `main`.
+Follow [Aleo account setup](../../skills/aleo-account-setup/SKILL.md) first if the account is not selected and verified. The account commands create or import the shared account without signing in or moving funds. Install or upgrade the [CLI dependencies](../../skills/aleo-account-setup/references/dependencies.md#veil-and-the-shield-swap-cli) from npm.
 
 For an explicitly requested CLI session with authentication, API-token creation, and testnet funding, the combined command below can perform those effects. Basic onboarding uses the standalone skill's separate checks instead. Verify the selected public identity and existing recovery state in the working directory before running this command; do not infer an account mismatch from the directory name:
 

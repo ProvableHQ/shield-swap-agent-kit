@@ -108,7 +108,7 @@ To install account setup on its own from a local checkout, run this in a separat
 npx skills add /path/to/shield-swap-agent-kit --skill aleo-account-setup
 ```
 
-Invoke `/aleo-account-setup` in Claude Code or `$aleo-account-setup` in Codex. It covers basic setup through API access, scanner registration, and balance checks, then offers trading or funding choices. A selected funding option invokes `aleo-funding` with the verified address. Its [dependency instructions](skills/aleo-account-setup/references/dependencies.md) use Veil `main` and the latest Python SDK releases from PyPI. The skill name remains `aleo-account-setup` for existing installations.
+Invoke `/aleo-account-setup` in Claude Code or `$aleo-account-setup` in Codex. It covers basic setup through API access, scanner registration, and balance checks, then offers trading or funding choices. A selected funding option invokes `aleo-funding` with the verified address. Its [dependency instructions](skills/aleo-account-setup/references/dependencies.md) check npm/PyPI and upgrade outdated Veil, CLI, or Python SDK installations to the latest published releases before retrying account checks. The skill name remains `aleo-account-setup` for existing installations.
 
 To install the funding skill independently, use `npx skills add /path/to/shield-swap-agent-kit --skill aleo-funding` from the consuming project. Invoke `/aleo-funding` in Claude Code or `$aleo-funding` in Codex. Installing the root `shield-swap` package includes both setup and funding; installing just `aleo-account-setup` needs the funding companion when a funding option is selected.
 

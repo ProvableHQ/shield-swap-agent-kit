@@ -4,7 +4,7 @@ Use `shield-swap-sdk`, imported as `aleo_shield_swap`, for Python bots, notebook
 
 ## Install in the application
 
-Follow [Python dependency setup](../../skills/aleo-account-setup/references/dependencies.md#python) to install or upgrade `aleo-sdk` and `shield-swap-sdk` to the latest PyPI releases using prebuilt wheels. Retain an existing virtual environment when there is one. Run the [account and network capability check](../../skills/aleo-account-setup/references/dependencies.md#check-account-support-and-both-networks) before account setup. Record the resolved release versions in the application. Missing capabilities should be reported; onboarding does not fall back to source builds.
+Follow [Python dependency setup](../../skills/aleo-account-setup/references/dependencies.md#python) to check PyPI and install or upgrade `aleo-sdk` and `shield-swap-sdk` to the latest releases using prebuilt wheels. Retain an existing virtual environment when there is one. Account setup uses the 0.9.0+ interfaces. Run the [account and network capability check](../../skills/aleo-account-setup/references/dependencies.md#check-account-support-and-both-networks) before setup and after upgrading. Retry with the updated environment before reporting a missing capability; onboarding does not fall back to source builds. Record the resolved release versions in the application.
 
 The installed package can print its full API reference:
 

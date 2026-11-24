@@ -27,6 +27,8 @@ python -m pip show shield-swap-sdk aleo-sdk
 
 Record versions, operating system, selected network, public account address, endpoint hostname, and state-directory location. Do not dump environment variables or account files.
 
+For an outdated installation or missing account interface, follow [release checks and upgrades](../../skills/aleo-account-setup/references/dependencies.md#check-releases-before-repairing-an-installation). Query npm/PyPI, upgrade the selected installation to the latest stable release, and retry using the same executable or interpreter. Account support ships in Veil/CLI 0.17.0+ and Python 0.9.0+; an older installed copy is not a reason to build SDK sources. An explicitly read-only diagnosis reports the available update without applying it.
+
 CLI state is relative to the working directory. Python profiles retain their stored network. Use [account verification](configure-account.md) before interpreting empty state as a new account. Stop rather than run setup with `--new` to repair an existing account.
 
 ## 2. Separate the service checks

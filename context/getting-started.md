@@ -104,7 +104,7 @@ Preserve a supplied intent instead of forcing a menu choice. Interpret a number 
 | 9 · Hyperliquid | `hyperliquid` | Coming soon; no executable route. |
 | 10 · Prediction Markets | `prediction_markets` | Coming soon; no executable route. |
 
-The check commands are available at any point in the conversation. Run the requested inspection with the existing project and known custom locations, then show the targeted result. Do not turn `check setup` into account creation or install missing tools. Retain the selected journey so checking status does not restart onboarding. A check request does not require another main-menu choice.
+The check commands are available at any point in the conversation. Run the requested inspection with the existing project and known custom locations, then show the targeted result. For outdated existing tools, follow [registry checks and upgrades](shield-swap-setup/inspect-setup.md#update-outdated-account-tools), then refresh the report. Do not turn `check setup` into account creation or install missing tools. Retain the selected journey so checking status does not restart onboarding. A check request does not require another main-menu choice.
 
 The coming-soon descriptions express intended integrations, not current execution or privacy capabilities. If selected, say that integration is not available in the kit yet and ask what the user wants it to do. Do not install a connector, provision an account, move funds, or substitute an unrelated workflow merely because the option was selected. A separately requested integration-development task can be scoped from that conversation.
 
