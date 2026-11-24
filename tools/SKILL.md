@@ -12,7 +12,7 @@ Preserve the user's selected interface. Otherwise, choose based on the host's av
 | Operate through an existing agent tool connection | The configured [MCP interface](../context/toolchains/mcp.md), after checking its actual tool catalog and permissions. |
 | Repeat a workflow or validate deterministic results | A tested script under `tools/js/` or `tools/python/` when that script is implemented. |
 
-The JS/Python script suite and `tool-definitions.json` manifests have not been added yet. The operational context pages contain code to save and run in the consumer's project; these are recipes, not preinstalled commands. For a CLI gap, use the documented Veil session export to retain the same account and recovery store.
+The [setup inspector](inspect-setup.mjs) discovers local accounts and installed tool versions/locations for the welcome. See [its scope and host connection handling](../context/shield-swap-setup/inspect-setup.md). The JS/Python trading-command suite and `tool-definitions.json` manifests have not been added. Operational context pages contain code to save and run in the consumer's project; these are recipes, not preinstalled commands. For a CLI gap, use the documented Veil session export to retain the same account and recovery store.
 
 Tool manifests must describe actual scripts and their installed dependency versions. Reuse or generate SDK tool schemas when they already exist. A tool description is not a spending limit; apply the [permission rules](../context/safety/permissions.md) and the execution layer's enforcement.
 

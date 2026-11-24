@@ -17,7 +17,7 @@ Opening the root skill without a concrete task starts this onboarding guide imme
 Private asset trading
 ```
 
-Use the layout below with verified facts, or the shared [welcome renderer](../tools/welcome.mjs). Keep **Tools**, **Aleo account**, and **Funding** as the three row labels. Do not substitute network rows or insert paths, script names, journals, SQLite, or signer implementation details.
+Use the layout below with verified facts, or the shared [welcome renderer](../tools/welcome.mjs). Keep **Tools**, **Aleo account**, and **Funding** as the three row labels. Put the discovered accounts and installed tool versions/locations in separate **ACCOUNTS** and **TOOLS** sections below the box, following [setup inspection](shield-swap-setup/inspect-setup.md). Keep journals and signer implementation details out of the introduction.
 
 Follow it with the status panel. This example is illustrative: replace every value with observed facts. Use ✓ for a verified check, ○ for missing or unchecked, and ! for a failed check. Do not invent percentages or show a check as running unless it is actually running.
 
@@ -30,6 +30,8 @@ Keep the banner and setup box in fenced text blocks. Render the menus below them
 │  ○ Funding        Not checked                      │
 ╰───────────────────────────────────────────────────╯
 ```
+
+Insert **ACCOUNTS** and **TOOLS** here using the current inspection. Show Aleo, EVM, and Solana account names, known public addresses, and access status. List each detected tool with its installed version and location. These sections precede the unchanged menu below; never replace them with only “Available” or “Configured.”
 
 **GET STARTED**
 
@@ -55,17 +57,17 @@ Keep the banner and setup box in fenced text blocks. Render the menus below them
 7. **Hyperliquid:** Trade perpetual futures privately on Hyperliquid.
 8. **Prediction Markets:** Create a private vault around prediction market trades.
 
-Show all three sections and keep options 1–8 in this order, even when accounts are already configured. Preserve the menu wording above. Options 1–5 have routes; 6–8 stay under **INTEGRATIONS [Coming Soon]**. Do not omit or renumber options based on setup status. Skip completed setup work within the selected route. Only a concrete task (a specified swap, an identified tool to connect, or a strategy to build) replaces the menu with that task and its next missing step. Do not ask them to select it again. Report current unchecked funding as **Not checked**; historical funding notes do not prove present holdings. Keep paths, network choices, storage questions, and protocol details out of this introduction. Account storage is handled by the setup skill; resolve a real configuration conflict only when encountered.
+Show all three menu sections and keep options 1–8 in this order, even when accounts are already configured. Preserve the menu wording above. Options 1–5 have routes; 6–8 stay under **INTEGRATIONS [Coming Soon]**. Do not omit or renumber options based on setup status. Skip completed setup work within the selected route. Only a concrete task (a specified swap, an identified tool to connect, or a strategy to build) replaces the menu with that task and its next missing step. Do not ask them to select it again. Report current unchecked funding as **Not checked**; historical funding notes do not prove present holdings. Show tool installation paths in **TOOLS**; keep network choices, storage questions, and protocol details out of this introduction. Account storage is handled by the setup skill; resolve a real configuration conflict only when encountered.
 
 ## Check the existing setup
 
-Start with the available interface and an existing account; see [tool selection](../tools/SKILL.md). Never inspect or print secret file contents to fill the panel.
+Run [setup inspection](shield-swap-setup/inspect-setup.md) against the working project, then add current agent connection facts. This provides the existing account inventory and tool versions/locations for the main screen. See [tool selection](../tools/SKILL.md) when a journey is chosen. Never print secret file contents to fill the panel.
 
 Inspect the configured account and session without provisioning a replacement. Distinguish a missing account, a locked account, and a configured account whose access has not yet been checked. When access and holdings are relevant, follow [configuration](shield-swap-setup/configure-shield-swap.md) and [funding](shield-swap-setup/bridge-funds.md) using the selected interface. Authentication and scanner registration can change session state; they do not authorize funding or trading. Failed access or scanning is an unavailable check, never a zero balance.
 
 If the required asset and amount are known, compare them with the observed private holdings using discovered token metadata. Otherwise label observed private holdings **Private funds found**, not **Ready to swap**. Public-only balances are insufficient for a private swap. Aggregate holdings do not verify a covering record, fees, a valid quote, or execution permission. Keep those checks in the operation's existing preflight.
 
-For a plain introductory question, show the screen immediately using current checks or **Not checked**. It does not require account creation first. Continue the selected journey afterward.
+For a plain introductory question, perform the bounded local inspection and show the screen. If a check cannot run, use **Not checked** or **Could not check** for that item. Do not defer all discovery to the funding journey. It does not require account creation first. Continue the selected journey afterward.
 
 ## The two setup steps
 

@@ -16,7 +16,7 @@ npx --yes skills@latest use ProvableHQ/shield-swap-agent-kit --skill shield-swap
 
 Use `--agent codex` for Codex CLI. The selected agent must already be installed and signed in.
 
-This entrypoint works with SDK, CLI, or MCP paths. Opening the guide does not require a wallet or MCP connection; unknown setup facts start as **Not checked**.
+This entrypoint works with SDK, CLI, or MCP paths. Opening the guide checks local account metadata and installed tools, then shows Aleo, EVM, and Solana accounts plus tool versions and locations below **YOUR SETUP**. See [setup inspection](context/shield-swap-setup/inspect-setup.md) for the checked locations and custom project paths. It does not require a wallet or MCP connection; unknown access and funding remain **Not checked**.
 
 The opening screen preserves **SHIELD SWAP**, **Private asset trading**, and the **YOUR SETUP** box. Options **1–5** route to account setup, funding, market exploration, trading integration, and arbitrage respectively. Options **6–8** stay visibly marked **Coming Soon**; they do not install connectors or execute trades. A direct request to make a swap still follows the complete swap-and-claim workflow.
 

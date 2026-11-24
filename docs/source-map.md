@@ -22,6 +22,10 @@ Copied-consumer tests exercise native quote shapes, real Web3 ABI encoding and s
 
 The copied Python trading modules also submitted two independent testnet swaps concurrently, using existing ETH and USDCx records. A fresh process resumed and confirmed both claims: `0.0001` testnet ETH returned `0.197188` USDCx, and `0.2` testnet USDCx returned `0.000112282234744379` ETH. Both input refunds were zero. SDK journals and operation state were retained privately outside the deliverable. This validates the Python submit/restart/claim path; it does not establish a profitable two-venue cycle or funded TypeScript execution. No mainnet funds were spent.
 
+### Opening account and tool inventory
+
+The [local setup inspector](../tools/inspect-setup.mjs) uses the public shared-account APIs described below, the funding skill's version 1 wallet manifests, and installed package metadata. Its tests cover all three account families, version/location reporting, missing or incompatible tools, custom locations, and a copy run outside the kit. A native smoke check on 2026-11-24 used an isolated home with an address-only account, installed Veil packages `0.16.2`, Python packages `0.8.0`, and the installed Shield Swap CLI `0.16.2`. The older SDKs lacked metadata readers, so the CLI supplied the public account description. No signing key, keychain entry, scanner, or chain was accessed. Host wallet/MCP readiness remains a separate current check by the calling agent.
+
 ### Shared account setup
 
 The [Aleo account setup skill](../skills/aleo-account-setup/SKILL.md) and account connection recipes were checked against Veil `main` at [`f59affa8`](https://github.com/ProvableHQ/veil/commit/f59affa8ce4a13e58ecb357e06ad4d449af02d38) and Python SDK source at [`156df8e7`](https://github.com/ProvableHQ/python-sdk/commit/156df8e78689c05af9c4ddffbcca23e253dde8cb) on 2026-11-17. Those are source-validation records, not Python installation instructions. Python setup installs the latest `aleo-sdk` and `shield-swap-sdk` releases from PyPI and checks the installed account interfaces. Veil setup uses `main`.

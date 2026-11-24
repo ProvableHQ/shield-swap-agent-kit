@@ -7,9 +7,9 @@ export const banner = `███████╗██╗  ██╗██╗█�
 
 /**
  * Render Markdown with a fenced banner/setup box and bold menu titles.
- * Render public readiness only. Never interpolate profile paths, keys, balances,
- * backend messages or historical account notes into the welcome.
- * @param {{checks?: {tools?: {status: string}, account?: {status: string}, funding?: {status: string}}}} report
+ * Render the inspector's public inventory, plus current host connection facts.
+ * Never interpolate key material, raw errors, or historical funding notes.
+ * @param {object} report
  * @param {{width?: number}} options
  */
 export function renderWelcome(report = {}, { width = 100 } = {}) {
@@ -17,7 +17,7 @@ export function renderWelcome(report = {}, { width = 100 } = {}) {
   const funding = report.checks?.funding?.status ?? 'not_checked';
   const tools = report.checks?.tools?.status ?? 'not_checked';
   const labels = {
-    tools: { available: ['✓', 'Available'], preparing: ['○', 'Preparing'], not_checked: ['○', 'Not checked'] },
+    tools: { available: ['✓', report.tools ? `${report.tools.length} installations found` : 'Available'], missing: ['○', 'No tools found'], preparing: ['○', 'Preparing'], not_checked: ['○', 'Not checked'] },
     account: { missing: ['○', 'Not configured'], locked: ['○', 'Unlock required'], configured: ['✓', 'Configured · access not checked'], usable: ['✓', 'Access verified'], unavailable: ['!', 'Access needs attention'], not_checked: ['○', 'Not checked'] },
     funding: { available: ['✓', 'Private funds found'], insufficient: ['○', 'Funding needed'], unavailable: ['!', 'Could not check'], not_checked: ['○', 'Not checked'] },
   };
@@ -30,6 +30,7 @@ export function renderWelcome(report = {}, { width = 100 } = {}) {
     '╭─ YOUR SETUP '.padEnd(59, '─') + '╮',
     row('Tools', labels.tools[tools]), row('Aleo account', labels.account[account]), row('Funding', labels.funding[funding]),
     '╰──────────────────────────────────────────────────────────╯', '```', '',
+    ...renderInventory(report),
     '**GET STARTED**', '',
     '1. **Configure an Aleo account for Shield Swap**\\',
     '   Setup an Aleo account to trade privately on Shield Swap.', '',
@@ -46,4 +47,79 @@ export function renderWelcome(report = {}, { width = 100 } = {}) {
     '7. **Hyperliquid:** Trade perpetual futures privately on Hyperliquid.',
     '8. **Prediction Markets:** Create a private vault around prediction market trades.',
   ].join('\n');
+}
+
+// Inventory labels come from public metadata. Escape formatting and ignore all
+// fields outside this presentation contract, including errors and credentials.
+function text(value) {
+  return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/APrivateKey1\S+|AViewKey1\S+|0x[0-9a-fA-F]{64}\b/g, '[redacted]')
+    .replace(/[\\`*_{}\[\]<>|]/g, '\\$&').slice(0, 512);
+}
+function shortAddress(address) {
+  if (!/^(aleo1[023456789acdefghjklmnpqrstuvwxyz]{58}|0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(address ?? '')) return '';
+  return `${address.slice(0, address.startsWith('aleo') ? 10 : 6)}…${address.slice(-6)}`;
+}
+function location(value) {
+  if (/^https?:\/\//i.test(value ?? '')) {
+    try {
+      const url = new URL(value);
+      url.username = ''; url.password = ''; url.search = ''; url.hash = '';
+      return text(url.toString());
+    } catch { return 'Location not reported'; }
+  }
+  return text(value);
+}
+
+export function renderInventory(report) {
+  const lines = ['**ACCOUNTS**', ''];
+  const storage = { keychain: 'Keychain', encrypted: 'Encrypted file', plaintext: 'Unencrypted file',
+    none: 'Address only', 'os-keyring': 'OS credential store' };
+  const statuses = { saved: 'Access not checked', metadata_unavailable: 'Account file found; details unavailable',
+    key_file_found: 'Keypair file found; address and access not checked', address_only: 'Address known; access not checked',
+    locked: 'Unlock required', usable: 'Access verified', unavailable: 'Access needs attention' };
+  for (const [family, label] of [['aleo', 'Aleo'], ['evm', 'EVM'], ['solana', 'Solana']]) {
+    const matching = (report.accounts ?? []).filter(item => item.family === family);
+    const grouped = new Map();
+    for (const account of matching) {
+      const key = account.address ? (family === 'evm' ? account.address.toLowerCase() : account.address) : account.path ?? account.name;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(account);
+    }
+    for (const group of grouped.values()) {
+      const account = group.find(item => item.status === 'saved') ?? group[0];
+      const names = [...new Set(group.map(item => text(item.name)))].join(', ');
+      const address = shortAddress(account.address);
+      const protection = [...new Set(group.map(item => storage[item.storage]).filter(Boolean))].join(', ');
+      const states = new Set(group.map(item => statuses[item.status] ?? 'Not checked'));
+      const access = states.size === 1 ? [...states][0]
+        : group.map(item => `${text(item.name)}: ${statuses[item.status] ?? 'Not checked'}`).join('; ');
+      lines.push(`- **${label} · ${names}**${address ? ` · ${address}` : ''}\\`,
+        `  ${protection ? `${protection} · ` : ''}${access}`);
+    }
+    const sources = (report.sources ?? []).filter(item => item.family === family);
+    for (const source of sources) lines.push(`- **${label} · ${text(source.name)}** · ${source.status === 'empty'
+      ? 'Configured but empty' : 'Key source configured; address and access not checked'}`);
+    if (!matching.length && !sources.length) {
+      const failed = (report.issues ?? []).some(item => item.family === family || item.family === 'source_wallets');
+      lines.push(`- **${label}** · ${failed ? 'Could not check all account locations' : report.accounts ? 'None found in checked locations' : 'Not checked'}`);
+    } else if ((report.issues ?? []).some(item => item.family === family || item.family === 'source_wallets')) {
+      lines.push(`  Some ${label} account locations could not be checked.`);
+    }
+  }
+  lines.push('', '**TOOLS**', '');
+  for (const tool of report.tools ?? []) {
+    lines.push(`- **${text(tool.name)}** · ${tool.version ? text(tool.version) : 'Version unavailable'}\\`,
+      `  ${text(tool.path)}${tool.environment && tool.environment !== report.project ? ` (${text(tool.environment)})` : ''}`);
+  }
+  if (!report.tools?.length) lines.push(report.tools ? 'No supported local tools found.' : 'Local tools not checked.');
+  for (const connection of report.connections ?? []) {
+    const state = { ready: 'Connected', locked: 'Unlock required', setup_required: 'Connection setup required',
+      unavailable: 'Unavailable' }[connection.status] ?? 'Not checked';
+    lines.push(`- **${text(connection.name)}** · ${state} · ${connection.version ? text(connection.version) : 'Version not reported'}\\`,
+      `  ${connection.location ? location(connection.location) : 'Agent tool connection; location not reported'}`);
+  }
+  if (report.issues?.some(item => item.family === 'tools')) lines.push('Some tool versions could not be checked.');
+  lines.push('', '---', '');
+  return lines;
 }

@@ -20,7 +20,7 @@ function assertIntro(screen) {
   ]);
   const box = screen.split('\n').filter(line => /^[╭│╰]/u.test(line));
   assert.deepEqual(box.map(line => [...line].length), [60, 60, 60, 60, 60]);
-  const menu = screen.split('```\n\n')[1];
+  const menu = screen.slice(screen.indexOf('**GET STARTED**'));
   assert.ok(menu.startsWith('**GET STARTED**'));
   assert.doesNotMatch(menu, /```/);
   assert.match(menu, /^   Setup an Aleo account to trade privately on Shield Swap\.$/m);
@@ -35,7 +35,8 @@ test('new users see the unchanged heading and setup box with the full numbered m
 
 test('the renderer and installed agent guide show the same menu', async () => {
   const guide = await readFile(new URL('../context/getting-started.md', import.meta.url), 'utf8');
-  const menu = renderWelcome().split('```\n\n')[1];
+  const welcome = renderWelcome();
+  const menu = welcome.slice(welcome.indexOf('**GET STARTED**'));
   assert.ok(guide.includes(menu));
 });
 
@@ -65,4 +66,37 @@ test('narrow displays retain a plain heading, tagline, status and choices', () =
   assert.match(screen, /4\. \*\*Setup a private trading integration\*\*/);
   assert.match(screen, /5\. \*\*Create an arbitrage bot\*\*/);
   assert.doesNotMatch(screen, /\u001b/);
+  assert.match(screen, /\*\*Aleo\*\* · Not checked/);
+  assert.match(screen, /Local tools not checked/);
+  assert.doesNotMatch(screen, /None found in checked locations/);
+});
+
+test('inventory keeps the setup box and menu while showing account access and exact tool locations', () => {
+  const screen = renderWelcome({ checks: { account: { status: 'configured' } }, accounts: [
+    { family: 'aleo', name: 'trading', address: 'aleo1' + 'q'.repeat(58), storage: 'encrypted', status: 'saved', privateKey: 'SECRET' },
+    { family: 'evm', name: 'browser', address: '0x' + '1'.repeat(40), status: 'locked' },
+  ], tools: [{ name: 'shield-swap', version: '0.16.2', path: '/opt/bin/shield-swap', stderr: 'SECRET' }],
+    connections: [{ name: 'Shield', status: 'setup_required', error: 'SECRET',
+      location: 'https://user:SECRET@example.com/mcp?token=SECRET#SECRET' }] });
+  assert.match(screen, /Encrypted file · Access not checked/);
+  assert.match(screen, /Unlock required/);
+  assert.match(screen, /\*\*Solana\*\* · None found in checked locations/);
+  assert.match(screen, /\*\*shield-swap\*\* · 0\.16\.2/);
+  assert.match(screen, /\/opt\/bin\/shield-swap/);
+  assert.match(screen, /Connection setup required · Version not reported/);
+  assert.match(screen, /https:\/\/example\.com\/mcp/);
+  assert.doesNotMatch(screen, /SECRET/);
+  assert.deepEqual([...screen.matchAll(/^(\d)\. \*\*/gm)].map(match => match[1]), ['1', '2', '3', '4', '5', '6', '7', '8']);
+  const box = screen.split('\n').filter(line => /^[╭│╰]/u.test(line));
+  assert.deepEqual(box.map(line => [...line].length), [60, 60, 60, 60, 60]);
+});
+
+test('merging the same address retains each connection access status', () => {
+  const address = '0x' + '1'.repeat(40);
+  const screen = renderWelcome({ accounts: [
+    { family: 'evm', name: 'local', address, storage: 'encrypted', status: 'saved' },
+    { family: 'evm', name: 'browser', address, status: 'usable' },
+  ], tools: [] });
+  assert.equal(screen.match(/\*\*EVM ·/g).length, 1);
+  assert.match(screen, /local: Access not checked; browser: Access verified/);
 });
