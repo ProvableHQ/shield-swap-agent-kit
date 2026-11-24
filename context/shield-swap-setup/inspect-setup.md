@@ -18,12 +18,12 @@ For known custom locations, add `--accounts-dir DIRECTORY`, `--wallet-dir DIRECT
 
 ## Explicit check commands
 
-The agent's main menu exposes both checks under **GET STARTED**, as the first two options. Recognize the number only when the main menu is active; recognize the command words directly at any point.
+The agent's main menu exposes both checks in a separate **CHECK SETUP** section, immediately after the **GET STARTED** section. Recognize the number only when the main menu is active; recognize the command words directly at any point.
 
 | Menu | Agent command | Result |
 | --- | --- | --- |
-| 1 · Check existing accounts | `check accounts` | Refresh the Aleo, EVM, and Solana account inventory. Show full known public addresses, saved locations, storage, and current access status. |
-| 2 · Check existing setup | `check setup` | Refresh the current project's accounts, installed tools/SDKs, versions, locations, and current agent connections. |
+| 5 · Check existing accounts | `check accounts` | Refresh the Aleo, EVM, and Solana account inventory. Show full known public addresses, saved locations, storage, and current access status. |
+| 6 · Check existing setup | `check setup` | Refresh the current project's accounts, installed tools/SDKs, versions, locations, and current agent connections. |
 
 These are arguments or requests to the main Shield Swap skill, not separate globally installed slash commands. A direct command skips the onboarding menu and returns the requested report. Keep the selected account, project, and journey. Never turn an inspection request into creating an account, installing tools, unlocking a wallet, or authenticating a new session.
 

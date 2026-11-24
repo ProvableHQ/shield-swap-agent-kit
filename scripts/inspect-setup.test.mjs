@@ -229,7 +229,7 @@ test('explicit accounts/setup commands work from an installed copy and help perf
     { cwd: f.project, env: { HOME: f.home, PATH: f.bin }, timeout: 10000 });
   const welcome = await run(['--project', f.project]);
   assert.ok(welcome.ok, welcome.stderr);
-  assert.match(welcome.stdout, /\*\*GET STARTED\*\*\n\n1\. \*\*Check existing accounts\*\*/);
+  assert.match(welcome.stdout, /\*\*CHECK SETUP\*\*\n\n5\. \*\*Check existing accounts\*\*/);
   assert.doesNotMatch(welcome.stdout, /\*\*ACCOUNTS\*\*|\*\*TOOLS\*\*|0x1111|funding-wallets|OS credential store/);
   const accounts = await run(['accounts', '--project', f.project]);
   assert.ok(accounts.ok, accounts.stderr);

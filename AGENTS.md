@@ -6,7 +6,7 @@ Choose [Veil](context/toolchains/typescript.md), [Python](context/toolchains/pyt
 
 Before the main menu, run [setup inspection](context/shield-swap-setup/inspect-setup.md) to populate the compact **YOUR SETUP** summary. Retain the heading and box, then go directly to **GET STARTED**. Show detailed account and tool listings only when a check is requested. Saved metadata does not prove signing access; unavailable checks remain visible in the summary.
 
-Main-menu options **1 · Check existing accounts** and **2 · Check existing setup** run the [explicit inspection commands](context/shield-swap-setup/inspect-setup.md#explicit-check-commands). Also accept `check accounts` and `check setup` directly. Show their targeted results, preserve the selected journey, and do not route an inspection request into account creation or installation.
+Main-menu options **5 · Check existing accounts** and **6 · Check existing setup** under **CHECK SETUP** run the [explicit inspection commands](context/shield-swap-setup/inspect-setup.md#explicit-check-commands). Also accept `check accounts` and `check setup` directly. Show their targeted results, preserve the selected journey, and do not route an inspection request into account creation or installation.
 
 Each operational page explains the shared behavior, then gives interface-specific recipes. Read the section for the chosen interface, not every implementation. The examples use testnet and run in the consumer's project, outside this installed kit. Change networks only to match the user's request. The kit does not bundle its own trading CLI.
 

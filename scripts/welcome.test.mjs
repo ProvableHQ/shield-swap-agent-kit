@@ -5,16 +5,16 @@ import { banner, renderInspection, renderWelcome } from '../tools/welcome.mjs';
 
 function assertIntro(screen) {
   assert.ok(screen.startsWith('```text\n' + banner + '\n\nPrivate asset trading'));
-  for (const label of ['Tools', 'Aleo account', 'Funding', 'GET STARTED', 'STRATEGIES', 'INTEGRATIONS [Coming Soon]']) {
+  for (const label of ['Tools', 'Aleo account', 'Funding', 'GET STARTED', 'CHECK SETUP', 'STRATEGIES', 'INTEGRATIONS [Coming Soon]']) {
     assert.ok(screen.includes(label), label);
   }
   assert.deepEqual([...screen.matchAll(/^(\d+)\. \*\*([^*]+)\*\*(.*)$/gm)].map(match => [match[1], (match[2] + match[3]).replace(/\\$/, '').trimEnd()]), [
-    ['1', 'Check existing accounts'],
-    ['2', 'Check existing setup'],
-    ['3', 'Configure an Aleo account for Shield Swap'],
-    ['4', 'Fund an account'],
-    ['5', 'Explore markets'],
-    ['6', 'Setup a private trading integration'],
+    ['1', 'Configure an Aleo account for Shield Swap'],
+    ['2', 'Fund an account'],
+    ['3', 'Explore markets'],
+    ['4', 'Setup a private trading integration'],
+    ['5', 'Check existing accounts'],
+    ['6', 'Check existing setup'],
     ['7', 'Create an arbitrage bot'],
     ['8', 'Hummingbot: Add a privacy layer to hummingbot.'],
     ['9', 'Hyperliquid: Trade perpetual futures privately on Hyperliquid.'],
@@ -26,15 +26,18 @@ function assertIntro(screen) {
   assert.ok(menu.startsWith('**GET STARTED**'));
   assert.doesNotMatch(menu, /```/);
   assert.match(menu, /^   Setup an Aleo account to trade privately on Shield Swap\.$/m);
-  assert.match(screen, /```\n\n\*\*GET STARTED\*\*\n\n1\. \*\*Check existing accounts\*\*/);
+  assert.match(screen, /```\n\n\*\*GET STARTED\*\*\n\n1\. \*\*Configure an Aleo account/);
+  assert.match(screen, /\*\*CHECK SETUP\*\*\n\n5\. \*\*Check existing accounts\*\*/);
+  const started = screen.slice(screen.indexOf('**GET STARTED**'), screen.indexOf('**CHECK SETUP**'));
+  assert.doesNotMatch(started, /Check existing/);
   assert.doesNotMatch(screen, /\*\*ACCOUNTS\*\*|\*\*TOOLS\*\*|CHECK YOUR SETUP/);
 }
 
 test('new users see the unchanged heading and setup box with the full numbered menu', () => {
   const screen = renderWelcome({ checks: { account: { status: 'missing' } } });
   assertIntro(screen);
-  assert.match(screen, /3\. \*\*Configure an Aleo account for Shield Swap\*\*/);
-  assert.match(screen, /4\. \*\*Fund an account\*\*/);
+  assert.match(screen, /1\. \*\*Configure an Aleo account for Shield Swap\*\*/);
+  assert.match(screen, /2\. \*\*Fund an account\*\*/);
 });
 
 test('the renderer and installed agent guide show the same menu', async () => {
@@ -67,7 +70,7 @@ test('historical notes and backend details cannot turn unchecked funding into a 
 test('narrow displays retain a plain heading, tagline, status and choices', () => {
   const screen = renderWelcome({}, { width: 80 });
   assert.ok(screen.startsWith('```text\nSHIELD SWAP\n\nPrivate asset trading'));
-  assert.match(screen, /6\. \*\*Setup a private trading integration\*\*/);
+  assert.match(screen, /4\. \*\*Setup a private trading integration\*\*/);
   assert.match(screen, /7\. \*\*Create an arbitrage bot\*\*/);
   assert.doesNotMatch(screen, /\u001b/);
   assert.match(screen, /Aleo account\s+Not checked/);

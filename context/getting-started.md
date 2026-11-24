@@ -31,27 +31,29 @@ Keep the banner and setup box in fenced text blocks. Render the menus below them
 ╰───────────────────────────────────────────────────╯
 ```
 
-Go directly from the setup box to the menu below. The first two options show account and setup details on request. Do not automatically print account names, addresses, storage details, tool versions, install paths, or separate account/tool sections.
+Go directly from the setup box to the menu below. A separate **CHECK SETUP** section after the four **GET STARTED** options shows account and setup details on request. Do not automatically print account names, addresses, storage details, tool versions, install paths, or separate account/tool sections.
 
 **GET STARTED**
 
-1. **Check existing accounts**\
-   List your Aleo, EVM, and Solana accounts, addresses, and access status.
-
-2. **Check existing setup**\
-   Check your project, installed tools, versions, locations, and connections.
-
-3. **Configure an Aleo account for Shield Swap**\
+1. **Configure an Aleo account for Shield Swap**\
    Setup an Aleo account to trade privately on Shield Swap.
 
-4. **Fund an account**\
+2. **Fund an account**\
    Bridge assets from Ethereum or Solana privately to Aleo
 
-5. **Explore markets**\
+3. **Explore markets**\
    Explore market opportunities on Shield Swap
 
-6. **Setup a private trading integration**\
+4. **Setup a private trading integration**\
    Integrate trading on Shield Swap into your application
+
+**CHECK SETUP**
+
+5. **Check existing accounts**\
+   List your Aleo, EVM, and Solana accounts, addresses, and access status.
+
+6. **Check existing setup**\
+   Check your project, installed tools, versions, locations, and connections.
 
 **STRATEGIES**
 
@@ -65,7 +67,7 @@ Go directly from the setup box to the menu below. The first two options show acc
 
 You can also type `check accounts` or `check setup`.
 
-Show all three menu sections and keep options 1–10 in this order, even when accounts are already configured. Preserve the menu wording above. Options 1–7 have routes; 8–10 stay under **INTEGRATIONS [Coming Soon]**. Do not omit or renumber options based on setup status. Skip completed setup work within the selected route. Only a concrete task (a specified swap, an identified tool to connect, a strategy to build, or an explicit check) replaces the menu with that task and its result or next missing step. Do not ask them to select it again. Report current unchecked funding as **Not checked**; historical funding notes do not prove present holdings. Show tool installation paths only in an explicit setup report; keep network choices, storage questions, and protocol details out of this introduction. Account storage is handled by the setup skill; resolve a real configuration conflict only when encountered.
+Show all four menu sections and keep options 1–10 in this order, even when accounts are already configured. Preserve the menu wording above. Options 1–7 have routes; 8–10 stay under **INTEGRATIONS [Coming Soon]**. Do not omit or renumber options based on setup status. Skip completed setup work within the selected route. Only a concrete task (a specified swap, an identified tool to connect, a strategy to build, or an explicit check) replaces the menu with that task and its result or next missing step. Do not ask them to select it again. Report current unchecked funding as **Not checked**; historical funding notes do not prove present holdings. Show tool installation paths only in an explicit setup report; keep network choices, storage questions, and protocol details out of this introduction. Account storage is handled by the setup skill; resolve a real configuration conflict only when encountered.
 
 ## Check the existing setup
 
@@ -91,12 +93,12 @@ Preserve a supplied intent instead of forcing a menu choice. Interpret a number 
 
 | Main-menu option | Journey ID | Destination and result |
 | --- | --- | --- |
-| 1 · Check existing accounts | `check_accounts` | [Account inspection](shield-swap-setup/inspect-setup.md#explicit-check-commands): refresh known Aleo/EVM/Solana accounts and report full public addresses, saved locations, storage, and access status. Also accepts `check accounts`. |
-| 2 · Check existing setup | `check_setup` | [Setup inspection](shield-swap-setup/inspect-setup.md#explicit-check-commands): refresh the current project's account/tool inventory, installed versions/locations, and current host connection readiness. Also accepts `check setup`. |
-| 3 · Configure an Aleo account for Shield Swap | `configure_account` | [Account setup](../skills/aleo-account-setup/SKILL.md): create/import or reuse the selected account, choose storage, authenticate, register the scanner, and inspect balances. |
-| 4 · Fund an account | `fund_account` | [Funding](../skills/aleo-funding/SKILL.md): continue with the selected account and funding path. |
-| 5 · Explore markets | `explore_markets` | [Discover pools and get quotes](shield-swap-setup/discover-pools-and-get-quotes.md#explore-markets-from-the-main-menu): show available pairs, liquidity and recent activity, then quote a requested pair and amount without executing. |
-| 6 · Setup a private trading integration | `trading_integration` | [Trading integration](../skills/trading-integration/SKILL.md): build callable trading code in the user's project, retaining its language and account setup. |
+| 1 · Configure an Aleo account for Shield Swap | `configure_account` | [Account setup](../skills/aleo-account-setup/SKILL.md): create/import or reuse the selected account, choose storage, authenticate, register the scanner, and inspect balances. |
+| 2 · Fund an account | `fund_account` | [Funding](../skills/aleo-funding/SKILL.md): continue with the selected account and funding path. |
+| 3 · Explore markets | `explore_markets` | [Discover pools and get quotes](shield-swap-setup/discover-pools-and-get-quotes.md#explore-markets-from-the-main-menu): show available pairs, liquidity and recent activity, then quote a requested pair and amount without executing. |
+| 4 · Setup a private trading integration | `trading_integration` | [Trading integration](../skills/trading-integration/SKILL.md): build callable trading code in the user's project, retaining its language and account setup. |
+| 5 · Check existing accounts | `check_accounts` | [Account inspection](shield-swap-setup/inspect-setup.md#explicit-check-commands): refresh known Aleo/EVM/Solana accounts and report full public addresses, saved locations, storage, and access status. Also accepts `check accounts`. |
+| 6 · Check existing setup | `check_setup` | [Setup inspection](shield-swap-setup/inspect-setup.md#explicit-check-commands): refresh the current project's account/tool inventory, installed versions/locations, and current host connection readiness. Also accepts `check setup`. |
 | 7 · Create an arbitrage bot | `arbitrage` | [Arbitrage](../skills/arbitrage/SKILL.md): build and test the strategy using the shared trading integration. |
 | 8 · Hummingbot | `hummingbot` | Coming soon; no executable route. |
 | 9 · Hyperliquid | `hyperliquid` | Coming soon; no executable route. |

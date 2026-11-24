@@ -8,7 +8,7 @@ These recipes reuse the selected account/network and [authenticated session](con
 
 ## Explore markets from the main menu
 
-For menu option 5, begin with a market overview using the existing network and interface. Show the pairs found, current trading availability, and liquidity or recent activity where the selected interface exposes them. Report the scope of the query and unavailable data; do not present an incomplete pool page as every market or turn missing reads into zero. Market activity alone does not establish a profitable opportunity.
+For menu option 3, begin with a market overview using the existing network and interface. Show the pairs found, current trading availability, and liquidity or recent activity where the selected interface exposes them. Report the scope of the query and unavailable data; do not present an incomplete pool page as every market or turn missing reads into zero. Market activity alone does not establish a profitable opportunity.
 
 If the user already named an asset or pair, start there. Otherwise show the overview before asking which market interests them. Ask for a direction and amount only when they want a quote, then show expected output, minimum output, route, and freshness. Use the recipes below for the selected interface. Do not ask for a project directory or build scripts as a prerequisite for browsing.
 
