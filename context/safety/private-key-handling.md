@@ -8,7 +8,7 @@ Never ask for a private key, view key, API secret, or claim secret in chat. Use 
 
 Choose a persistent state location per account and network. Record the non-secret account address, network, and location so a new session can reconnect. Protect private files with appropriate permissions, exclude them from version control, and do not use them as test fixtures. TS and Python profiles are not interchangeable files; do not copy one over the other.
 
-Use [Aleo account setup](../../aleo-account-setup/SKILL.md) for local account and storage choices. Veil, Python, and the CLI share the account format in `~/.aleo/accounts`; environment private keys are loaded without saving a copy. These account files are network-neutral. Trading profiles, API credentials, and swap recovery stores remain specific to each tool and network. The AgentKit MCP keeps its own encrypted store.
+Use [Aleo account setup](../../skills/aleo-account-setup/SKILL.md) for local account and storage choices. Veil, Python, and the CLI share the account format in `~/.aleo/accounts`; environment private keys are loaded without saving a copy. These account files are network-neutral. Trading profiles, API credentials, and swap recovery stores remain specific to each tool and network.
 
 Swaps require durable recovery material. The TypeScript SDK supports a persistent blinded-identity store; Python supports a journal. Configure persistence before submission and retain it through claim and reconciliation. Transaction ids alone may not contain what is needed to claim an output.
 

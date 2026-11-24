@@ -1,18 +1,12 @@
 # Configure an account
 
-For initial setup, use [basic Shield Swap setup](../../aleo-account-setup/SKILL.md) through its public balance check, language or existing-project choice, API/scanner setup, private balance check, and next-step menu. This page supplies connection recipes for an already selected operational integration; it is not the next step after creating a private key. Reuse an existing account unless the user requests a new one. An explicit code-only/read-only milestone can defer this page; an operational trading-tool connection includes account setup and funding.
+For initial setup, use [basic Shield Swap setup](../../skills/aleo-account-setup/SKILL.md) through its public balance check, language or existing-project choice, API/scanner setup, private balance check, and next-step menu. This page supplies connection recipes for an already selected operational integration; it is not the next step after creating a private key. Reuse an existing account unless the user requests a new one. An explicit code-only/read-only milestone can defer this page; an operational trading-tool connection includes account setup and funding.
 
 The examples use **testnet**. Keep the account's state outside the installed kit, exclude it from version control, and use a private working directory. On macOS/Linux, `umask 077` before running scripts makes newly created state owner-only. See [private keys and state](../safety/private-key-handling.md) for custody boundaries.
 
-## AgentKit MCP
-
-For an existing connection, use `get_config` and `list_wallets` to select the configured profile and verify its public address and network. Reuse that profile and state directory; do not create another account for a quote or an authorized swap.
-
-MCP `setup` reports the selected profile’s account and funding checks. For guided configuration, run the installed `shield-swap-mcp setup --guided` (or `node dist/cli.js setup --guided` from the built `mcp/` directory). It reuses the configured default profile unless another is selected; for a missing profile it offers import or explicit creation. Existing profiles retain their configuration; new guided profiles default to mainnet, so preserve an explicitly requested testnet with `--network testnet`. Non-guided setup continues to require an explicit network. See [trusted-terminal wallet configuration](../../mcp/README.md#configure-an-existing-wallet). Import the selected existing key through an environment reference or hidden terminal input. Never pass keys or passphrases in MCP arguments. Account creation requires choosing Create in the trusted terminal or the explicit `--generate` option. Setup stores configuration with execution disabled and does not authenticate, fund, or trade. Continue to [configure Shield Swap](configure-shield-swap.md).
-
 ## CLI
 
-Follow [Aleo account setup](../../aleo-account-setup/SKILL.md) first if the account is not selected and verified. The account commands create or import the shared account without signing in or moving funds. Use the [CLI dependencies](../../aleo-account-setup/references/dependencies.md#veil-and-the-shield-swap-cli) from Veil `main`.
+Follow [Aleo account setup](../../skills/aleo-account-setup/SKILL.md) first if the account is not selected and verified. The account commands create or import the shared account without signing in or moving funds. Use the [CLI dependencies](../../skills/aleo-account-setup/references/dependencies.md#veil-and-the-shield-swap-cli) from Veil `main`.
 
 For an explicitly requested CLI session with authentication, API-token creation, and testnet funding, the combined command below can perform those effects. Basic onboarding uses the standalone skill's separate checks instead. Verify the selected public identity and existing recovery state in the working directory before running this command; do not infer an account mismatch from the directory name:
 
@@ -26,7 +20,7 @@ Check the printed address against the selected account. If it differs, resolve t
 
 ## Veil local applications
 
-Install the [TypeScript dependencies](../toolchains/typescript.md) and complete [Aleo account setup](../../aleo-account-setup/SKILL.md). Save this as `session.mts` in the application. It loads the account selected by `ALEO_ACCOUNT`, or `default`, from the shared storage or environment:
+Install the [TypeScript dependencies](../toolchains/typescript.md) and complete [Aleo account setup](../../skills/aleo-account-setup/SKILL.md). Save this as `session.mts` in the application. It loads the account selected by `ALEO_ACCOUNT`, or `default`, from the shared storage or environment:
 
 ```ts
 import { mkdir } from 'node:fs/promises'
@@ -64,7 +58,7 @@ If extending a CLI account, use the [CLI session recipe](../toolchains/cli.md#re
 
 ## Python profiles
 
-Install the [Python dependencies](../toolchains/python.md) and complete [Aleo account setup](../../aleo-account-setup/SKILL.md). Select `SHIELD_SWAP_HOME` for an existing profile or a separate account/network; the default is `~/.shield-swap`. Keep `ALEO_ACCOUNT` and any custom account directory or secret source available to this process.
+Install the [Python dependencies](../toolchains/python.md) and complete [Aleo account setup](../../skills/aleo-account-setup/SKILL.md). Select `SHIELD_SWAP_HOME` for an existing profile or a separate account/network; the default is `~/.shield-swap`. Keep `ALEO_ACCOUNT` and any custom account directory or secret source available to this process.
 
 Save this as `session.py` in the application:
 

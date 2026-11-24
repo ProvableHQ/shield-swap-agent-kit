@@ -4,7 +4,7 @@ This file guides contributors. [AGENTS.md](AGENTS.md) starts the agent journey; 
 
 ## Scope
 
-Maintain the user's layout: journey entrypoint in `AGENTS.md`, runbooks in top-level `context/`, deterministic tools in `tools/`, and executable CLI, MCP, and examples in their respective top-level directories when implemented. Keep local references inside the repository so the root package works after installation. Do not move the source context under a `skills/` wrapper.
+Keep the main journey entrypoints in root `AGENTS.md` and `SKILL.md`, runbooks in top-level `context/`, and deterministic tools in `tools/`. Standalone installable skills belong in `skills/<skill-name>/`, with their references and helpers bundled inside each skill. Keep local references inside the repository so the root package works after installation. Do not move the shared `context/` tree under `skills/`.
 
 SDKs own protocol logic, transaction construction, persistence, and signing. Use their public interfaces. Reuse the existing Shield Swap CLI when adding the kit's CLI integration. Add wrappers only when they provide a concrete workflow or validation benefit.
 
@@ -29,6 +29,8 @@ No roadmap document is maintained here. Describe current functionality in the RE
 ## Verification
 
 Run `npm test` after changing context or validation. The validator supports this repository's inline Markdown links and single-line skill metadata; extend it deliberately if authoring conventions change.
+
+The funding tests also require `python3` (Python 3.10 or newer). Their wallet-storage tests use the standard library and a mock credential store; they do not install SDK dependencies or access the OS keychain.
 
 For executable additions, verify the affected workflow from an installed copy outside SDK workspaces. Exercise the relevant failure paths, including process restart and uncertain submission results. Live transactions require authorization for the account, network, and intended action; a development task alone does not authorize them.
 
