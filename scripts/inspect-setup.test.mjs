@@ -215,3 +215,41 @@ test('a copied inspector runs outside the kit with no SDK dependencies or privat
   assert.deepEqual(report.sources, []);
   assert.equal(report.tools.find(tool => tool.name === 'node').version, process.versions.node);
 });
+
+test('explicit accounts/setup commands work from an installed copy and help performs no inspection', async t => {
+  const f = await fixture(t);
+  const copied = join(f.root, 'installed/tools');
+  const source = join(dirname(fileURLToPath(import.meta.url)), '../tools');
+  await mkdir(copied, { recursive: true });
+  for (const name of ['inspect-setup.mjs', 'inspect-python.py', 'welcome.mjs']) await cp(join(source, name), join(copied, name));
+  await put(join(f.home, '.aleo/funding-wallets/bridge/wallet.json'), {
+    version: 1, service: 'shield-swap-funding', family: 'evm', address: evm, storage: 'os-keyring', credentialId: secret,
+  });
+  const run = args => runProbe(process.execPath, [join(copied, 'inspect-setup.mjs'), ...args],
+    { cwd: f.project, env: { HOME: f.home, PATH: f.bin }, timeout: 10000 });
+  const accounts = await run(['accounts', '--project', f.project]);
+  assert.ok(accounts.ok, accounts.stderr);
+  assert.ok(accounts.stdout.includes(evm));
+  assert.match(accounts.stdout, /Location \(bridge\):/);
+  assert.doesNotMatch(accounts.stdout, /GET STARTED|\*\*TOOLS\*\*|PRIVATE_TEST_SENTINEL/);
+  const json = await run(['accounts', '--project', f.project, '--json']);
+  assert.ok(json.ok, json.stderr);
+  assert.equal(JSON.parse(json.stdout).accounts[0].address, evm);
+  assert.equal(Object.hasOwn(JSON.parse(json.stdout), 'tools'), false);
+  const setup = await run(['setup', '--project', f.project, '--json']);
+  assert.ok(setup.ok, setup.stderr);
+  assert.equal(JSON.parse(setup.stdout).tools.find(tool => tool.name === 'node').version, process.versions.node);
+  const setupText = await run(['setup', '--project', f.project]);
+  assert.ok(setupText.ok, setupText.stderr);
+  assert.match(setupText.stdout, /\*\*EXISTING SETUP\*\*/);
+  assert.match(setupText.stdout, /\*\*TOOLS\*\*/);
+  assert.doesNotMatch(setupText.stdout, /GET STARTED|PRIVATE_TEST_SENTINEL/);
+  const help = await run(['--help', '--project', '/nonexistent-project']);
+  assert.ok(help.ok, help.stderr);
+  assert.match(help.stdout, /accounts\s+List existing/);
+  assert.doesNotMatch(help.stdout, new RegExp(evm));
+  const unknown = await run(['unknown']);
+  assert.equal(unknown.ok, false);
+  assert.equal(unknown.stdout, '');
+  assert.match(unknown.stderr, /--help/);
+});

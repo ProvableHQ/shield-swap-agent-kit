@@ -1,14 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { banner, renderWelcome } from '../tools/welcome.mjs';
+import { banner, renderInspection, renderWelcome } from '../tools/welcome.mjs';
 
 function assertIntro(screen) {
   assert.ok(screen.startsWith('```text\n' + banner + '\n\nPrivate asset trading'));
-  for (const label of ['Tools', 'Aleo account', 'Funding', 'GET STARTED', 'STRATEGIES', 'INTEGRATIONS [Coming Soon]']) {
+  for (const label of ['Tools', 'Aleo account', 'Funding', 'GET STARTED', 'STRATEGIES', 'INTEGRATIONS [Coming Soon]', 'CHECK YOUR SETUP']) {
     assert.ok(screen.includes(label), label);
   }
-  assert.deepEqual([...screen.matchAll(/^(\d)\. \*\*([^*]+)\*\*(.*)$/gm)].map(match => [match[1], (match[2] + match[3]).replace(/\\$/, '').trimEnd()]), [
+  assert.deepEqual([...screen.matchAll(/^(\d+)\. \*\*([^*]+)\*\*(.*)$/gm)].map(match => [match[1], (match[2] + match[3]).replace(/\\$/, '').trimEnd()]), [
     ['1', 'Configure an Aleo account for Shield Swap'],
     ['2', 'Fund an account'],
     ['3', 'Explore markets'],
@@ -17,6 +17,8 @@ function assertIntro(screen) {
     ['6', 'Hummingbot: Add a privacy layer to hummingbot.'],
     ['7', 'Hyperliquid: Trade perpetual futures privately on Hyperliquid.'],
     ['8', 'Prediction Markets: Create a private vault around prediction market trades.'],
+    ['9', 'Check existing accounts'],
+    ['10', 'Check existing setup'],
   ]);
   const box = screen.split('\n').filter(line => /^[╭│╰]/u.test(line));
   assert.deepEqual(box.map(line => [...line].length), [60, 60, 60, 60, 60]);
@@ -86,7 +88,7 @@ test('inventory keeps the setup box and menu while showing account access and ex
   assert.match(screen, /Connection setup required · Version not reported/);
   assert.match(screen, /https:\/\/example\.com\/mcp/);
   assert.doesNotMatch(screen, /SECRET/);
-  assert.deepEqual([...screen.matchAll(/^(\d)\. \*\*/gm)].map(match => match[1]), ['1', '2', '3', '4', '5', '6', '7', '8']);
+  assert.deepEqual([...screen.matchAll(/^(\d+)\. \*\*/gm)].map(match => match[1]), ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
   const box = screen.split('\n').filter(line => /^[╭│╰]/u.test(line));
   assert.deepEqual(box.map(line => [...line].length), [60, 60, 60, 60, 60]);
 });
@@ -99,4 +101,22 @@ test('merging the same address retains each connection access status', () => {
   ], tools: [] });
   assert.equal(screen.match(/\*\*EVM ·/g).length, 1);
   assert.match(screen, /local: Access not checked; browser: Access verified/);
+});
+
+test('explicit inspection shows full account details without repeating onboarding', () => {
+  const address = 'aleo1' + 'q'.repeat(58);
+  const report = { project: '/projects/bot', accounts: [{ family: 'aleo', name: 'trading', address,
+    path: '/accounts/trading.json', status: 'saved', storage: 'keychain' }],
+    tools: [{ name: 'node', version: '24.12.0', path: '/bin/node' }],
+    connections: [{ name: 'Shield', status: 'locked' }] };
+  const accounts = renderInspection(report, 'accounts');
+  assert.ok(accounts.includes(address));
+  assert.match(accounts, /Location \(trading\): \/accounts\/trading\.json/);
+  assert.doesNotMatch(accounts, /\*\*TOOLS\*\*|GET STARTED|YOUR SETUP|SHIELD SWAP|\/bin\/node/);
+  const setup = renderInspection(report, 'setup');
+  assert.match(setup, /Project: \/projects\/bot/);
+  assert.match(setup, /24\.12\.0/);
+  assert.match(setup, /\/bin\/node/);
+  assert.match(setup, /Unlock required/);
+  assert.doesNotMatch(setup, /GET STARTED|Create an arbitrage bot/);
 });

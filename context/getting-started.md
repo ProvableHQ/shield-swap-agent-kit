@@ -57,7 +57,17 @@ Insert **ACCOUNTS** and **TOOLS** here using the current inspection. Show Aleo, 
 7. **Hyperliquid:** Trade perpetual futures privately on Hyperliquid.
 8. **Prediction Markets:** Create a private vault around prediction market trades.
 
-Show all three menu sections and keep options 1–8 in this order, even when accounts are already configured. Preserve the menu wording above. Options 1–5 have routes; 6–8 stay under **INTEGRATIONS [Coming Soon]**. Do not omit or renumber options based on setup status. Skip completed setup work within the selected route. Only a concrete task (a specified swap, an identified tool to connect, or a strategy to build) replaces the menu with that task and its next missing step. Do not ask them to select it again. Report current unchecked funding as **Not checked**; historical funding notes do not prove present holdings. Show tool installation paths in **TOOLS**; keep network choices, storage questions, and protocol details out of this introduction. Account storage is handled by the setup skill; resolve a real configuration conflict only when encountered.
+**CHECK YOUR SETUP**
+
+9. **Check existing accounts**\
+   List your Aleo, EVM, and Solana accounts, addresses, and access status.
+
+10. **Check existing setup**\
+    Check your project, installed tools, versions, locations, and connections.
+
+You can also type `check accounts` or `check setup`.
+
+Show all four menu sections and keep options 1–10 in this order, even when accounts are already configured. Preserve the menu wording above. Options 1–5 and 9–10 have routes; 6–8 stay under **INTEGRATIONS [Coming Soon]**. Do not omit or renumber options based on setup status. Skip completed setup work within the selected route. Only a concrete task (a specified swap, an identified tool to connect, a strategy to build, or an explicit check) replaces the menu with that task and its result or next missing step. Do not ask them to select it again. Report current unchecked funding as **Not checked**; historical funding notes do not prove present holdings. Show tool installation paths in **TOOLS**; keep network choices, storage questions, and protocol details out of this introduction. Account storage is handled by the setup skill; resolve a real configuration conflict only when encountered.
 
 ## Check the existing setup
 
@@ -91,6 +101,10 @@ Preserve a supplied intent instead of forcing a menu choice. Interpret a number 
 | 6 · Hummingbot | `hummingbot` | Coming soon; no executable route. |
 | 7 · Hyperliquid | `hyperliquid` | Coming soon; no executable route. |
 | 8 · Prediction Markets | `prediction_markets` | Coming soon; no executable route. |
+| 9 · Check existing accounts | `check_accounts` | [Account inspection](shield-swap-setup/inspect-setup.md#explicit-check-commands): refresh known Aleo/EVM/Solana accounts and report full public addresses, saved locations, storage, and access status. Also accepts `check accounts`. |
+| 10 · Check existing setup | `check_setup` | [Setup inspection](shield-swap-setup/inspect-setup.md#explicit-check-commands): refresh the current project's account/tool inventory, installed versions/locations, and current host connection readiness. Also accepts `check setup`. |
+
+The check commands are available at any point in the conversation. Run the requested inspection with the existing project and known custom locations, then show the targeted result. Do not turn `check setup` into account creation or install missing tools. Retain the selected journey so checking status does not restart onboarding. A check request does not require another main-menu choice.
 
 The coming-soon descriptions express intended integrations, not current execution or privacy capabilities. If selected, say that integration is not available in the kit yet and ask what the user wants it to do. Do not install a connector, provision an account, move funds, or substitute an unrelated workflow merely because the option was selected. A separately requested integration-development task can be scoped from that conversation.
 

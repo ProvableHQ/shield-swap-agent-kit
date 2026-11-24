@@ -45,7 +45,13 @@ export function renderWelcome(report = {}, { width = 100 } = {}) {
     '**INTEGRATIONS [Coming Soon]**', '',
     '6. **Hummingbot:** Add a privacy layer to hummingbot.',
     '7. **Hyperliquid:** Trade perpetual futures privately on Hyperliquid.',
-    '8. **Prediction Markets:** Create a private vault around prediction market trades.',
+    '8. **Prediction Markets:** Create a private vault around prediction market trades.', '',
+    '**CHECK YOUR SETUP**', '',
+    '9. **Check existing accounts**\\',
+    '   List your Aleo, EVM, and Solana accounts, addresses, and access status.', '',
+    '10. **Check existing setup**\\',
+    '    Check your project, installed tools, versions, locations, and connections.', '',
+    'You can also type `check accounts` or `check setup`.',
   ].join('\n');
 }
 
@@ -71,7 +77,7 @@ function location(value) {
   return text(value);
 }
 
-export function renderInventory(report) {
+export function renderAccounts(report, { fullAddresses = false, showLocations = false } = {}) {
   const lines = ['**ACCOUNTS**', ''];
   const storage = { keychain: 'Keychain', encrypted: 'Encrypted file', plaintext: 'Unencrypted file',
     none: 'Address only', 'os-keyring': 'OS credential store' };
@@ -89,13 +95,20 @@ export function renderInventory(report) {
     for (const group of grouped.values()) {
       const account = group.find(item => item.status === 'saved') ?? group[0];
       const names = [...new Set(group.map(item => text(item.name)))].join(', ');
-      const address = shortAddress(account.address);
+      const short = shortAddress(account.address);
+      const address = short && fullAddresses ? text(account.address) : short;
       const protection = [...new Set(group.map(item => storage[item.storage]).filter(Boolean))].join(', ');
       const states = new Set(group.map(item => statuses[item.status] ?? 'Not checked'));
       const access = states.size === 1 ? [...states][0]
         : group.map(item => `${text(item.name)}: ${statuses[item.status] ?? 'Not checked'}`).join('; ');
       lines.push(`- **${label} · ${names}**${address ? ` · ${address}` : ''}\\`,
         `  ${protection ? `${protection} · ` : ''}${access}`);
+      if (showLocations) for (const item of group) {
+        if (item.path) {
+          lines[lines.length - 1] += '\\';
+          lines.push(`  Location (${text(item.name)}): ${text(item.path)}`);
+        }
+      }
     }
     const sources = (report.sources ?? []).filter(item => item.family === family);
     for (const source of sources) lines.push(`- **${label} · ${text(source.name)}** · ${source.status === 'empty'
@@ -107,7 +120,11 @@ export function renderInventory(report) {
       lines.push(`  Some ${label} account locations could not be checked.`);
     }
   }
-  lines.push('', '**TOOLS**', '');
+  return lines;
+}
+
+export function renderTools(report) {
+  const lines = ['**TOOLS**', ''];
   for (const tool of report.tools ?? []) {
     lines.push(`- **${text(tool.name)}** · ${tool.version ? text(tool.version) : 'Version unavailable'}\\`,
       `  ${text(tool.path)}${tool.environment && tool.environment !== report.project ? ` (${text(tool.environment)})` : ''}`);
@@ -120,6 +137,17 @@ export function renderInventory(report) {
       `  ${connection.location ? location(connection.location) : 'Agent tool connection; location not reported'}`);
   }
   if (report.issues?.some(item => item.family === 'tools')) lines.push('Some tool versions could not be checked.');
-  lines.push('', '---', '');
   return lines;
+}
+
+export function renderInventory(report, options) {
+  return [...renderAccounts(report, options), '', ...renderTools(report), '', '---', ''];
+}
+
+/** Targeted command results omit the onboarding banner and journey menu. */
+export function renderInspection(report, command) {
+  const options = { fullAddresses: true, showLocations: true };
+  if (command === 'accounts') return renderAccounts(report, options).join('\n');
+  return ['**EXISTING SETUP**', '', `Project: ${text(report.project)}`, '',
+    ...renderAccounts(report, options), '', ...renderTools(report)].join('\n');
 }

@@ -6,6 +6,8 @@ Choose [Veil](context/toolchains/typescript.md), [Python](context/toolchains/pyt
 
 Before the main menu, run [setup inspection](context/shield-swap-setup/inspect-setup.md). Retain the heading and **YOUR SETUP** box, then show discovered Aleo/EVM/Solana accounts and installed tool versions/locations in **ACCOUNTS** and **TOOLS**. Add current host connection facts. Saved metadata does not prove signing access; unavailable checks remain visible.
 
+Main-menu options **9 · Check existing accounts** and **10 · Check existing setup** run the [explicit inspection commands](context/shield-swap-setup/inspect-setup.md#explicit-check-commands). Also accept `check accounts` and `check setup` directly. Show their targeted results, preserve the selected journey, and do not route an inspection request into account creation or installation.
+
 Each operational page explains the shared behavior, then gives interface-specific recipes. Read the section for the chosen interface, not every implementation. The examples use testnet and run in the consumer's project, outside this installed kit. Change networks only to match the user's request. The kit does not bundle its own trading CLI.
 
 ## Setup and trading are separate journeys

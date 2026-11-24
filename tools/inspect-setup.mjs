@@ -5,7 +5,7 @@ import { homedir } from 'node:os';
 import { basename, delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { renderWelcome } from './welcome.mjs';
+import { renderInspection, renderWelcome } from './welcome.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packageNames = ['@provablehq/shield-swap-cli', '@provablehq/shield-swap-sdk',
@@ -263,14 +263,37 @@ else {
 
 if (process.argv[1] && await realpath(process.argv[1]).catch(() => '') === fileURLToPath(import.meta.url)) {
   try {
-    const { values } = parseArgs({ options: { project: { type: 'string' }, python: { type: 'string' },
+    const { values, positionals } = parseArgs({ allowPositionals: true, options: { project: { type: 'string' }, python: { type: 'string' },
       'accounts-dir': { type: 'string', multiple: true }, 'wallet-dir': { type: 'string', multiple: true },
-      json: { type: 'boolean' }, width: { type: 'string' } } });
-    const report = await inspectSetup({ project: values.project, python: values.python,
-      accountDirectories: values['accounts-dir'], walletDirectories: values['wallet-dir'] });
-    console.log(values.json ? JSON.stringify(report, null, 2) : renderWelcome(report, { width: Number(values.width ?? 100) }));
+      json: { type: 'boolean' }, width: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
+    if (values.help) {
+      console.log(`Usage: node inspect-setup.mjs [accounts|setup] [options]
+
+  accounts       List existing Aleo, EVM, and Solana accounts and key sources.
+  setup          Report the current project, accounts, tools, and versions.
+  (no command)   Show the welcome, inventory, and main menu.
+
+  --project DIRECTORY      Inspect this project (default: working directory).
+  --accounts-dir DIRECTORY Include a known Aleo account directory; repeatable.
+  --wallet-dir DIRECTORY   Include a known bridge wallet directory; repeatable.
+  --python PATH            Inspect this Python interpreter as well.
+  --json                   Output public structured data instead of Markdown.
+  --width NUMBER           Welcome display width (default: 100).
+  --help                   Show this help without inspecting anything.`);
+    } else {
+      const command = positionals[0] ?? 'welcome';
+      if (positionals.length > 1 || !['welcome', 'accounts', 'setup'].includes(command)) throw new Error('INVALID_COMMAND');
+      const report = await inspectSetup({ project: values.project, python: values.python,
+        accountDirectories: values['accounts-dir'], walletDirectories: values['wallet-dir'] });
+      const result = command === 'accounts' ? { version: report.version, checkedAt: report.checkedAt,
+        project: report.project, accounts: report.accounts, sources: report.sources,
+        checks: { account: report.checks.account }, scope: report.scope,
+        issues: report.issues.filter(issue => issue.family !== 'tools') } : report;
+      console.log(values.json ? JSON.stringify(result, null, 2) : command === 'welcome'
+        ? renderWelcome(report, { width: Number(values.width ?? 100) }) : renderInspection(report, command));
+    }
   } catch {
-    console.error('Setup inspection could not finish. Keep the accounts and tools marked as not checked.');
+    console.error('Setup inspection could not finish. Use --help to check the command. Keep incomplete checks marked as not checked.');
     process.exitCode = 1;
   }
 }

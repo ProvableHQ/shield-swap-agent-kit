@@ -16,6 +16,31 @@ The inspector needs Node.js, with no package installation. It probes installed c
 
 For known custom locations, add `--accounts-dir DIRECTORY`, `--wallet-dir DIRECTORY`, or `--python /absolute/path/to/python`. Directory flags can be repeated. Reuse locations already identified by the project or conversation. Do not scan unrelated projects or the whole home directory.
 
+## Explicit check commands
+
+The agent's main menu exposes both checks under **CHECK YOUR SETUP**. Recognize the number only when the main menu is active; recognize the command words directly at any point.
+
+| Menu | Agent command | Result |
+| --- | --- | --- |
+| 9 · Check existing accounts | `check accounts` | Refresh the Aleo, EVM, and Solana account inventory. Show full known public addresses, saved locations, storage, and current access status. |
+| 10 · Check existing setup | `check setup` | Refresh the current project's accounts, installed tools/SDKs, versions, locations, and current agent connections. |
+
+These are arguments or requests to the main Shield Swap skill, not separate globally installed slash commands. A direct command skips the onboarding menu and returns the requested report. Keep the selected account, project, and journey. Never turn an inspection request into creating an account, installing tools, unlocking a wallet, or authenticating a new session.
+
+With the same `KIT_DIRECTORY` and `PROJECT_DIRECTORY` as above, run the matching shell command:
+
+```sh
+node KIT_DIRECTORY/tools/inspect-setup.mjs accounts --project PROJECT_DIRECTORY
+```
+
+```sh
+node KIT_DIRECTORY/tools/inspect-setup.mjs setup --project PROJECT_DIRECTORY
+```
+
+`accounts` prints only the account report; it may probe installed metadata readers to obtain account details. `setup` prints the project and complete local inventory, without the welcome or journey menu. Both accept the custom-location flags and `--json`. The accounts JSON contains only account checks, sources, locations, and discovery issues; setup JSON contains the full report. `--help` lists commands without running any checks. With no command, the helper retains its full welcome output.
+
+After the local command, add relevant current host facts using [agent connections](#add-agent-connections). Account checks include public accounts already exposed by those connections; setup checks also include their reported readiness, versions, and locations. The helper cannot perform those host checks itself. Setup inspection covers the selected project and known locations, not an exhaustive search for every project on the computer. If no project is known, inspect the current working directory and name it in the result.
+
 ## What is checked
 
 | Area | Sources |
