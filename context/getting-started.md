@@ -1,6 +1,6 @@
 # Getting started
 
-Use this page when the Shield Swap skill is invoked for setup, trading, or integration. Installing the skill does not run a startup hook. The host agent checks the current setup and renders this introduction in its response. Never print it on an MCP server's protocol stdout.
+Use this page when the Shield Swap skill is invoked for setup, trading, or integration. Installing the skill does not run a startup hook. The host agent checks the current setup and renders this introduction in its response.
 
 ## Welcome
 
@@ -17,13 +17,13 @@ Opening the root skill without a concrete task starts this onboarding guide imme
 Private asset trading
 ```
 
-For AgentKit MCP, render the `welcome` string returned by `setup` verbatim in a text block. It uses the shared [welcome renderer](../tools/welcome.mjs). For other interfaces, use the same layout below with verified facts. Keep **Tools**, **Aleo account**, and **Funding** as the three row labels. Do not substitute network rows or insert paths, script names, journals, SQLite, or signer implementation details.
+Use the layout below with verified facts, or the shared [welcome renderer](../tools/welcome.mjs). Keep **Tools**, **Aleo account**, and **Funding** as the three row labels. Do not substitute network rows or insert paths, script names, journals, SQLite, or signer implementation details.
 
 Follow it with the status panel. This example is illustrative: replace every value with observed facts. Use ✓ for a verified check, ○ for missing or unchecked, and ! for a failed check. Do not invent percentages or show a check as running unless it is actually running.
 
 ```text
 ╭─ YOUR SETUP ───────────────────────────────────────╮
-│  ✓ Tools          MCP connected                    │
+│  ✓ Tools          Available                        │
 │  ○ Aleo account   Not configured                   │
 │  ○ Funding        Not checked                      │
 ╰───────────────────────────────────────────────────╯
@@ -45,19 +45,11 @@ Show all four menu choices for introductory prompts, even when accounts are alre
 
 Start with the available interface and an existing account; see [tool selection](../tools/SKILL.md). Never inspect or print secret file contents to fill the panel.
 
-For the AgentKit MCP, call `setup` with the selected `journey` and optional `profileId`. It performs local configuration inspection by default. `checks.account.status` distinguishes `missing`, `locked`, and `configured`; a configured profile is not yet verified signing access. Follow `nextAction` rather than rerunning account creation. A locked store does not reveal which profiles it contains.
+Inspect the configured account and session without provisioning a replacement. Distinguish a missing account, a locked account, and a configured account whose access has not yet been checked. When access and holdings are relevant, follow [configuration](shield-swap-setup/configure-shield-swap.md) and [funding](shield-swap-setup/bridge-funds.md) using the selected interface. Authentication and scanner registration can change session state; they do not authorize funding or trading. Failed access or scanning is an unavailable check, never a zero balance.
 
-When account access and holdings are relevant, call `setup` with `checkBalances: true`. It verifies signing/API access before reading balances. This may authenticate and initialize scanner state but never funds, signs a transaction, or grants execution permissions. Successful access is `usable`; failed access or scanning is `unavailable`, never a zero balance. Use `checkAccess: true` for account access alone.
+If the required asset and amount are known, compare them with the observed private holdings using discovered token metadata. Otherwise label observed private holdings **Private funds found**, not **Ready to swap**. Public-only balances are insufficient for a private swap. Aggregate holdings do not verify a covering record, fees, a valid quote, or execution permission. Keep those checks in the operation's existing preflight.
 
-If the required asset and amount are known, pass `funding: { tokenId, amount }`, with the discovered token ID and integer base-unit amount. This implies balance checking. `available` means sufficient aggregate private holdings for that requirement, or some private holdings if no requirement was given. Label the latter **Private funds found**, not **Ready to swap**. Public-only balances are insufficient for a private swap. Neither result verifies a covering record, fees, a valid quote, or execution permission. Keep those checks in the operation's existing preflight.
-
-Use the same distinctions with an SDK or CLI: inspect the configured session, authenticate when needed, and read private holdings through its existing recipes. An absent MCP server does not make an existing SDK/CLI setup unusable. [Configuration](shield-swap-setup/configure-shield-swap.md) and [funding](shield-swap-setup/bridge-funds.md) explain the effects of each interface.
-
-## Launch with local setup
-
-When the user wants the kit to handle local setup and the Claude connection, use the [one-command launcher](../README.md#start-with-claude-code): `npm start` from the complete kit checkout, in the user's own terminal. It prints this intro, collects protected account inputs locally, then starts Claude with the skill and a connected MCP server. Do not run it through an agent's captured tool input to collect secrets. It reuses the existing default or explicitly selected profile and does not move funds or grant execution permissions.
-
-For a plain introductory question in an existing agent conversation, show the screen immediately using current checks or **Not checked**. It does not require account creation or launching another Claude session first. Continue the selected journey afterward.
+For a plain introductory question, show the screen immediately using current checks or **Not checked**. It does not require account creation first. Continue the selected journey afterward.
 
 ## The two setup steps
 
@@ -84,8 +76,8 @@ For **Build a strategy**, suggest a price alert, a scheduled swap, or an arbitra
 
 ## Guided and unattended operation
 
-Use these same journeys in both modes. Guided users receive only the next missing choice or local setup step. With `mode: "unattended"`, use the supplied profile, funding source, and authority. If a requirement is missing, return the journey, current checks, and `nextAction` to the caller; do not open an interactive prompt, infer a new account, or infer spending permission. The terminal supports explicit noninteractive key references or `--generate` only when account creation is already authorized. MCP never prompts on stdin.
+Use these same journeys in both modes. Guided users receive only the next missing choice or local setup step. For unattended operation, use the supplied account, funding source, and authority. If a requirement is missing, report the journey, current checks, and required next action to the caller; do not open an interactive prompt, infer a new account, or infer spending permission. Use the selected tool's supported noninteractive setup only when already authorized.
 
-`setup` returns observed checkpoints: `tools_available`, `account_configured`, `account_access_verified`, `funding_checked`, and `private_balance_observed`, only when each applies. Keep `profileId` and the selected journey in the caller's session. These are observations, not a persisted onboarding journal or timing metrics. Recheck facts after reconnecting; use existing durable operation IDs and recovery stores for in-flight bridges and swaps. Never repeat funding or a swap just to complete a checklist.
+Keep the selected account and journey in the caller's session. Record tool availability, account configuration, verified access, and observed funding only when checked. Recheck facts after reconnecting; use existing durable operation IDs and recovery stores for in-flight bridges and swaps. Never repeat funding or a swap just to complete a checklist.
 
 After setup, record the real journey milestones in the caller: integration quote verified, strategy dry run verified, bridge destination verified, or swap output claimed and verified. Those are distinct from setup checkpoints. A quote, an accepted transaction, and a completed swap are different outcomes. Keep errors and unknown outcomes visible so future measurements can distinguish setup, funding, integration work, and trading.

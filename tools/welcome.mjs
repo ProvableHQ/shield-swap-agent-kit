@@ -16,7 +16,7 @@ export function renderWelcome(report = {}, { width = 100 } = {}) {
   const funding = report.checks?.funding?.status ?? 'not_checked';
   const tools = report.checks?.tools?.status ?? 'not_checked';
   const labels = {
-    tools: { available: ['✓', 'MCP connected'], preparing: ['○', 'Preparing'], not_checked: ['○', 'Not checked'] },
+    tools: { available: ['✓', 'Available'], preparing: ['○', 'Preparing'], not_checked: ['○', 'Not checked'] },
     account: { missing: ['○', 'Not configured'], locked: ['○', 'Unlock required'], configured: ['✓', 'Configured · access not checked'], usable: ['✓', 'Access verified'], unavailable: ['!', 'Access needs attention'], not_checked: ['○', 'Not checked'] },
     funding: { available: ['✓', 'Private funds found'], insufficient: ['○', 'Funding needed'], unavailable: ['!', 'Could not check'], not_checked: ['○', 'Not checked'] },
   };

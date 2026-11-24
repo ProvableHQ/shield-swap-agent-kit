@@ -4,12 +4,6 @@ For initial setup, use [basic Shield Swap setup](../../aleo-account-setup/SKILL.
 
 The examples use **testnet**. Keep the account's state outside the installed kit, exclude it from version control, and use a private working directory. On macOS/Linux, `umask 077` before running scripts makes newly created state owner-only. See [private keys and state](../safety/private-key-handling.md) for custody boundaries.
 
-## AgentKit MCP
-
-For an existing connection, use `get_config` and `list_wallets` to select the configured profile and verify its public address and network. Reuse that profile and state directory; do not create another account for a quote or an authorized swap.
-
-MCP `setup` reports the selected profile’s account and funding checks. For guided configuration, run the installed `shield-swap-mcp setup --guided` (or `node dist/cli.js setup --guided` from the built `mcp/` directory). It reuses the configured default profile unless another is selected; for a missing profile it offers import or explicit creation. Existing profiles retain their configuration; new guided profiles default to mainnet, so preserve an explicitly requested testnet with `--network testnet`. Non-guided setup continues to require an explicit network. See [trusted-terminal wallet configuration](../../mcp/README.md#configure-an-existing-wallet). Import the selected existing key through an environment reference or hidden terminal input. Never pass keys or passphrases in MCP arguments. Account creation requires choosing Create in the trusted terminal or the explicit `--generate` option. Setup stores configuration with execution disabled and does not authenticate, fund, or trade. Continue to [configure Shield Swap](configure-shield-swap.md).
-
 ## CLI
 
 Follow [Aleo account setup](../../aleo-account-setup/SKILL.md) first if the account is not selected and verified. The account commands create or import the shared account without signing in or moving funds. Use the [CLI dependencies](../../aleo-account-setup/references/dependencies.md#veil-and-the-shield-swap-cli) from Veil `main`.

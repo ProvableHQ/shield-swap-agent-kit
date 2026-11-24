@@ -1,6 +1,6 @@
 # Review available funds
 
-Read balances for the selected Aleo recipient and automatically check relevant assets for source addresses already known from the conversation, existing setup, or saved wallet metadata. Present the results and funding-wallet choices together in Step 4. If no source address is known, skip the source checks without asking for one and omit that section. Keep the selected network, language, and project. Reconnect an existing Aleo setup as needed for private reads. Source balances require only public addresses; do not generate a wallet or unlock a source key for them.
+At the funds-and-wallet step of the selected bridge path, read balances for the chosen Aleo recipient and automatically check relevant assets for source addresses already known from the conversation, existing setup, or saved wallet metadata. Keep balance checks out of the initial guidance-or-build question. An unavailable read gets its actual status, never an assumed zero. If no source address is known, skip the source checks without asking for one and omit that balance section. Keep the selected network, language, and project. Reconnect an existing Aleo setup as needed for private reads. Source balances require only public addresses; do not generate a wallet or unlock a source key for them.
 
 ## Selected Aleo account
 

@@ -16,17 +16,7 @@ npx --yes skills@latest use 'ProvableHQ/shield-swap-agent-kit#feat/guided-onboar
 
 Use `--agent codex` for Codex CLI. The selected agent must already be installed and signed in. After the onboarding changes merge to the default branch, the source can be shortened to `ProvableHQ/shield-swap-agent-kit`.
 
-This entrypoint works with SDK, CLI, or MCP paths. Opening the guide does not require a wallet or MCP connection; unknown setup facts start as **Not checked**. The optional launcher below also handles protected local account setup and the Claude MCP connection.
-
-## Start with Claude Code
-
-From a checkout of this branch, run one command:
-
-```sh
-npm start
-```
-
-Requires macOS or Linux, Node.js 22.13+, and Claude Code installed and signed in. The launcher prepares the MCP tools, prints the Shield Swap intro, guides local account import or creation when needed, and opens Claude with the intro skill and MCP connection. Existing profiles are reused. Run it from this checkout to use `~/shield-swap-trading`, or use `npm start -- --project /path/to/your/trading-project`.
+This entrypoint works with SDK, CLI, or MCP paths. Opening the guide does not require a wallet or MCP connection; unknown setup facts start as **Not checked**.
 
 The opening screen shows **SHIELD SWAP**, **Private asset trading**, setup status, and four choices: **Trade now**, **Connect trading tools**, **Build a strategy**, and **Explore markets**. Funding and transaction permissions remain steps in the chosen journey.
 
@@ -36,7 +26,7 @@ Already inside Claude with the skill installed? Invoke `/shield-swap`, or ask â€
 Read /path/to/shield-swap-agent-kit/SKILL.md and show the Shield Swap intro.
 ```
 
-An introductory prompt shows the screen again even after account setup. The skill supplies the intro instructions; installing it alone does not run a startup hook. The launcher explicitly loads it for the new session.
+An introductory prompt shows the screen again even after account setup. The skill supplies the intro instructions; installing it alone does not run a startup hook.
 
 ## Current contents
 
@@ -46,7 +36,7 @@ The standalone [funding skill](aleo-funding/SKILL.md) picks up the chosen fundin
 
 This version contains builder/trader decision paths, account configuration and funding, swap/claim and recovery runbooks, history and record management, SDK/CLI/MCP guidance, and troubleshooting. Product integration guides and an arbitrage design guide explain how to extend those workflows.
 
-The [draft standalone MCP server](mcp/README.md) provides terminal wallet setup, encrypted state, stdio transport, and 20 swap, bridge, and recovery tools. Its README distinguishes completed live checks from remaining validation. The kit does not include its own trading CLI, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. CLI recipes assume the CLI is installed and use `shield-swap` directly; selecting an SDK or MCP path does not require installing the CLI.
+The kit does not include its own trading CLI, terminal connectors, or strategy implementations. SDK and CLI implementations remain in their existing packages. CLI recipes assume the CLI is installed and use `shield-swap` directly; selecting an SDK or an available MCP connection does not require installing the CLI.
 
 ## Layout
 
@@ -64,14 +54,13 @@ context/
   safety/                    # Permissions, custody, and unattended execution
   strategies/                # Strategy design; currently arbitrage
   troubleshooting/           # Scanner lag, record contention, proving failures
-scripts/launch-claude.mjs     # One-command local setup and Claude launch
-mcp/                         # Draft standalone TypeScript MCP server
+scripts/                     # Context validation and tests
 tools/
   SKILL.md                   # When to use SDKs, CLI, MCP, or scripts
 CONTRIBUTING.md              # Instructions for working on this repository
 ```
 
-Keep context and tools at the top level. Executable JS/Python scripts, CLI/MCP code, and examples belong in their corresponding directories when implemented. Integration context is not a working connector, and strategy guidance is not a running strategy. The draft MCP README records supported wallet adapters, live validation, and route-specific recovery limits.
+Keep context and tools at the top level. Executable JS/Python scripts and examples belong in their corresponding directories. Integration context is not a working connector, and strategy guidance is not a running strategy.
 
 Setup follows account configuration, then Shield Swap authentication with optional referrals, then a link to funding. [Discover pools and get quotes](context/shield-swap-setup/discover-pools-and-get-quotes.md) supports standalone inspection; [swap](context/shield-swap-setup/swap.md) retains its complete discovery-to-claim flow. The `shield-swap-setup/` folder is a collection of runbooks, not a sequence that starts trading automatically.
 
