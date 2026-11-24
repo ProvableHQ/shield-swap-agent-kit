@@ -1,6 +1,6 @@
 # Arbitrage
 
-Use this page as a design checklist for a price-discrepancy strategy, not as a ready-to-run strategy engine. A one-account bot follows [Build a one-account bot](../decisions/trade/bot-integration.md#build-a-one-account-bot) first, and uses this checklist only when that strategy was requested. The testnet order is [Set up an arbitrage bot](../decisions/trade/arbitrage-setup.md). The kit supplies the Shield Swap execution leg; it does not ship a second-venue connector or guarantee profitable execution.
+Use this page as a design checklist for a price-discrepancy strategy. For implementation, load the [arbitrage skill](../../skills/arbitrage/SKILL.md), which uses the shared trading integration and includes a Python Uniswap v3 adapter. Preserve the project's language and accounts. A price difference alone does not establish profitable execution.
 
 ## Define the trade before calculating an edge
 

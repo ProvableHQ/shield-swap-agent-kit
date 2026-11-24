@@ -4,6 +4,18 @@ Rechecked on 2026-10-01 for the cross-surface context and operational documentat
 
 ## Sources
 
+### Trading integration and arbitrage
+
+The [trading integration](../skills/trading-integration/SKILL.md) and [arbitrage](../skills/arbitrage/SKILL.md) skills were checked on 2026-11-24 against published packages installed outside the SDK workspaces: PyPI `aleo-sdk` and `shield-swap-sdk` `0.8.0`, Web3 `8.0.0`, and npm `@provablehq/shield-swap-sdk`, `@provablehq/veil-core`, and `@provablehq/veil-aleo-sdk` `0.16.2`. Consumer installation instructions use the latest release, rather than pinning this validation snapshot.
+
+The Python modules use native quotes and handles, `Journal`, and `SqliteRecordInventoryStore`. The JavaScript modules implement Veil's public `RecordInventoryStore` contract with SQLite and retain `swapFileStore` for identities. Both add application request IDs and durable submit/claim checkpoints. Published record management supplies reservations and inventory planning; the older concurrency observations below predate those interfaces. [AgentKit PR #13](https://github.com/ProvableHQ/shield-swap-agent-kit/pull/13) informed the concurrent-request scenarios, without restoring the removed MCP server.
+
+The maintained arbitrage implementation is Python and uses a configured Uniswap v3 pool. Its ABI follows the official [original SwapRouter](https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/ISwapRouter.sol) and [QuoterV2](https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/IQuoterV2.sol); addresses must match the chosen chain's [deployments](https://developers.uniswap.org/docs/protocols/v3/deployments). It sells on Shield Swap, waits for the claim, then buys the same base quantity on Uniswap. It does not execute both venues atomically or bridge inventory inside the cycle. TypeScript has maintained core trading modules and a strategy adaptation guide, not a second validated arbitrage implementation.
+
+Copied-consumer tests exercise native quote shapes, real Web3 ABI encoding and signing against a controlled RPC, concurrent requests, duplicate IDs, process restart, unknown submissions/claims, partial fills, signer changes, gas preflight, and Python/JavaScript reservation interoperability. TypeScript checks use the installed package declarations. Live inspection authenticated existing Aleo accounts, registered scanners, read private balances on both Aleo networks, read EVM balances on Ethereum/Base/Arbitrum, and obtained Shield and Ethereum Uniswap quotes. The sampled mainnet opportunity was unprofitable before fees; no mainnet arbitrage transaction was submitted.
+
+The copied Python trading modules also submitted two independent testnet swaps concurrently, using existing ETH and USDCx records. A fresh process resumed and confirmed both claims: `0.0001` testnet ETH returned `0.197188` USDCx, and `0.2` testnet USDCx returned `0.000112282234744379` ETH. Both input refunds were zero. SDK journals and operation state were retained privately outside the deliverable. This validates the Python submit/restart/claim path; it does not establish a profitable two-venue cycle or funded TypeScript execution. No mainnet funds were spent.
+
 ### Shared account setup
 
 The [Aleo account setup skill](../skills/aleo-account-setup/SKILL.md) and account connection recipes were checked against Veil `main` at [`f59affa8`](https://github.com/ProvableHQ/veil/commit/f59affa8ce4a13e58ecb357e06ad4d449af02d38) and Python SDK source at [`156df8e7`](https://github.com/ProvableHQ/python-sdk/commit/156df8e78689c05af9c4ddffbcca23e253dde8cb) on 2026-11-17. Those are source-validation records, not Python installation instructions. Python setup installs the latest `aleo-sdk` and `shield-swap-sdk` releases from PyPI and checks the installed account interfaces. Veil setup uses `main`.
@@ -70,8 +82,8 @@ Use the installed dependency's reference when writing executable code. The Pytho
 | Veil `syncBlindedIdentities()` infers claimed status from missing output. | Do not treat this local status alone as proof of an accepted claim; correlate the actual transaction. |
 | Veil `transactionStatus()` catches read errors and can return `not_found`. | Use direct confirmed-transaction reads for recovery and preserve transport uncertainty. |
 | Python API swap history/detail endpoints are retired. | Use the journal plus on-chain execution receipts. Pool trade feeds describe market activity, not the account's private ledger. |
-| Neither inspected SDK exports a general split/join/autojoin helper. | Explain single-record readiness and coordination. Any record reshaping requires the actual token program's supported ABI and a separately authorized transaction. |
-| Counter locking is not account-wide record reservation. | Veil's store lock is process-local; Python batch exclusions are batch-local. Coordinate input records across writers or serialize them. |
+| Older SDKs lacked the current inventory planners and join/split helpers. | Use the installed SDK's record-management interface. Record reshaping is a separate authorized transaction; do not infer readiness from aggregate balance. |
+| Counter locking alone is not account-wide record reservation. | Enable record management with a durable reservation store shared by every writer. The trading skill supplies tested single-host storage; unrelated processes or separate stores do not coordinate. |
 | Veil has no public record-provider progress API; Python's Shield facade has no public scanner-status accessor. | Do not invent scanner heights or use private members in portable recipes. Distinguish DEX indexer freshness from record visibility. |
 | Wallet-based Veil claims can return before chain confirmation. | Verify confirmation separately; neither local nor wallet claim return implies records are already scanner-visible. |
 
@@ -83,6 +95,6 @@ GMGN has a documented agent interface; that does not supply an Aleo connector. F
 
 ## Evidence boundary
 
-Repository tests validate context structure and isolated packaging. The operational recipes are checked against the source interfaces above; source inspection does not certify published dependency versions, live onboarding, a completed swap, or transport compatibility. Report syntax/type checks separately from live workflow tests.
+Repository tests validate context structure, isolated packaging, and the bundled workflow modules. The dated sections above distinguish published-package checks and live observations from older source inspections. Source inspection alone does not certify live onboarding, a completed swap, or transport compatibility. Report syntax/type checks separately from live workflow tests.
 
 For this documentation pass, the examples were extracted and checked without executing trading code: 42 TypeScript modules typechecked against local SDK declarations (native SDK and CLI-session variants), 19 Python blocks parsed, and 26 shell blocks passed syntax checks. All 37 context pages were reachable from `AGENTS.md`, and the operational directory matched the revised ten-file layout. The existing `swap.md` prose and examples were preserved, with only renamed link targets updated. These checks do not validate private scanner behavior, live transaction outcomes, or external connector access.

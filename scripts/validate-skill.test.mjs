@@ -26,7 +26,7 @@ async function fixture(t, body, header = metadata) {
 test('the real skill works when copied outside the repository', async (t) => {
   const parent = await temporaryDirectory(t)
   const destination = join(parent, 'shield-swap')
-  const excluded = new Set(['.git', 'node_modules', '.agents', '.claude', '.codex', '.superpowers'])
+  const excluded = new Set(['.git', 'node_modules', '.agents', '.claude', '.codex', '.superpowers', '.shield-swap'])
   await cp(repository, destination, { recursive: true, filter: (source) => !excluded.has(basename(source)) })
   const result = await validateSkillDirectory(destination)
   assert.equal(result.name, 'shield-swap')
@@ -75,6 +75,19 @@ test('a missing bundled reference fails with its target', async (t) => {
   const { directory } = await fixture(t, '[Setup](missing.md)\n')
   await assert.rejects(validateSkillDirectory(directory), /missing\.md/)
 })
+
+for (const name of ['trading-integration', 'arbitrage']) {
+  test(`${name} installs independently with its maintained modules`, async t => {
+    const parent = await temporaryDirectory(t)
+    const destination = join(parent, name)
+    await cp(join(repository, 'skills', name), destination, { recursive: true })
+    const result = await validateSkillDirectory(destination)
+    assert.equal(result.name, name)
+    await access(join(destination, 'assets/python', name === 'arbitrage' ? 'bot.py' : 'trading.py'))
+    if (name === 'trading-integration') await access(join(destination, 'assets/typescript/shield.mts'))
+    await assert.rejects(access(join(parent, 'context')))
+  })
+}
 
 test('a reference outside the skill fails even if that file exists', async (t) => {
   const { directory, parent } = await fixture(t, '[Repo docs](../outside.md)\n')

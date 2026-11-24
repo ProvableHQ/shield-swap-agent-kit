@@ -34,7 +34,8 @@ For inspection without execution, use [discover pools and get quotes](context/sh
 | Diagnose a broken environment or operation | [Diagnostics](context/shield-swap-setup/diagnose-environment.md) / [error handling](context/shield-swap-setup/error-handling.md) |
 | Integrate a terminal or chat bot | [Terminal integration](context/decisions/trade/terminal-integration.md) / [bot integration](context/decisions/trade/bot-integration.md) |
 | Build a one-account bot from scratch | [One-account bot](context/decisions/trade/bot-integration.md#build-a-one-account-bot): native SDK |
-| Set up an arbitrage bot | [Arbitrage setup](context/decisions/trade/arbitrage-setup.md) |
+| Add reusable trading code or concurrent swaps to an application | [Trading integration](skills/trading-integration/SKILL.md) |
+| Set up an arbitrage bot | [Arbitrage](skills/arbitrage/SKILL.md), using the trading integration for execution |
 | Configure access or submit an operation | [Permissions](context/safety/permissions.md) |
 | Select an account, signer, or state location | [Private keys and state](context/safety/private-key-handling.md) |
 | Run recurring strategies | [Unattended trading](context/safety/unattended-trading.md) |

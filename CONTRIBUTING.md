@@ -32,6 +32,8 @@ Run `npm test` after changing context or validation. The validator supports this
 
 The funding tests also require `python3` (Python 3.10 or newer). Their wallet-storage tests use the standard library and a mock credential store; they do not install SDK dependencies or access the OS keychain.
 
+The trading tests copy the Python and JavaScript modules into temporary consumer projects. Use Node 22.13 or newer for SQLite. To include the native SDK, Web3 ABI, and cross-language reservation checks, install the latest `shield-swap-sdk` and `web3` in an isolated Python environment, then run `TRADING_TEST_PYTHON=/absolute/path/to/venv/bin/python npm test`. Without those dependencies, the Python boundary checks are skipped. Typecheck the copied TypeScript assets with their package's `npm run check` after installing dependencies. These checks do not sign or send live transactions.
+
 For executable additions, verify the affected workflow from an installed copy outside SDK workspaces. Exercise the relevant failure paths, including process restart and uncertain submission results. Live transactions require authorization for the account, network, and intended action; a development task alone does not authorize them.
 
 Before committing, inspect `git diff --check` and the staged files. Keep changes to upstream SDKs in their owning repositories.

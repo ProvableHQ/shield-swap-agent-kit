@@ -21,25 +21,41 @@ Use the layout below with verified facts, or the shared [welcome renderer](../to
 
 Follow it with the status panel. This example is illustrative: replace every value with observed facts. Use ✓ for a verified check, ○ for missing or unchecked, and ! for a failed check. Do not invent percentages or show a check as running unless it is actually running.
 
+Keep the banner and setup box in fenced text blocks. Render the menus below them as Markdown, with bold option titles and regular descriptions. Keep the menus outside code fences so the bold formatting renders.
+
 ```text
 ╭─ YOUR SETUP ───────────────────────────────────────╮
 │  ✓ Tools          Available                        │
 │  ○ Aleo account   Not configured                   │
 │  ○ Funding        Not checked                      │
 ╰───────────────────────────────────────────────────╯
-
-GET STARTED
-  1. Configure an Aleo account for Shield Swap
-  2. Fund your account
-
-WHAT WOULD YOU LIKE TO DO?
-  Trade now              Complete a swap and receive your tokens.
-  Connect trading tools  Connect your existing terminal, bot, or app.
-  Build a strategy       Build and test a trading workflow.
-  Explore markets        Discover assets and get quotes.
 ```
 
-Show all four menu choices for introductory prompts, even when accounts are already configured. Only a concrete task (a specified swap, an identified tool to connect, or a strategy to build) replaces the menu with that task and its next missing step. Do not ask them to select it again. Omit completed setup steps. Report current unchecked funding as **Not checked**; historical funding notes do not prove present holdings. Give at most one short explanation of the swap lifecycle when helpful, and put technical detail in the relevant follow-up rather than turning the welcome into a protocol tutorial. Keep the account's existing configuration and the interface the user selected; do not add a network-choice step or a key-storage questionnaire to this introduction. Account storage is handled by the selected tool's local defaults and protected prompts. Resolve a real configuration conflict only when encountered.
+**GET STARTED**
+
+1. **Configure an Aleo account for Shield Swap**\
+   Setup an Aleo account to trade privately on Shield Swap.
+
+2. **Fund an account**\
+   Bridge assets from Ethereum or Solana privately to Aleo
+
+3. **Explore markets**\
+   Explore market opportunities on Shield Swap
+
+4. **Setup a private trading integration**\
+   Integrate trading on Shield Swap into your application
+
+**STRATEGIES**
+
+5. **Create an arbitrage bot**
+
+**INTEGRATIONS [Coming Soon]**
+
+6. **Hummingbot:** Add a privacy layer to hummingbot.
+7. **Hyperliquid:** Trade perpetual futures privately on Hyperliquid.
+8. **Prediction Markets:** Create a private vault around prediction market trades.
+
+Show all three sections and keep options 1–8 in this order, even when accounts are already configured. Preserve the menu wording above. Options 1–5 have routes; 6–8 stay under **INTEGRATIONS [Coming Soon]**. Do not omit or renumber options based on setup status. Skip completed setup work within the selected route. Only a concrete task (a specified swap, an identified tool to connect, or a strategy to build) replaces the menu with that task and its next missing step. Do not ask them to select it again. Report current unchecked funding as **Not checked**; historical funding notes do not prove present holdings. Keep paths, network choices, storage questions, and protocol details out of this introduction. Account storage is handled by the setup skill; resolve a real configuration conflict only when encountered.
 
 ## Check the existing setup
 
@@ -55,24 +71,30 @@ For a plain introductory question, show the screen immediately using current che
 
 **1. Configure an Aleo account for Shield Swap.** Load [basic Shield Swap setup](../skills/aleo-account-setup/SKILL.md). Stay in that skill for account and storage choices, public balances on both networks, the trading language or existing project, API authentication, scanner registration, and private balances. It offers the next step based on the observed holdings. Creating an account does not select testnet or authorize the CLI's combined setup/funding command. Secrets go directly into the trusted terminal or configured secret manager, never chat or tool arguments. Preserve existing account, signer, network, and recovery state.
 
-**2. Fund your account.** Basic setup first checks public and private holdings and offers bridging to Aleo mainnet, testnet ALEO funds from the Aleo faucet, or use of existing funds as appropriate. When an option is selected, load [fund an Aleo account](../skills/aleo-funding/SKILL.md) with the verified address and setup context. For bridging, choose a guided transfer or reusable funding scripts unless the request already specifies one. Script setup can finish with files and run commands while funding remains outstanding. Do not start funding as a setup side effect. A bridge receipt alone does not finish funding. Funding a wallet does not authorize a swap or start a strategy.
+**2. Fund an account.** Load [fund an Aleo account](../skills/aleo-funding/SKILL.md) with the verified address and setup context. When coming from basic setup, retain its public/private balance checks and selected funding option. For a general funding request, use the funding skill's opening choices; a specific bridge or faucet request goes directly to that path. Script setup can finish with files and run commands while funding remains outstanding. Do not start funding as a setup side effect. A bridge receipt alone does not finish funding. Funding a wallet does not authorize a swap or start a strategy.
 
-These steps apply to **Connect trading tools** as well as **Trade now** and a funded **Build a strategy** journey. Users connecting a terminal, bot, or app ordinarily need an account and funds to use that integration. Reuse the same account, signer, and recovery state throughout. Do not end their journey at a successful quote while account setup or funding remains outstanding. An explicitly requested code-only, read-only, or dry-run milestone may stop earlier; state what is still required before trading.
+Account setup and funding also apply when bringing a trading integration or arbitrage bot into operation, and when executing a requested swap. Reuse the same account, signer, and recovery state throughout. Do not end an operational integration at a successful quote while account setup or funding remains outstanding. An explicitly requested code-only, read-only, or dry-run milestone may stop earlier; state what is still required before trading.
 
 ## Canonical journeys
 
-Preserve a supplied intent instead of forcing a menu choice. The identifiers below remain stable for clients and later measurement. They describe workflows, not installed connector or strategy implementations.
+Preserve a supplied intent instead of forcing a menu choice. Interpret a number against the most recently displayed menu: once a child skill opens its own menu, its numbering applies. Pass the selected project, language, account, network, interface, and existing authorization to the destination; do not ask for them again.
 
-| Journey ID | User-facing choice | Path and completion |
+| Main-menu option | Journey ID | Destination and result |
 | --- | --- | --- |
-| `trade_now` | Trade now | Account → funds → [quote, execute, claim](shield-swap-setup/swap.md) → verify received spendable output and report partial fill/refund accurately. |
-| `connect_trading_tools` | Connect trading tools | Identify the existing stack → account → funds → [terminal](decisions/trade/terminal-integration.md), [bot](decisions/trade/bot-integration.md), or [application integration](decisions/build/what-are-you-building.md#extend-an-existing-system) → demonstrate a quote through that integration using the same account. Execution verification follows when authorized. |
-| `build_strategy` | Build a strategy | Define [strategy requirements](decisions/trade/what-is-your-strategy.md) → account → funds → build and dry-run the selected runner → enforce [unattended limits](safety/unattended-trading.md) → start only within the requested authority. An explicit dry-run-only task can defer funding. |
-| `explore_markets` | Explore markets | [Discover assets, pools, and quotes](shield-swap-setup/discover-pools-and-get-quotes.md). Configure access only as required by the selected interface; funding is not required. |
+| 1 · Configure an Aleo account for Shield Swap | `configure_account` | [Account setup](../skills/aleo-account-setup/SKILL.md): create/import or reuse the selected account, choose storage, authenticate, register the scanner, and inspect balances. |
+| 2 · Fund an account | `fund_account` | [Funding](../skills/aleo-funding/SKILL.md): continue with the selected account and funding path. |
+| 3 · Explore markets | `explore_markets` | [Discover pools and get quotes](shield-swap-setup/discover-pools-and-get-quotes.md#explore-markets-from-the-main-menu): show available pairs, liquidity and recent activity, then quote a requested pair and amount without executing. |
+| 4 · Setup a private trading integration | `trading_integration` | [Trading integration](../skills/trading-integration/SKILL.md): build callable trading code in the user's project, retaining its language and account setup. |
+| 5 · Create an arbitrage bot | `arbitrage` | [Arbitrage](../skills/arbitrage/SKILL.md): build and test the strategy using the shared trading integration. |
+| 6 · Hummingbot | `hummingbot` | Coming soon; no executable route. |
+| 7 · Hyperliquid | `hyperliquid` | Coming soon; no executable route. |
+| 8 · Prediction Markets | `prediction_markets` | Coming soon; no executable route. |
 
-For **Connect trading tools**, identify integration support before moving funds. If the named product has no usable connector/API, explain that gap and establish a viable path before funding it. Continue account and funding setup as part of the agreed operational integration; do not silently reduce the request to code generation.
+The coming-soon descriptions express intended integrations, not current execution or privacy capabilities. If selected, say that integration is not available in the kit yet and ask what the user wants it to do. Do not install a connector, provision an account, move funds, or substitute an unrelated workflow merely because the option was selected. A separately requested integration-development task can be scoped from that conversation.
 
-For **Build a strategy**, suggest a price alert, a scheduled swap, or an arbitrage monitor according to the user's goal. These are projects to build, not bundled ready-to-run bots. Use [arbitrage setup](decisions/trade/arbitrage-setup.md) when requested; do not promise that a profitable opportunity will appear.
+Direct requests remain supported without adding them to the main menu. `trade_now` follows [swap](shield-swap-setup/swap.md) through claim and verified output. Existing `connect_trading_tools` requests identify the actual stack and use [terminal](decisions/trade/terminal-integration.md), [bot](decisions/trade/bot-integration.md), or [application integration](decisions/build/what-are-you-building.md#extend-an-existing-system) guidance as appropriate. Existing `build_strategy` requests use [strategy requirements](decisions/trade/what-is-your-strategy.md); route arbitrage specifically to option 5's skill. Preserve these identifiers for callers already using them.
+
+Verify integration support before moving funds. Building a strategy does not authorize starting it; apply [unattended limits](safety/unattended-trading.md) when execution is requested. Do not promise a profitable opportunity.
 
 ## Guided and unattended operation
 

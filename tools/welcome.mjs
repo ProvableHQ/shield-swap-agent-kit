@@ -6,6 +6,7 @@ export const banner = `███████╗██╗  ██╗██╗█�
 ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚═════╝     ╚══════╝ ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝`;
 
 /**
+ * Render Markdown with a fenced banner/setup box and bold menu titles.
  * Render public readiness only. Never interpolate profile paths, keys, balances,
  * backend messages or historical account notes into the welcome.
  * @param {{checks?: {tools?: {status: string}, account?: {status: string}, funding?: {status: string}}}} report
@@ -25,15 +26,24 @@ export function renderWelcome(report = {}, { width = 100 } = {}) {
     const [mark, text] = state ?? ['○', 'Not checked'];
     return `│  ${mark} ${title.padEnd(14)}${text}`.padEnd(59) + '│';
   };
-  return [width >= 82 ? banner : 'SHIELD SWAP', '', 'Private asset trading', '',
+  return ['```text', width >= 82 ? banner : 'SHIELD SWAP', '', 'Private asset trading', '',
     '╭─ YOUR SETUP '.padEnd(59, '─') + '╮',
     row('Tools', labels.tools[tools]), row('Aleo account', labels.account[account]), row('Funding', labels.funding[funding]),
-    '╰──────────────────────────────────────────────────────────╯', '',
-    ...(['missing', 'locked', 'not_checked'].includes(account) ? ['GET STARTED', '  1. Configure an Aleo account for Shield Swap', '  2. Fund your account', ''] : []),
-    'WHAT WOULD YOU LIKE TO DO?',
-    '  Trade now              Complete a swap and receive your tokens.',
-    '  Connect trading tools  Connect your existing terminal, bot, or app.',
-    '  Build a strategy       Build and test a trading workflow.',
-    '  Explore markets        Discover assets and get quotes.',
+    '╰──────────────────────────────────────────────────────────╯', '```', '',
+    '**GET STARTED**', '',
+    '1. **Configure an Aleo account for Shield Swap**\\',
+    '   Setup an Aleo account to trade privately on Shield Swap.', '',
+    '2. **Fund an account**\\',
+    '   Bridge assets from Ethereum or Solana privately to Aleo', '',
+    '3. **Explore markets**\\',
+    '   Explore market opportunities on Shield Swap', '',
+    '4. **Setup a private trading integration**\\',
+    '   Integrate trading on Shield Swap into your application', '',
+    '**STRATEGIES**', '',
+    '5. **Create an arbitrage bot**', '',
+    '**INTEGRATIONS [Coming Soon]**', '',
+    '6. **Hummingbot:** Add a privacy layer to hummingbot.',
+    '7. **Hyperliquid:** Trade perpetual futures privately on Hyperliquid.',
+    '8. **Prediction Markets:** Create a private vault around prediction market trades.',
   ].join('\n');
 }
